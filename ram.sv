@@ -13,7 +13,7 @@ assign rdata = mem[addr];
 initial begin
     mem[0] = 8'h01;
     mem[1] = 8'h01;
-    mem[2] = 8'h01;
+    mem[2] = 8'h02;
     mem[3] = 8'hFF;
 end
 
