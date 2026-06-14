@@ -14,7 +14,9 @@ initial begin
     mem[0] = 8'h01;
     mem[1] = 8'h01;
     mem[2] = 8'h02;
-    mem[3] = 8'hFF;
+    mem[3] = 8'h03;
+    mem[4] = 8'h31;
+    mem[5] = 8'hFF;
 end
 
 always @(posedge clk) begin

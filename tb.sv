@@ -18,7 +18,7 @@ initial begin
 
     @(negedge clk);
     reset = 0;
-    #100;
+    #150;
 
     $finish;
 end
