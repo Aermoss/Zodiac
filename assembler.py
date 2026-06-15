@@ -7,17 +7,28 @@ instructions = {
     "ldi": 0x03,
     "ld": 0x04,
     "st": 0x05,
+    "j": 0x06,
     "hlt": 0xFF
 }
 
 def main(argv: list[str]) -> int:
+    labels, index = {}, 0
     result = bytearray()
 
     with open(argv[1], "r") as file:
         lines = file.readlines()
 
     for line in lines:
-        instruction, *operands = line.strip().split(" ")
+        line = line.strip()
+
+        if line == "":
+            continue
+
+        if line.endswith(":"):
+            labels[line[:-1]] = index.to_bytes(1)
+            continue
+
+        instruction, *operands = line.split(" ")
 
         if instruction.lower() not in instructions:
             raise SyntaxError(f"Unknown instruction '{instruction}'")
@@ -25,6 +36,10 @@ def main(argv: list[str]) -> int:
         result += instructions[instruction].to_bytes(1)
 
         for operand in operands:
+            if operand in labels:
+                result += labels[operand]
+                continue
+
             base = 10
 
             if operand.startswith("0x"):
@@ -40,6 +55,8 @@ def main(argv: list[str]) -> int:
                 base = 2
 
             result += int(operand, base).to_bytes(1)
+
+        index += 1
 
     with open("ram.sv", "r") as file:
         content = file.read()

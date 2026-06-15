@@ -1,7 +1,6 @@
-inc
-inc
-dec
-ldi 0x31
-st 0x10
-ld 0x10
-hlt
+loop:
+    inc
+    j loop
+
+exit:
+    hlt

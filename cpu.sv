@@ -6,55 +6,44 @@ module cpu(
 typedef enum logic [1:0] {
     FETCH,
     DECODE,
-    MEMORY,
+    FETCH_OPERAND,
     EXECUTE
 } state_t;
 
 logic halted;
-logic [7:0] next;
 logic [7:0] pc;
 state_t state;
 
-logic [7:0] instruction;
+logic [7:0] instr;
+logic [7:0] operand;
 logic [7:0] acc;
 
-logic ram_we = 0;
+logic ram_we;
 logic [7:0] ram_addr;
 logic [7:0] ram_write;
 logic [7:0] ram_read;
-
-pc pc0(
-    .clk(clk),
-    .reset(reset),
-    .next(next),
-    .pc(pc)
-);
 
 ram ram0(
     .clk(clk),
     .we(ram_we),
     .addr(ram_addr),
-    .wdata(ram_write),
-    .rdata(ram_read)
+    .write(ram_write),
+    .read(ram_read)
 );
-
-always @(*) begin
-    next = pc;
-
-    if (state == EXECUTE) begin
-        case (instruction)
-            8'hFF: next = pc;
-            8'h03, 8'h04, 8'h05: next = pc + 2;
-            default: next = pc + 1;
-        endcase
-    end
-end
 
 always @(posedge clk) begin
     if (reset) begin
         halted <= 0;
         state <= FETCH;
+        pc <= 0;
+
+        instr <= 0;
+        operand <= 0;
         acc <= 0;
+
+        ram_we <= 0;
+        ram_addr <= 0;
+        ram_write <= 0;
     end
 
     else if (!halted) begin
@@ -65,42 +54,53 @@ always @(posedge clk) begin
             end
 
             DECODE: begin
-                instruction <= ram_read;
+                instr <= ram_read;
 
                 case (ram_read)
-                    8'h03, 8'h04, 8'h05:
+                    8'h03, 8'h04, 8'h05, 8'h06: begin
                         ram_addr <= pc + 1;
-                endcase
+                        state <= FETCH_OPERAND;
+                    end
 
-                case (ram_read)
-                    8'h04, 8'h05: state <= MEMORY;
-                    default: state <= EXECUTE;
+                    default: begin 
+                        state <= EXECUTE;
+                    end
                 endcase
             end
 
-            MEMORY: begin
-                case (instruction)
+            FETCH_OPERAND: begin
+                operand <= ram_read;
+
+                case (instr)
                     8'h04: begin
                         ram_addr <= ram_read;
-                        state <= EXECUTE;
                     end
 
                     8'h05: begin
                         ram_we <= 1;
                         ram_addr <= ram_read;
                         ram_write <= acc;
-                        state <= EXECUTE;
                     end
                 endcase
+
+                state <= EXECUTE;
             end
 
             EXECUTE: begin
-                case (instruction)
+                case (instr)
                     8'h01: acc <= acc + 1;
                     8'h02: acc <= acc - 1;
-                    8'h03, 8'h04: acc <= ram_read;
+                    8'h03: acc <= operand;
+                    8'h04: acc <= ram_read;
                     8'h05: ram_we <= 0;
                     8'hFF: halted <= 1;
+                endcase
+
+                case (instr)
+                    8'hFF: pc <= pc;
+                    8'h03, 8'h04, 8'h05: pc <= pc + 2;
+                    8'h06: pc <= operand;
+                    default: pc <= pc + 1;
                 endcase
 
                 state <= FETCH;
