@@ -12,8 +12,7 @@ instructions = {
 }
 
 def main(argv: list[str]) -> int:
-    labels, index = {}, 0
-    result = bytearray()
+    result, labels = bytearray(), {}
 
     with open(argv[1], "r") as file:
         lines = file.readlines()
@@ -25,7 +24,7 @@ def main(argv: list[str]) -> int:
             continue
 
         if line.endswith(":"):
-            labels[line[:-1]] = index.to_bytes(1)
+            labels[line[:-1]] = len(result).to_bytes(1)
             continue
 
         instruction, *operands = line.split(" ")
@@ -55,8 +54,6 @@ def main(argv: list[str]) -> int:
                 base = 2
 
             result += int(operand, base).to_bytes(1)
-
-        index += 1
 
     with open("ram.sv", "r") as file:
         content = file.read()
