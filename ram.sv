@@ -16,7 +16,11 @@ initial begin
     mem[2] = 8'h02;
     mem[3] = 8'h03;
     mem[4] = 8'h31;
-    mem[5] = 8'hFF;
+    mem[5] = 8'h05;
+    mem[6] = 8'h10;
+    mem[7] = 8'h04;
+    mem[8] = 8'h10;
+    mem[9] = 8'hFF;
 end
 
 always @(posedge clk) begin
