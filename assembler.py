@@ -1,8 +1,13 @@
 import sys, re
 
 instructions = [
-    "nop", "ldi", "ld", "st", "cmp", "j", "jz", "jnz", "jc", "jnc",
-    "add", "sub", "and", "or", "xor", "not", "shl", "shr", "hlt"
+    "nop",
+    "ld", "ldi", "st",
+    "cmp", "cmpi",
+    "j", "jz", "jnz", "jc", "jnc",
+    "add", "sub", "and", "or", "xor", "not", "shl", "shr",
+    "addi", "subi", "andi", "ori", "xori", "noti", "shli", "shri",
+    "hlt"
 ]
 
 def main(argv: list[str]) -> int:

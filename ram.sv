@@ -6,22 +6,19 @@ module ram(
     output logic [31:0] read
 );
 
-logic [31:0] mem [0:255];
+logic [31:0] mem [0:4095];
 
 assign read = mem[addr];
 
 initial begin
-    mem[0] = 32'h0100000A;
-    mem[1] = 32'h01080000;
-    mem[2] = 32'h01100002;
-    mem[3] = 32'h0A084400;
-    mem[4] = 32'h04004000;
-    mem[5] = 32'h06000007;
-    mem[6] = 32'h05000003;
-    mem[7] = 32'hFF000000;
+    mem[0] = 32'h13000002;
+    mem[1] = 32'h0500000A;
+    mem[2] = 32'h07000004;
+    mem[3] = 32'h06000000;
+    mem[4] = 32'hFF000000;
 end
 
-always @(posedge clk) begin
+always_ff @(posedge clk) begin
     if (we)
         mem[addr] <= write;
 end

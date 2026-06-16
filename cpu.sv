@@ -5,10 +5,11 @@ module cpu(
 
 typedef enum logic [7:0] {
     OP_NOP,
-    OP_LDI,
     OP_LD,
+    OP_LDI,
     OP_ST,
     OP_CMP,
+    OP_CMPI,
     OP_J,
     OP_JZ,
     OP_JNZ,
@@ -22,13 +23,20 @@ typedef enum logic [7:0] {
     OP_NOT,
     OP_SHL,
     OP_SHR,
+    OP_ADDI,
+    OP_SUBI,
+    OP_ANDI,
+    OP_ORI,
+    OP_XORI,
+    OP_NOTI,
+    OP_SHLI,
+    OP_SHRI,
     OP_HLT = 8'hFF
 } opcode_t;
 
-typedef enum logic [2:0] {
+typedef enum logic [1:0] {
     S_FETCH,
     S_DECODE,
-    S_FETCH_OPERAND,
     S_EXECUTE,
     S_WRITEBACK
 } state_t;
@@ -39,6 +47,7 @@ state_t state;
 
 logic [31:0] instr;
 logic [31:0] regs [0:31];
+integer i;
 
 opcode_t opcode;
 logic [4:0] rd;
@@ -87,13 +96,16 @@ alu alu0(
     .carry(alu_carry)
 );
 
-always @(posedge clk) begin
+always_ff @(posedge clk) begin
     if (reset) begin
+        instr <= 0;
+
+        for (i = 0; i < 32; i++)
+            regs[i] <= 0;
+
         halted <= 0;
         state <= S_FETCH;
         pc <= 0;
-
-        instr <= 0;
 
         ram_we <= 0;
         ram_addr <= 0;
@@ -115,9 +127,7 @@ always @(posedge clk) begin
                 instr <= ram_read;
 
                 case (opcode_t'(ram_read[31:24]))
-                    OP_LD: begin
-                        ram_addr <= imm19;
-                    end
+                    OP_LD: ram_addr <= imm19;
 
                     OP_ST: begin
                         ram_we <= 1;
@@ -130,75 +140,49 @@ always @(posedge clk) begin
             end
 
             S_EXECUTE: begin
+                if (opcode != OP_HLT) begin
+                    state <= S_FETCH;
+                    pc <= pc + 1;
+                end
+
                 case (opcode)
-                    OP_LDI: begin
-                        regs[rd] = imm19;
-                        state <= S_FETCH;
-                        pc <= pc + 1;
-                    end
+                    OP_HLT: halted <= 1;
+                    OP_LD, OP_LDI: regs[rd] <= (opcode > OP_LD) ? imm19 : ram_read;
+                    OP_ST: ram_we <= 0;
 
-                    OP_LD: begin
-                        regs[rd] <= ram_read;
-                        state <= S_FETCH;
-                        pc <= pc + 1;
-                    end
-
-                    OP_ST: begin
-                        ram_we <= 0;
-                        state <= S_FETCH;
-                        pc <= pc + 1;
-                    end
-
-                    OP_CMP: begin
-                        alu_op <= ALU_OP_SUB;
+                    OP_CMP, OP_CMPI: begin
                         alu_left <= regs[rd];
-                        alu_right <= regs[rs1];
-                        state <= S_FETCH;
-                        pc <= pc + 1;
+                        alu_right <= (opcode > OP_CMP) ? imm19 : regs[rs1];
+                        alu_op <= ALU_OP_SUB;
                     end
 
-                    OP_J: begin
-                        state <= S_FETCH;
-                        pc <= imm24;
-                    end
+                    OP_J: pc <= imm24;
+                    OP_JZ: if (alu_zero) pc <= imm24;
+                    OP_JNZ: if (!alu_zero) pc <= imm24;
+                    OP_JC: if (alu_carry) pc <= imm24;
+                    OP_JNC: if (!alu_carry) pc <= imm24;
 
-                    OP_JZ, OP_JNZ, OP_JC, OP_JNC: begin
-                        state <= S_FETCH;
-
+                    OP_ADD, OP_SUB, OP_AND, OP_OR, OP_XOR, OP_SHL, OP_SHR,
+                    OP_ADDI, OP_SUBI, OP_ANDI, OP_ORI, OP_XORI, OP_SHLI, OP_SHRI: begin
                         case (opcode)
-                            OP_JZ: pc <= alu_zero ? imm24 : pc + 1;
-                            OP_JNZ: pc <= !alu_zero ? imm24 : pc + 1;
-                            OP_JC: pc <= alu_carry ? imm24 : pc + 1;
-                            OP_JNC: pc <= !alu_carry ? imm24 : pc + 1;
-                        endcase
-                    end
-
-                    OP_ADD, OP_SUB, OP_AND, OP_OR, OP_XOR, OP_SHL, OP_SHR: begin
-                        case (opcode)
-                            OP_ADD: alu_op <= ALU_OP_ADD;
-                            OP_SUB: alu_op <= ALU_OP_SUB;
-                            OP_AND: alu_op <= ALU_OP_AND;
-                            OP_OR: alu_op <= ALU_OP_OR;
-                            OP_XOR: alu_op <= ALU_OP_XOR;
-                            OP_SHL: alu_op <= ALU_OP_SHL;
-                            OP_SHR: alu_op <= ALU_OP_SHR;
+                            OP_ADD, OP_ADDI: alu_op <= ALU_OP_ADD;
+                            OP_SUB, OP_SUBI: alu_op <= ALU_OP_SUB;
+                            OP_AND, OP_ANDI: alu_op <= ALU_OP_AND;
+                            OP_OR, OP_ORI: alu_op <= ALU_OP_OR;
+                            OP_XOR, OP_XORI: alu_op <= ALU_OP_XOR;
+                            OP_SHL, OP_SHLI: alu_op <= ALU_OP_SHL;
+                            OP_SHR, OP_SHRI: alu_op <= ALU_OP_SHR;
                         endcase
 
                         alu_left <= regs[rs1];
-                        alu_right <= regs[rs2];
+                        alu_right <= (opcode > OP_SHR) ? imm14 : regs[rs2];
                         state <= S_WRITEBACK;
-                        pc <= pc + 1;
                     end
 
-                    OP_NOT: begin
+                    OP_NOT, OP_NOTI: begin
                         alu_op <= ALU_OP_NOT;
-                        alu_left <= regs[rs1];
+                        alu_left <= (opcode > OP_NOT) ? imm19 : regs[rs1];
                         state <= S_WRITEBACK;
-                        pc <= pc + 1;
-                    end
-
-                    OP_HLT: begin
-                        halted <= 1;
                     end
                 endcase
             end
