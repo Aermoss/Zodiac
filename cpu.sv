@@ -34,17 +34,17 @@ typedef enum logic [2:0] {
 } state_t;
 
 logic halted;
-logic [7:0] pc;
+logic [31:0] pc;
 state_t state;
 
 opcode_t instr;
-logic [7:0] operand;
-logic [7:0] acc;
+logic [31:0] operand;
+logic [31:0] acc;
 
 logic ram_we;
-logic [7:0] ram_addr;
-logic [7:0] ram_write;
-logic [7:0] ram_read;
+logic [31:0] ram_addr;
+logic [31:0] ram_write;
+logic [31:0] ram_read;
 
 ram ram0(
     .clk(clk),
@@ -54,10 +54,10 @@ ram ram0(
     .read(ram_read)
 );
 
-logic [7:0] alu_left;
-logic [7:0] alu_right;
+logic [31:0] alu_left;
+logic [31:0] alu_right;
 alu_op_t alu_op;
-logic [7:0] alu_result;
+logic [31:0] alu_result;
 logic alu_zero;
 logic alu_carry;
 
@@ -97,7 +97,7 @@ always @(posedge clk) begin
             end
 
             S_DECODE: begin
-                instr <= opcode_t'(ram_read);
+                instr <= opcode_t'(ram_read[7:0]);
 
                 case (ram_read)
                     OP_LDI, OP_LD, OP_ST, OP_CMP, OP_J, OP_JZ, OP_JNZ, OP_JC, OP_JNC, OP_ADD, OP_SUB, OP_AND, OP_OR, OP_XOR, OP_SHL, OP_SHR: begin

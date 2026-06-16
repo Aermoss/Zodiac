@@ -10,15 +10,15 @@ typedef enum logic [2:0] {
 } alu_op_t;
 
 module alu(
-    input logic [7:0] left,
-    input logic [7:0] right,
+    input logic [31:0] left,
+    input logic [31:0] right,
     input alu_op_t alu_op,
-    output logic [7:0] result,
+    output logic [31:0] result,
     output logic zero,
     output logic carry
 );
 
-logic [8:0] temp;
+logic [32:0] temp;
 
 always_comb begin
     case (alu_op)
@@ -34,8 +34,8 @@ always_comb begin
     endcase
 end
 
-assign result = temp[7:0];
-assign zero = (temp[7:0] == 8'b0);
-assign carry = temp[8];
+assign result = temp[31:0];
+assign zero = (temp[31:0] == 0);
+assign carry = temp[32];
 
 endmodule

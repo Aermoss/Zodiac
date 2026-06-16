@@ -20,7 +20,7 @@ def main(argv: list[str]) -> int:
             continue
 
         if line.endswith(":"):
-            labels[line[:-1]] = address.to_bytes(1)
+            labels[line[:-1]] = address.to_bytes(4)
             continue
 
         instruction, *operands = line.split(" ")
@@ -40,7 +40,7 @@ def main(argv: list[str]) -> int:
         if instruction.lower() not in instructions:
             raise SyntaxError(f"Unknown instruction '{instruction}'")
 
-        result += (instructions.index(instruction) if instruction != instructions[-1] else 0xFF).to_bytes(1)
+        result += (instructions.index(instruction) if instruction != instructions[-1] else 0xFF).to_bytes(4)
 
         for operand in operands:
             if operand in labels:
@@ -61,15 +61,16 @@ def main(argv: list[str]) -> int:
                 operand = operand[2:]
                 base = 2
 
-            result += int(operand, base).to_bytes(1)
+            result += int(operand, base).to_bytes(4)
 
     with open("ram.sv", "r") as file:
         content = file.read()
         start = content.find("initial begin")
         generated = content[:start + 14]
 
-        for index, byte in enumerate(result):
-            generated += f"    mem[{index}] = 8'h{format(byte, "02X")};\n"
+        for index in range(int(len(result) / 4)):
+            byte = sum(result[index * 4 + i] for i in range(4))
+            generated += f"    mem[{index}] = 32'h{format(byte, "08X")};\n"
 
         end = content.find("end", start)
         generated += content[end:]
