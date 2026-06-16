@@ -2,8 +2,8 @@
 
 module tb;
 
+logic reset;
 logic clk = 0;
-logic reset = 1;
 integer i;
 
 cpu cpu0(
@@ -20,6 +20,7 @@ initial begin
     for (i = 0; i < 32; i++)
         $dumpvars(0, cpu0.regs[i]);
 
+    reset = 1;
     @(negedge clk);
     reset = 0;
     #1000;

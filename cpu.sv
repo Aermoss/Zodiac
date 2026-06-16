@@ -72,6 +72,26 @@ logic [31:0] ram_addr;
 logic [31:0] ram_write;
 logic [31:0] ram_read;
 
+always_comb begin
+    ram_addr = pc;
+    ram_write = 0;
+    ram_we = 0;
+
+    case (state)
+        S_DECODE: begin
+            case (ram_read[31:24])
+                OP_LD: ram_addr = ram_read[18:0];
+
+                OP_ST: begin
+                    ram_addr = ram_read[18:0];
+                    ram_write = regs[ram_read[23:19]];
+                    ram_we = 1;
+                end
+            endcase
+        end
+    endcase
+end
+
 ram ram0(
     .clk(clk),
     .we(ram_we),
@@ -96,7 +116,7 @@ alu alu0(
     .carry(alu_carry)
 );
 
-always_ff @(posedge clk) begin
+always_ff @(posedge clk or posedge reset) begin
     if (reset) begin
         instr <= 0;
 
@@ -107,10 +127,6 @@ always_ff @(posedge clk) begin
         state <= S_FETCH;
         pc <= 0;
 
-        ram_addr <= 0;
-        ram_write <= 0;
-        ram_we <= 0;
-
         alu_left <= 0;
         alu_op <= ALU_OP_ADD;
         alu_right <= 0;
@@ -119,23 +135,11 @@ always_ff @(posedge clk) begin
     else if (!halted) begin
         case (state)
             S_FETCH: begin
-                ram_addr <= pc;
                 state <= S_DECODE;
             end
 
             S_DECODE: begin
                 instr <= ram_read;
-
-                case (opcode_t'(ram_read[31:24]))
-                    OP_LD: ram_addr <= ram_read[18:0];
-
-                    OP_ST: begin
-                        ram_addr <= ram_read[18:0];
-                        ram_write <= regs[instr[23:19]];
-                        ram_we <= 1;
-                    end
-                endcase
-
                 state <= S_EXECUTE;
             end
 
@@ -146,9 +150,8 @@ always_ff @(posedge clk) begin
                 end
 
                 case (opcode)
-                    OP_HLT: halted <= 1;
-                    OP_LD, OP_LDI: regs[rd] <= (opcode > OP_LD) ? imm19 : ram_read;
-                    OP_ST: ram_we <= 0;
+                    OP_LD, OP_LDI: if (rd != 0)
+                        regs[rd] <= (opcode > OP_LD) ? imm19 : ram_read;
 
                     OP_CMP, OP_CMPI: begin
                         alu_left <= regs[rd];
@@ -184,11 +187,15 @@ always_ff @(posedge clk) begin
                         alu_left <= (opcode > OP_NOT) ? imm19 : regs[rs1];
                         state <= S_WRITEBACK;
                     end
+
+                    OP_HLT: halted <= 1;
                 endcase
             end
 
             S_WRITEBACK: begin
-                regs[rd] <= alu_result;
+                if (rd != 0)
+                    regs[rd] <= alu_result;
+
                 state <= S_FETCH;
             end
         endcase
