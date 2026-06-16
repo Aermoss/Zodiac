@@ -5,8 +5,6 @@ module cpu(
 
 typedef enum logic [7:0] {
     OP_NOP,
-    OP_INC,
-    OP_DEC,
     OP_LDI,
     OP_LD,
     OP_ST,
@@ -18,6 +16,12 @@ typedef enum logic [7:0] {
     OP_JNC,
     OP_ADD,
     OP_SUB,
+    OP_AND,
+    OP_OR,
+    OP_XOR,
+    OP_NOT,
+    OP_SHL,
+    OP_SHR,
     OP_HLT = 8'hFF
 } opcode_t;
 
@@ -96,7 +100,7 @@ always @(posedge clk) begin
                 instr <= opcode_t'(ram_read);
 
                 case (ram_read)
-                    OP_LDI, OP_LD, OP_ST, OP_CMP, OP_J, OP_JZ, OP_JNZ, OP_JC, OP_JNC, OP_ADD, OP_SUB: begin
+                    OP_LDI, OP_LD, OP_ST, OP_CMP, OP_J, OP_JZ, OP_JNZ, OP_JC, OP_JNC, OP_ADD, OP_SUB, OP_AND, OP_OR, OP_XOR, OP_SHL, OP_SHR: begin
                         ram_addr <= pc + 1;
                         state <= S_FETCH_OPERAND;
                     end
@@ -127,20 +131,6 @@ always @(posedge clk) begin
 
             S_EXECUTE: begin
                 case (instr)
-                    OP_INC: begin
-                        alu_op <= ALU_OP_INC;
-                        alu_left <= acc;
-                        state <= S_WRITEBACK;
-                        pc <= pc + 1;
-                    end
-
-                    OP_DEC: begin
-                        alu_op <= ALU_OP_DEC;
-                        alu_left <= acc;
-                        state <= S_WRITEBACK;
-                        pc <= pc + 1;
-                    end
-
                     OP_LDI: begin
                         acc <= operand;
                         state <= S_FETCH;
@@ -172,56 +162,39 @@ always @(posedge clk) begin
                         pc <= operand;
                     end
 
-                    OP_JZ: begin
+                    OP_JZ, OP_JNZ, OP_JC, OP_JNC: begin
                         state <= S_FETCH;
 
-                        if (alu_zero)
-                            pc <= operand;
-                        else
-                            pc <= pc + 2;
+                        case (instr)
+                            OP_JZ: pc <= alu_zero ? operand : pc + 2;
+                            OP_JNZ: pc <= !alu_zero ? operand : pc + 2;
+                            OP_JC: pc <= alu_carry ? operand : pc + 2;
+                            OP_JNC: pc <= !alu_carry ? operand : pc + 2;
+                        endcase
                     end
 
-                    OP_JNZ: begin
-                        state <= S_FETCH;
+                    OP_ADD, OP_SUB, OP_AND, OP_OR, OP_XOR, OP_SHL, OP_SHR: begin
+                        case (instr)
+                            OP_ADD: alu_op <= ALU_OP_ADD;
+                            OP_SUB: alu_op <= ALU_OP_SUB;
+                            OP_AND: alu_op <= ALU_OP_AND;
+                            OP_OR: alu_op <= ALU_OP_OR;
+                            OP_XOR: alu_op <= ALU_OP_XOR;
+                            OP_SHL: alu_op <= ALU_OP_SHL;
+                            OP_SHR: alu_op <= ALU_OP_SHR;
+                        endcase
 
-                        if (!alu_zero)
-                            pc <= operand;
-                        else
-                            pc <= pc + 2;
-                    end
-
-                    OP_JC: begin
-                        state <= S_FETCH;
-
-                        if (alu_carry)
-                            pc <= operand;
-                        else
-                            pc <= pc + 2;
-                    end
-
-                    OP_JNC: begin
-                        state <= S_FETCH;
-
-                        if (!alu_carry)
-                            pc <= operand;
-                        else
-                            pc <= pc + 2;
-                    end
-
-                    OP_ADD: begin
-                        alu_op <= ALU_OP_ADD;
                         alu_left <= acc;
                         alu_right <= operand;
                         state <= S_WRITEBACK;
                         pc <= pc + 2;
                     end
 
-                    OP_SUB: begin
-                        alu_op <= ALU_OP_SUB;
+                    OP_NOT: begin
+                        alu_op <= ALU_OP_NOT;
                         alu_left <= acc;
-                        alu_right <= operand;
                         state <= S_WRITEBACK;
-                        pc <= pc + 2;
+                        pc <= pc + 1;
                     end
 
                     OP_HLT: begin

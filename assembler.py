@@ -1,7 +1,9 @@
 import sys
 
-instructions = ["nop", "inc", "dec", "ldi", "ld", "st", "cmp", "j", "jz", "jnz", "jc", "jnc", "add", "sub", "hlt"]
-instructions = {k: v if k != "hlt" else 0xFF for v, k in enumerate(instructions)}
+instructions = [
+    "nop", "ldi", "ld", "st", "cmp", "j", "jz", "jnz", "jc", "jnc",
+    "add", "sub", "and", "or", "xor", "not", "shl", "shr", "hlt"
+]
 
 def main(argv: list[str]) -> int:
     result = bytearray()
@@ -38,7 +40,7 @@ def main(argv: list[str]) -> int:
         if instruction.lower() not in instructions:
             raise SyntaxError(f"Unknown instruction '{instruction}'")
 
-        result += instructions[instruction].to_bytes(1)
+        result += (instructions.index(instruction) if instruction != instructions[-1] else 0xFF).to_bytes(1)
 
         for operand in operands:
             if operand in labels:

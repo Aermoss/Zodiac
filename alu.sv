@@ -1,8 +1,12 @@
-typedef enum logic [1:0] {
-    ALU_OP_INC,
-    ALU_OP_DEC,
+typedef enum logic [2:0] {
     ALU_OP_ADD,
-    ALU_OP_SUB
+    ALU_OP_SUB,
+    ALU_OP_AND,
+    ALU_OP_OR,
+    ALU_OP_XOR,
+    ALU_OP_NOT,
+    ALU_OP_SHL,
+    ALU_OP_SHR
 } alu_op_t;
 
 module alu(
@@ -17,13 +21,16 @@ module alu(
 logic [8:0] temp;
 
 always_comb begin
-    temp = 9'b0;
-
     case (alu_op)
-        ALU_OP_INC: temp = left + 1;
-        ALU_OP_DEC: temp = left - 1;
         ALU_OP_ADD: temp = left + right;
         ALU_OP_SUB: temp = left - right;
+        ALU_OP_AND: temp = left & right;
+        ALU_OP_OR: temp = left | right;
+        ALU_OP_XOR: temp = left ^ right;
+        ALU_OP_NOT: temp = ~left;
+        ALU_OP_SHL: temp = left << right;
+        ALU_OP_SHR: temp = left >> right;
+        default: temp = 0;
     endcase
 end
 
