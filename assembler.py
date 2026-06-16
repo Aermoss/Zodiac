@@ -1,4 +1,4 @@
-import sys
+import sys, re
 
 instructions = [
     "nop", "ldi", "ld", "st", "cmp", "j", "jz", "jnz", "jc", "jnc",
@@ -20,11 +20,10 @@ def main(argv: list[str]) -> int:
             continue
 
         if line.endswith(":"):
-            labels[line[:-1]] = address.to_bytes(4)
+            labels[line[:-1]] = address
             continue
 
-        instruction, *operands = line.split(" ")
-        address += 1 + len(operands)
+        address += 1
 
     for line in lines:
         line = line.strip()
@@ -35,16 +34,24 @@ def main(argv: list[str]) -> int:
         if line.endswith(":"):
             continue
 
-        instruction, *operands = line.split(" ")
+        instruction, *operands = re.split(r"[,\s]+", line)
 
         if instruction.lower() not in instructions:
             raise SyntaxError(f"Unknown instruction '{instruction}'")
 
-        result += (instructions.index(instruction) if instruction != instructions[-1] else 0xFF).to_bytes(4)
+        index = 32
+        index -= 8
+        instruction = (instructions.index(instruction) if instruction != instructions[-1] else 0xFF) << index
 
         for operand in operands:
             if operand in labels:
-                result += labels[operand]
+                index -= index
+                instruction |= labels[operand]
+                continue
+
+            if operand.startswith("x"):
+                index -= 5
+                instruction |= int(operand[1:]) << index
                 continue
 
             base = 10
@@ -61,7 +68,10 @@ def main(argv: list[str]) -> int:
                 operand = operand[2:]
                 base = 2
 
-            result += int(operand, base).to_bytes(4)
+            index -= index
+            instruction |= int(operand, base) << index
+
+        result += instruction.to_bytes(4, "big")
 
     with open("ram.sv", "r") as file:
         content = file.read()
@@ -69,8 +79,8 @@ def main(argv: list[str]) -> int:
         generated = content[:start + 14]
 
         for index in range(int(len(result) / 4)):
-            byte = sum(result[index * 4 + i] for i in range(4))
-            generated += f"    mem[{index}] = 32'h{format(byte, "08X")};\n"
+            instruction = int.from_bytes(result[index * 4:index * 4 + 4], "big")
+            generated += f"    mem[{index}] = 32'h{format(instruction, "08X")};\n"
 
         end = content.find("end", start)
         generated += content[end:]
