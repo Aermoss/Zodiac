@@ -1,13 +1,15 @@
 import sys
 
-instructions = ["nop", "inc", "dec", "ldi", "ld", "st", "j", "add", "sub", "hlt"]
+instructions = ["nop", "inc", "dec", "ldi", "ld", "st", "cmp", "j", "jz", "jnz", "jc", "jnc", "add", "sub", "hlt"]
 instructions = {k: v if k != "hlt" else 0xFF for v, k in enumerate(instructions)}
 
 def main(argv: list[str]) -> int:
-    result, labels = bytearray(), {}
+    result = bytearray()
 
     with open(argv[1], "r") as file:
         lines = file.readlines()
+
+    labels, address = {}, 0
 
     for line in lines:
         line = line.strip()
@@ -16,7 +18,19 @@ def main(argv: list[str]) -> int:
             continue
 
         if line.endswith(":"):
-            labels[line[:-1]] = len(result).to_bytes(1)
+            labels[line[:-1]] = address.to_bytes(1)
+            continue
+
+        instruction, *operands = line.split(" ")
+        address += 1 + len(operands)
+
+    for line in lines:
+        line = line.strip()
+
+        if line == "":
+            continue
+
+        if line.endswith(":"):
             continue
 
         instruction, *operands = line.split(" ")

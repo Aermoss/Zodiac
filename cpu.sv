@@ -10,7 +10,12 @@ typedef enum logic [7:0] {
     OP_LDI,
     OP_LD,
     OP_ST,
+    OP_CMP,
     OP_J,
+    OP_JZ,
+    OP_JNZ,
+    OP_JC,
+    OP_JNC,
     OP_ADD,
     OP_SUB,
     OP_HLT = 8'hFF
@@ -91,7 +96,7 @@ always @(posedge clk) begin
                 instr <= opcode_t'(ram_read);
 
                 case (ram_read)
-                    OP_LDI, OP_LD, OP_ST, OP_J, OP_ADD, OP_SUB: begin
+                    OP_LDI, OP_LD, OP_ST, OP_CMP, OP_J, OP_JZ, OP_JNZ, OP_JC, OP_JNC, OP_ADD, OP_SUB: begin
                         ram_addr <= pc + 1;
                         state <= S_FETCH_OPERAND;
                     end
@@ -154,9 +159,53 @@ always @(posedge clk) begin
                         pc <= pc + 2;
                     end
 
+                    OP_CMP: begin
+                        alu_op <= ALU_OP_SUB;
+                        alu_left <= acc;
+                        alu_right <= operand;
+                        state <= S_FETCH;
+                        pc <= pc + 2;
+                    end
+
                     OP_J: begin
                         state <= S_FETCH;
                         pc <= operand;
+                    end
+
+                    OP_JZ: begin
+                        state <= S_FETCH;
+
+                        if (alu_zero)
+                            pc <= operand;
+                        else
+                            pc <= pc + 2;
+                    end
+
+                    OP_JNZ: begin
+                        state <= S_FETCH;
+
+                        if (!alu_zero)
+                            pc <= operand;
+                        else
+                            pc <= pc + 2;
+                    end
+
+                    OP_JC: begin
+                        state <= S_FETCH;
+
+                        if (alu_carry)
+                            pc <= operand;
+                        else
+                            pc <= pc + 2;
+                    end
+
+                    OP_JNC: begin
+                        state <= S_FETCH;
+
+                        if (!alu_carry)
+                            pc <= operand;
+                        else
+                            pc <= pc + 2;
                     end
 
                     OP_ADD: begin
