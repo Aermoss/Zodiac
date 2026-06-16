@@ -1,15 +1,7 @@
 import sys
 
-instructions = {
-    "nop": 0x00,
-    "inc": 0x01,
-    "dec": 0x02,
-    "ldi": 0x03,
-    "ld": 0x04,
-    "st": 0x05,
-    "j": 0x06,
-    "hlt": 0xFF
-}
+instructions = ["nop", "inc", "dec", "ldi", "ld", "st", "j", "add", "sub", "hlt"]
+instructions = {k: v if k != "hlt" else 0xFF for v, k in enumerate(instructions)}
 
 def main(argv: list[str]) -> int:
     result, labels = bytearray(), {}

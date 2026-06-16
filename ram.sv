@@ -11,10 +11,11 @@ logic [7:0] mem [0:255];
 assign read = mem[addr];
 
 initial begin
-    mem[0] = 8'h01;
-    mem[1] = 8'h06;
-    mem[2] = 8'h00;
-    mem[3] = 8'hFF;
+    mem[0] = 8'h07;
+    mem[1] = 8'h02;
+    mem[2] = 8'h06;
+    mem[3] = 8'h00;
+    mem[4] = 8'hFF;
 end
 
 always @(posedge clk) begin

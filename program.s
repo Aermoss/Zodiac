@@ -1,5 +1,5 @@
 loop:
-    inc
+    add 2
     j loop
 
 exit:
