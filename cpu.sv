@@ -107,9 +107,9 @@ always_ff @(posedge clk) begin
         state <= S_FETCH;
         pc <= 0;
 
-        ram_we <= 0;
         ram_addr <= 0;
         ram_write <= 0;
+        ram_we <= 0;
 
         alu_left <= 0;
         alu_op <= ALU_OP_ADD;
@@ -130,9 +130,9 @@ always_ff @(posedge clk) begin
                     OP_LD: ram_addr <= ram_read[18:0];
 
                     OP_ST: begin
-                        ram_we <= 1;
                         ram_addr <= ram_read[18:0];
-                        ram_write <= regs[rd];
+                        ram_write <= regs[instr[23:19]];
+                        ram_we <= 1;
                     end
                 endcase
 
