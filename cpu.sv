@@ -127,12 +127,12 @@ always_ff @(posedge clk) begin
                 instr <= ram_read;
 
                 case (opcode_t'(ram_read[31:24]))
-                    OP_LD: ram_addr <= imm19;
+                    OP_LD: ram_addr <= ram_read[18:0];
 
                     OP_ST: begin
                         ram_we <= 1;
-                        ram_addr <= imm19;
-                        ram_write <= rd;
+                        ram_addr <= ram_read[18:0];
+                        ram_write <= regs[rd];
                     end
                 endcase
 
