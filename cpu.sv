@@ -15,6 +15,7 @@ typedef enum logic [7:0] {
     OP_JNZ,
     OP_JC,
     OP_JNC,
+    OP_JR,
     OP_ADD,
     OP_SUB,
     OP_AND,
@@ -80,10 +81,10 @@ always_comb begin
     case (state)
         S_DECODE: begin
             case (ram_read[31:24])
-                OP_LD: ram_addr = ram_read[18:0];
+                OP_LD: ram_addr = regs[ram_read[18:14]];
 
                 OP_ST: begin
-                    ram_addr = ram_read[18:0];
+                    ram_addr = regs[ram_read[18:14]];
                     ram_write = regs[ram_read[23:19]];
                     ram_we = 1;
                 end
@@ -164,6 +165,7 @@ always_ff @(posedge clk or posedge reset) begin
                     OP_JNZ: if (!alu_zero) pc <= imm24;
                     OP_JC: if (alu_carry) pc <= imm24;
                     OP_JNC: if (!alu_carry) pc <= imm24;
+                    OP_JR: pc <= regs[rd];
 
                     OP_ADD, OP_SUB, OP_AND, OP_OR, OP_XOR, OP_SHL, OP_SHR,
                     OP_ADDI, OP_SUBI, OP_ANDI, OP_ORI, OP_XORI, OP_SHLI, OP_SHRI: begin

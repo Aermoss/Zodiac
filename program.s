@@ -1,10 +1,11 @@
-st x1, 0x31
+ldi x31, 0xFFF
 
 loop:
-    ldi x1, 0
-    ld x1, 0x31
+    subi x31, x31, 1
+    st x1, x31
     addi x1, x1, 2
-    st x1, 0x31
+    ld x1, x31
+    addi x31, x31, 1
     cmpi x1, 10
     jz exit
     j loop

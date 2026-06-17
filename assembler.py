@@ -4,7 +4,7 @@ instructions = [
     "nop",
     "ld", "ldi", "st",
     "cmp", "cmpi",
-    "j", "jz", "jnz", "jc", "jnc",
+    "j", "jz", "jnz", "jc", "jnc", "jr",
     "add", "sub", "and", "or", "xor", "not", "shl", "shr",
     "addi", "subi", "andi", "ori", "xori", "noti", "shli", "shri",
     "hlt"
