@@ -17,9 +17,9 @@
 #[include "std/str" : *]
 
 enum TokenType: i32 {
-    UNKNOWN, EOF,
+    UNKNOWN, EOF, NEWLINE,
 
-    IDENTIFIER, INTEGER, FLOAT, STRING, CHAR,
+    IDENTIFIER, NUMBER,
     PLUS, MINUS, MUL, DIV, MOD, AND, OR, XOR, NOT, LSHIFT, RSHIFT,
     LPAREN, RPAREN, LBRACE, RBRACE, LBRACKET, RBRACKET,
 
@@ -28,11 +28,9 @@ enum TokenType: i32 {
 
 func ToString(_type: TokenType) -> String {
     if _type == TokenType::EOF { ret "EOF".ToString(); }
+    else if _type == TokenType::NEWLINE { ret "NEWLINE".ToString(); }
     else if _type == TokenType::IDENTIFIER { ret "IDENTIFIER".ToString(); }
-    else if _type == TokenType::INTEGER { ret "INTEGER".ToString(); }
-    else if _type == TokenType::FLOAT { ret "FLOAT".ToString(); }
-    else if _type == TokenType::STRING { ret "STRING".ToString(); }
-    else if _type == TokenType::CHAR { ret "CHAR".ToString(); }
+    else if _type == TokenType::NUMBER { ret "NUMBER".ToString(); }
     else if _type == TokenType::PLUS { ret "PLUS".ToString(); }
     else if _type == TokenType::MINUS { ret "MINUS".ToString(); }
     else if _type == TokenType::MUL { ret "MUL".ToString(); }
@@ -54,26 +52,6 @@ func ToString(_type: TokenType) -> String {
     else if _type == TokenType::COLON { ret "COLON".ToString(); }
     else if _type == TokenType::DOLLAR { ret "DOLLAR".ToString(); }
     else { ret "UNKNOWN".ToString(); }
-}
-
-func ToBinaryOperatorString(operator: TokenType) -> String {
-    if operator == TokenType::PLUS { ret "+".ToString(); }
-    else if operator == TokenType::MINUS { ret "-".ToString(); }
-    else if operator == TokenType::MUL { ret "*".ToString(); }
-    else if operator == TokenType::DIV { ret "/".ToString(); }
-    else if operator == TokenType::MOD { ret "%".ToString(); }
-    else if operator == TokenType::AND { ret "&".ToString(); }
-    else if operator == TokenType::OR { ret "|".ToString(); }
-    else if operator == TokenType::XOR { ret "^".ToString(); }
-    else if operator == TokenType::LSHIFT { ret "<<".ToString(); }
-    else if operator == TokenType::RSHIFT { ret ">>".ToString(); }
-    else { ret "unknown".ToString(); }
-}
-
-func ToUnaryOperatorString(operator: TokenType) -> String {
-    if operator == TokenType::MINUS { ret "-".ToString(); }
-    else if operator == TokenType::NOT { ret "!".ToString(); }
-    else { ret "unknown".ToString(); }
 }
 
 class Token {
