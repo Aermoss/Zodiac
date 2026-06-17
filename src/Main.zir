@@ -1,0 +1,97 @@
+/*
+ * Copyright 2025-2026 Yusuf Rençber
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+#[include "std/io", "std/file", "src/Logger.zir", "src/Lexer.zir" : *]
+
+func PrintVersion(executable: String) {
+    WriteLine("Unversioned build of " + executable + ".");
+    WriteLine("Copyright (c) 2025-2026 Yusuf Rençber. All rights reserved.");
+    WriteLine("This software is licensed under the Apache License, Version 2.0.");
+    WriteLine("See the LICENSE file in the project root for more information.");
+}
+
+func PrintUsage(executable: String) {
+    WriteLine("OVERVIEW: Zodiac assembler");
+    WriteLine("USAGE: " + executable + " [options] <input>");
+    WriteLine("OPTIONS:");
+    WriteLine("  -o <file>                Write output to <file>");
+    WriteLine("  --version                Display assembler version");
+    WriteLine("  -h, --help               Display this help message");
+}
+
+func FatalErrorHandler(reason: *const i8) {
+    Logger::Log("LLVM", reason, LogSeverity::Fatal);
+}
+
+func main(args: &mut Vector<String>) -> i32 {
+    let mut logger: Logger;
+    let executable = SplitPath(args[0u64]).right;
+
+    if args.Size() < 2u64 {
+        PrintUsage(executable);
+        ret 1i32;
+    }
+
+    let mut input_file: String;
+    let mut output_file: String;
+    let mut i = 1u64;
+
+    while i < args.Size() {
+        let arg = args[i];
+
+        if arg == "--help" || arg == "-h" {
+            PrintUsage(executable);
+            ret 0i32;
+        } else if arg == "--version" {
+            PrintVersion(executable);
+            ret 0i32;
+        } else if arg == "-o" {
+            i += 1u64;
+
+            if i < args.Size() {
+                output_file = args[i];
+            } else {
+                Logger::Log(executable, "Missing argument to '-o'.", LogSeverity::Error);
+                ret 1i32;
+            }
+        } else {
+            if FileExists(arg) {
+                if input_file.Empty() {
+                    input_file = arg;
+                } else {
+                    Logger::Log(executable, "Already specified an input file.", LogSeverity::Error);
+                    ret 1i32;
+                }
+            } else {
+                Logger::Log(executable, "Cannot find '" + arg + "'.", LogSeverity::Error);
+                ret 1i32;
+            }
+        } i += 1u64;
+    }
+
+    if input_file.Empty() {
+        Logger::Log(executable, "No input file.", LogSeverity::Error);
+        ret 1i32;
+    }
+
+    let mut lexer = Lexer();
+    let content = _ReadFile(input_file);
+    let tokens = lexer.Lex(content, input_file);
+
+    for token in tokens {
+        WriteLine(token.value + ", " + token._type.ToString());
+    } ret 0i32;
+}

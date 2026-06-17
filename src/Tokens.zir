@@ -1,0 +1,82 @@
+/*
+ * Copyright 2025-2026 Yusuf Rençber
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+#[include "std/str" : *]
+
+enum TokenType: i32 {
+    UNKNOWN, EOF,
+
+    IDENTIFIER, INTEGER, FLOAT, STRING, CHAR,
+    PLUS, MINUS, MUL, DIV, MOD, AND, OR, XOR, NOT, LSHIFT, RSHIFT,
+    LPAREN, RPAREN, LBRACE, RBRACE, LBRACKET, RBRACKET,
+
+    COMMA, COLON, DOLLAR
+}
+
+func ToString(_type: TokenType) -> String {
+    if _type == TokenType::EOF { ret "EOF".ToString(); }
+    else if _type == TokenType::IDENTIFIER { ret "IDENTIFIER".ToString(); }
+    else if _type == TokenType::INTEGER { ret "INTEGER".ToString(); }
+    else if _type == TokenType::FLOAT { ret "FLOAT".ToString(); }
+    else if _type == TokenType::STRING { ret "STRING".ToString(); }
+    else if _type == TokenType::CHAR { ret "CHAR".ToString(); }
+    else if _type == TokenType::PLUS { ret "PLUS".ToString(); }
+    else if _type == TokenType::MINUS { ret "MINUS".ToString(); }
+    else if _type == TokenType::MUL { ret "MUL".ToString(); }
+    else if _type == TokenType::DIV { ret "DIV".ToString(); }
+    else if _type == TokenType::MOD { ret "MOD".ToString(); }
+    else if _type == TokenType::AND { ret "AND".ToString(); }
+    else if _type == TokenType::OR { ret "OR".ToString(); }
+    else if _type == TokenType::XOR { ret "XOR".ToString(); }
+    else if _type == TokenType::NOT { ret "NOT".ToString(); }
+    else if _type == TokenType::LSHIFT { ret "LSHIFT".ToString(); }
+    else if _type == TokenType::RSHIFT { ret "RSHIFT".ToString(); }
+    else if _type == TokenType::LPAREN { ret "LPAREN".ToString(); }
+    else if _type == TokenType::RPAREN { ret "RPAREN".ToString(); }
+    else if _type == TokenType::LBRACE { ret "LBRACE".ToString(); }
+    else if _type == TokenType::RBRACE { ret "RBRACE".ToString(); }
+    else if _type == TokenType::LBRACKET { ret "LBRACKET".ToString(); }
+    else if _type == TokenType::RBRACKET { ret "RBRACKET".ToString(); }
+    else if _type == TokenType::COMMA { ret "COMMA".ToString(); }
+    else if _type == TokenType::COLON { ret "COLON".ToString(); }
+    else if _type == TokenType::DOLLAR { ret "DOLLAR".ToString(); }
+    else { ret "UNKNOWN".ToString(); }
+}
+
+func ToBinaryOperatorString(operator: TokenType) -> String {
+    if operator == TokenType::PLUS { ret "+".ToString(); }
+    else if operator == TokenType::MINUS { ret "-".ToString(); }
+    else if operator == TokenType::MUL { ret "*".ToString(); }
+    else if operator == TokenType::DIV { ret "/".ToString(); }
+    else if operator == TokenType::MOD { ret "%".ToString(); }
+    else if operator == TokenType::AND { ret "&".ToString(); }
+    else if operator == TokenType::OR { ret "|".ToString(); }
+    else if operator == TokenType::XOR { ret "^".ToString(); }
+    else if operator == TokenType::LSHIFT { ret "<<".ToString(); }
+    else if operator == TokenType::RSHIFT { ret ">>".ToString(); }
+    else { ret "unknown".ToString(); }
+}
+
+func ToUnaryOperatorString(operator: TokenType) -> String {
+    if operator == TokenType::MINUS { ret "-".ToString(); }
+    else if operator == TokenType::NOT { ret "!".ToString(); }
+    else { ret "unknown".ToString(); }
+}
+
+class Token {
+    pub _type: TokenType, pub value: String,
+    pub row: u64, pub column: u64, pub file: String
+}

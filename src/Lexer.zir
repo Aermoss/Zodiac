@@ -1,0 +1,406 @@
+/*
+ * Copyright 2025-2026 Yusuf Rençber
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+#[include "std/str", "std/vec", "src/Logger.zir", "src/Tokens.zir" : *]
+
+class Lexer {
+    priv row: u64, priv column: u64,
+    priv text: String, priv file: String,
+    priv length: u64, priv index: u64,
+    priv preprocessor: bool = false,
+    priv assembly: bool = false;
+
+    priv IsDigit(&this, character: i8) -> bool {
+        ret character >= '0' && character <= '9';
+    }
+
+    priv IsHexDigit(&this, character: i8) -> bool {
+        ret (character >= '0' && character <= '9') || (character >= 'a' && character <= 'f') || (character >= 'A' && character <= 'F');
+    }
+
+    priv IsBinDigit(&this, character: i8) -> bool {
+        ret character == '0' || character == '1';
+    }
+
+    priv IsOctDigit(&this, character: i8) -> bool {
+        ret character >= '0' && character <= '7';
+    }
+
+    priv IsAlpha(&this, character: i8) -> bool {
+        ret (character >= 'a' && character <= 'z') || (character >= 'A' && character <= 'Z') || character == '_';
+    }
+
+    priv IsAlphaNum(&this, character: i8) -> bool {
+        ret this.IsAlpha(character) || this.IsDigit(character);
+    }
+
+    priv CurrentChar(&this) -> i8 {
+        if this.index >= this.length { ret '\0'; }
+        ret this.text.Data()[this.index];
+    }
+
+    priv PeekChar(&this, offset: u64) -> i8 {
+        let peek_index = this.index + offset;
+        if peek_index >= this.length { ret '\0'; }
+        ret this.text.Data()[peek_index];
+    }
+
+    priv Advance(&mut this, count: u64) {
+        for _ in 0u64..count {
+            if this.index < this.length {
+                if this.CurrentChar() == '\n' {
+                    this.row += 1u64;
+                    this.column = 1u64;
+                } else {
+                    this.column += 1u64;
+                } this.index += 1u64;
+            }
+        }
+    }
+
+    priv SkipWhitespace(&mut this) {
+        while this.CurrentChar() == ' ' || this.CurrentChar() == '\t' || this.CurrentChar() == '\r' {
+            this.Advance(1u64);
+        }
+    }
+
+    priv SkipComment(&mut this) -> bool {
+        if this.CurrentChar() == '/' {
+            if this.PeekChar(1u64) == '/' {
+                while this.CurrentChar() != '\n' && this.CurrentChar() != '\0' {
+                    this.Advance(1u64);
+                } ret true;
+            } else if this.PeekChar(1u64) == '*' {
+                this.Advance(2u64);
+
+                while this.CurrentChar() != '\0' {
+                    if this.CurrentChar() == '*' && this.PeekChar(1u64) == '/' {
+                        this.Advance(2u64);
+                        break;
+                    } this.Advance(1u64);
+                } ret true;
+            }
+        } ret false;
+    }
+
+    priv LexString(&mut this) -> Token {
+        let mut token: Token;
+        (token.row, token.column, token.file) = (this.row, this.column, this.file);
+        let quote_char = this.CurrentChar();
+        token._type = quote_char != '"' ? TokenType::CHAR : TokenType::STRING;
+        this.Advance(1u64);
+
+        while this.CurrentChar() != quote_char && this.CurrentChar() != '\n' && this.CurrentChar() != '\0' {
+            if this.CurrentChar() == '\\' {
+                this.Advance(1u64);
+
+                if this.CurrentChar() != '\0' {
+                    let escaped = this.CurrentChar();
+
+                    if escaped == '\'' {
+                        token.value += "'";
+                    } else if escaped == '"' {
+                        token.value += "\"";
+                    } else if escaped == '?' {
+                        token.value += "\?";
+                    } else if escaped == '\\' {
+                        token.value += "\\";
+                    } else if escaped == 'a' {
+                        token.value += "\a";
+                    } else if escaped == 'b' {
+                        token.value += "\b";
+                    } else if escaped == 'f' {
+                        token.value += "\f";
+                    } else if escaped == 'n' {
+                        token.value += "\n";
+                    } else if escaped == 'r' {
+                        token.value += "\r";
+                    } else if escaped == 't' {
+                        token.value += "\t";
+                    } else if escaped == 'v' {
+                        token.value += "\v";
+                    } else if escaped == 'x' {
+                        this.Advance(1u64);
+                        let mut value: String;
+
+                        while this.IsHexDigit(this.CurrentChar()) {
+                            value += this.CurrentChar();
+                            this.Advance(1u64);
+                        } else {
+                            Logger::Log("Invalid hexadecimal escape sequence.", token, LogSeverity::Error);
+                        }
+
+                        if value.Size() > 3u64 {
+                            Logger::Log("Hexadecimal escape sequence too long.", token, LogSeverity::Error);
+                        }
+
+                        token.value += value.ToInteger(16i64) as i8;
+                        this.index -= 1u64;
+                    } else {
+                        let mut value: String;
+
+                        while this.IsOctDigit(this.CurrentChar()) {
+                            value += this.CurrentChar();
+                            this.Advance(1u64);
+                        } else {
+                            Logger::Log("Invalid octal escape sequence.", token, LogSeverity::Error);
+                        }
+
+                        if value.Size() > 4u64 {
+                            Logger::Log("Octal escape sequence too long.", token, LogSeverity::Error);
+                        }
+
+                        token.value += value.ToInteger(8i64) as i8;
+                        this.index -= 1u64;
+                    } this.Advance(1u64);
+                }
+            } else {
+                token.value += this.CurrentChar();
+                this.Advance(1u64);
+            }
+        }
+
+        if this.CurrentChar() == quote_char {
+            this.Advance(1u64);
+        } else {
+            Logger::Log("Unterminated string literal.", token, LogSeverity::Error);
+        } ret token;
+    }
+
+    priv LexNumber(&mut this) -> Token {
+        let mut token: Token;
+        (token.row, token.column, token.file) = (this.row, this.column, this.file);
+        token._type = TokenType::INTEGER;
+
+        if this.CurrentChar() == '0' {
+            token.value += this.CurrentChar();
+            this.Advance(1u64);
+
+            if this.CurrentChar() == 'x' || this.CurrentChar() == 'X' {
+                token.value += this.CurrentChar();
+                this.Advance(1u64);
+
+                while this.IsHexDigit(this.CurrentChar()) {
+                    token.value += this.CurrentChar();
+                    this.Advance(1u64);
+                }
+            } else if this.CurrentChar() == 'b' || this.CurrentChar() == 'B' {
+                token.value += this.CurrentChar();
+                this.Advance(1u64);
+
+                while this.IsBinDigit(this.CurrentChar()) {
+                    token.value += this.CurrentChar();
+                    this.Advance(1u64);
+                }
+            } else if this.CurrentChar() == 'o' || this.CurrentChar() == 'O' {
+                token.value += this.CurrentChar();
+                this.Advance(1u64);
+
+                while this.IsOctDigit(this.CurrentChar()) {
+                    token.value += this.CurrentChar();
+                    this.Advance(1u64);
+                }
+            } else {
+                while this.IsDigit(this.CurrentChar()) {
+                    token.value += this.CurrentChar();
+                    this.Advance(1u64);
+                }
+            }
+        } else {
+            while this.IsDigit(this.CurrentChar()) {
+                token.value += this.CurrentChar();
+                this.Advance(1u64);
+            }
+        }
+
+        if this.CurrentChar() == '.' && this.IsDigit(this.PeekChar(1u64)) {
+            token._type = TokenType::FLOAT;
+            token.value += this.CurrentChar();
+            this.Advance(1u64);
+
+            while this.IsDigit(this.CurrentChar()) {
+                token.value += this.CurrentChar();
+                this.Advance(1u64);
+            }
+        }
+
+        if this.CurrentChar() == 'e' || this.CurrentChar() == 'E' {
+            token._type = TokenType::FLOAT;
+            token.value += this.CurrentChar();
+            this.Advance(1u64);
+
+            if this.CurrentChar() == '+' || this.CurrentChar() == '-' {
+                token.value += this.CurrentChar();
+                this.Advance(1u64);
+            }
+
+            while this.IsDigit(this.CurrentChar()) {
+                token.value += this.CurrentChar();
+                this.Advance(1u64);
+            }
+        } ret token;
+    }
+
+    priv LexIdentifier(&mut this) -> Token {
+        let mut token: Token;
+        (token.row, token.column, token.file) = (this.row, this.column, this.file);
+        token._type = TokenType::IDENTIFIER;
+
+        loop {
+            let byte = this.CurrentChar() as u8;
+
+            if byte > 0x7Fu8 {
+                token.value += byte as i8;
+                token.value += this.PeekChar(1u64);
+
+                if (byte & 0xE0u8) == 0xC0u8 {
+                    this.Advance(2u64);
+                } else {
+                    token.value += this.PeekChar(2u64);
+
+                    if (byte & 0xF0u8) == 0xE0u8 {
+                        this.Advance(3u64);
+                    } else {
+                        token.value += this.PeekChar(3u64);
+                        this.Advance(4u64);
+                    }
+                }
+            } else {
+                if token.value.Size() > 1u64 ? this.IsAlphaNum(byte as i8) : this.IsAlpha(byte as i8) {
+                    token.value += byte as i8;
+                    this.Advance(1u64);
+                } else {
+                    break;
+                }
+            }
+        } ret token;
+    }
+
+    priv LexSymbol(&mut this) -> Token {
+        let mut token: Token;
+        (token.row, token.column, token.file) = (this.row, this.column, this.file);
+        let current = this.CurrentChar();
+        let next = this.PeekChar(1u64);
+        token.value += current;
+
+        if current == '+' {
+            token._type = TokenType::PLUS;
+            this.Advance(1u64);
+        } else if current == '-' {
+            token._type = TokenType::MINUS;
+            this.Advance(1u64);
+        } else if current == '*' {
+            token._type = TokenType::MUL;
+            this.Advance(1u64);
+        } else if current == '/' {
+            token._type = TokenType::DIV;
+            this.Advance(1u64);
+        } else if current == '%' {
+            token._type = TokenType::MOD;
+            this.Advance(1u64);
+        } else if current == '&' {
+            token._type = TokenType::AND;
+            this.Advance(1u64);
+        } else if current == '|' {
+            token._type = TokenType::OR;
+            this.Advance(1u64);
+        } else if current == '^' {
+            token._type = TokenType::XOR;
+            this.Advance(1u64);
+        } else if current == '!' {
+            token._type = TokenType::NOT;
+            this.Advance(1u64);
+        } else if current == '<' && next == '<' {
+            token.value += next;
+            token._type = TokenType::LSHIFT;
+            this.Advance(2u64);
+        } else if current == '>' && next == '>' {
+            token.value += next;
+            token._type = TokenType::RSHIFT;
+            this.Advance(2u64);
+        } else if current == '(' {
+            token._type = TokenType::LPAREN;
+            this.Advance(1u64);
+        } else if current == ')' {
+            token._type = TokenType::RPAREN;
+            this.Advance(1u64);
+        } else if current == '[' {
+            token._type = TokenType::LBRACKET;
+            this.Advance(1u64);
+        } else if current == ']' {
+            token._type = TokenType::RBRACKET;
+            this.Advance(1u64);
+        } else if current == '{' {
+            token._type = TokenType::LBRACE;
+            this.Advance(1u64);
+        } else if current == '}' {
+            token._type = TokenType::RBRACE;
+            this.Advance(1u64);
+        } else if current == ',' {
+            token._type = TokenType::COMMA;
+            this.Advance(1u64);
+        } else if current == ':' {
+            token._type = TokenType::COLON;
+            this.Advance(1u64);
+        } else if current == '$' {
+            token._type = TokenType::DOLLAR;
+            this.Advance(1u64);
+        } else {
+            Logger::Log("Invalid symbol '" + current.ToString() + "'.", token, LogSeverity::Error);
+            this.Advance(1u64);
+        } ret token;
+    }
+
+    pub Lex(&mut this, text: String, file: String) -> Vector<Token> {
+        (this.index, this.row, this.column) = (0u64, 1u64, 1u64);
+        (this.file, this.text, this.length) = (file, text, text.Size());
+        let mut tokens: Vector<Token>;
+
+        while this.CurrentChar() != '\0' {
+            this.SkipWhitespace();
+
+            if this.CurrentChar() == '\0' {
+                break;
+            }
+
+            if this.CurrentChar() == '\n' {
+                this.Advance(1u64);
+                continue;
+            }
+
+            if this.SkipComment() {
+                continue;
+            }
+
+            let character = this.CurrentChar();
+
+            if character == '"' || character == '\'' {
+                tokens.PushBack(this.LexString());
+            } else if this.IsDigit(character) || (character == '.' && this.IsDigit(this.PeekChar(1u64))) {
+                tokens.PushBack(this.LexNumber());
+            } else if this.IsAlpha(character) || (character as u8) > 0x7Fu8 {
+                tokens.PushBack(this.LexIdentifier());
+            } else {
+                tokens.PushBack(this.LexSymbol());
+            }
+        }
+
+        let mut eof: Token;
+        (eof._type, eof.row, eof.column, eof.file) = (TokenType::EOF, this.row, this.column, this.file);
+        tokens.PushBack(eof);
+        ret tokens;
+    }
+}
