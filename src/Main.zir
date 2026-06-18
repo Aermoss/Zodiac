@@ -93,8 +93,18 @@ func main(args: &mut Vector<String>) -> i32 {
 
     let mut assembler = Assembler();
     let instructions = assembler.Assemble(root);
+    let mut result: String;
 
-    for j in 0u64..instructions.Size() {
-        WriteLine(String(instructions[j] as u64, 16u64));
-    } ret 0i32;
+    for instruction in instructions {
+        let mut hex = String(instruction as u64, 16u64);
+        while hex.Length() < 8u64 { hex = "0" + hex; }
+        result += hex + "\n";
+    }
+
+    if output_file.Empty() {
+        output_file = SplitExtension(input_file).left + ".hex";
+    }
+
+    _WriteFile(output_file, result);
+    ret 0i32;
 }
