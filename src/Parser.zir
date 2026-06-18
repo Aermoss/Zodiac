@@ -1,0 +1,230 @@
+/*
+ * Copyright 2025-2026 Yusuf Rençber
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+#[include "std/str", "std/vec", "std/map", "std/pair", "std/arena",
+    "src/Logger.zir", "src/Lexer.zir", "src/Nodes.zir" : *]
+
+class Parser {
+    priv arena: Arena,
+    priv tokens: Vector<Token>,
+    priv index: u64;
+
+    priv Current(&this) -> Token {
+        if this.index >= this.tokens.Size() {
+            ret this.tokens[this.tokens.Size() - 1u64];
+        } else {
+            ret this.tokens[this.index];
+        }
+    }
+
+    priv Peek(&this, offset: u64) -> Token {
+        let index = this.index + offset;
+        if index >= this.tokens.Size() {
+            ret this.tokens[this.tokens.Size() - 1u64];
+        } else {
+            ret this.tokens[index];
+        }
+    }
+
+    priv Advance(&mut this) -> Token {
+        let token = this.Current();
+        if this.index < this.tokens.Size() {
+            this.index += 1u64;
+        } ret token;
+    }
+
+    priv Match(&mut this, _type: TokenType) -> bool {
+        if this.Current()._type == _type {
+            this.Advance();
+            ret true;
+        } else {
+            ret false;
+        }
+    }
+
+    priv Expect(&mut this, _type: TokenType) -> Token {
+        let token = this.Current();
+
+        if token._type == _type {
+            ret this.Advance();
+        }
+
+        Logger::Log("Expected '" + _type.ToString() + "' but got '" + token._type.ToString() + "'.", token, LogSeverity::Error);
+
+        let mut error: Token;
+        (error._type, error.row, error.column, error.file) = (TokenType::UNKNOWN, token.row, token.column, token.file);
+        ret error;
+    }
+
+    priv Expect2(&mut this, _type: TokenType) -> bool {
+        let token = this.Current();
+
+        if token._type == _type {
+            this.Advance();
+            ret true;
+        }
+
+        Logger::Log("Expected '" + _type.ToString() + "' but got '" + token._type.ToString() + "'.", token, LogSeverity::Error);
+        ret false;
+    }
+
+    priv GetBinaryOperatorPrecedence(&this, _type: TokenType) -> i32 {
+        if _type == TokenType::OR { ret 1i32; }
+        else if _type == TokenType::XOR { ret 2i32; }
+        else if _type == TokenType::AND { ret 3i32; }
+        else if _type == TokenType::LSHIFT || _type == TokenType::RSHIFT { ret 4i32; }
+        else if _type == TokenType::PLUS || _type == TokenType::MINUS { ret 5i32; }
+        else if _type == TokenType::MUL || _type == TokenType::DIV || _type == TokenType::MOD { ret 6i32; }
+        else { ret -1i32; }
+    }
+
+    priv IsBinaryOperator(&this, _type: TokenType) -> bool {
+        ret this.GetBinaryOperatorPrecedence(_type) > 0i32;
+    }
+
+    priv IsUnaryOperator(&this, _type: TokenType) -> bool {
+        ret _type == TokenType::NOT || _type == TokenType::MINUS;
+    }
+
+    priv ParsePrimary(&mut this) -> *const Node {
+        let token = this.Current();
+
+        if token._type == TokenType::NUMBER {
+            this.Advance();
+            ret this.arena.New<LiteralNode>(token.value, token);
+        } else if token._type == TokenType::IDENTIFIER {
+            this.Advance();
+            ret this.arena.New<IdentifierNode>(token.value, token);
+        } else if token._type == TokenType::LPAREN {
+            this.Advance();
+            let expression = this.ParseExpression();
+            if expression == null || !this.Expect2(TokenType::RPAREN) { ret null; }
+            ret expression;
+        } else {
+            this.Advance();
+            Logger::Log("Unexpected token '" + token.value + "'.", token, LogSeverity::Error);
+            ret null;
+        }
+    }
+
+    priv ParsePostfix(&mut this) -> *const Node {
+        ret this.ParsePrimary();
+    }
+
+    priv ParseUnary(&mut this) -> *const Node {
+        let token = this.Current();
+        let mut mutable = false;
+
+        if this.IsUnaryOperator(token._type) {
+            this.Advance();
+            let expression = this.ParseUnary();
+            if expression == null { ret null; }
+            ret this.arena.New<UnaryOperationNode>(expression, token._type, token);
+        } else {
+            ret this.ParsePostfix();
+        }
+    }
+
+    priv ParseBinary(&mut this, min_precedence: i32) -> *const Node {
+        let mut left = this.ParseUnary();
+        if left == null { ret null; }
+
+        loop {
+            let token = this.Current();
+            let precedence = this.GetBinaryOperatorPrecedence(token._type);
+            if precedence < min_precedence { break; }
+            this.Advance();
+
+            let right = this.ParseBinary(precedence + 1i32);
+            if right == null { ret null; }
+            left = this.arena.New<BinaryOperationNode>(left, right, token._type, token);
+        } ret left;
+    }
+
+    priv ParseExpression(&mut this) -> *const Node {
+        ret this.ParseBinary(0i32);
+    }
+
+    priv ParseOperand(&mut this) -> *const OperandNode {
+        let token = this.Current();
+        let deref = this.Match(TokenType::LBRACKET);
+        let expr = this.ParseExpression();
+        if expr == null { ret null; }
+
+        if deref {
+            if !this.Expect2(TokenType::RBRACKET) { ret null; }
+        }
+
+        ret this.arena.New<OperandNode>(expr, deref, token);
+    }
+
+    pub ParseInstruction(&mut this) -> *const InstructionNode {
+        let token = this.Expect(TokenType::IDENTIFIER);
+        if token._type == TokenType::UNKNOWN { ret null; }
+        let mnemonic = token.value;
+        let instruction = this.arena.New<InstructionNode>(mnemonic, token);
+
+        if this.Current()._type != TokenType::NEWLINE && this.Current()._type != TokenType::EOF {
+            let mut index = 0u64;
+
+            loop {
+                let operand = this.ParseOperand();
+
+                if operand != null {
+                    if (mnemonic == "st" || mnemonic == "ld") && index == 1u64 && !operand->deref {
+                        Logger::Log("instruction '" + mnemonic + "' requires dereference operator [] for address operand.", token, LogSeverity::Error);
+                    }
+
+                    instruction->operands.PushBack(operand);
+                }
+
+                if this.Match(TokenType::COMMA) {
+                    index += 1u64;
+                } else {
+                    break;
+                }
+            }
+        } ret instruction;
+    }
+
+    pub ParseLabel(&mut this) -> *const LabelNode {
+        let token = this.Expect(TokenType::IDENTIFIER);
+        if token._type == TokenType::UNKNOWN || !this.Expect2(TokenType::COLON) { ret null; }
+        ret this.arena.New<LabelNode>(token.value, token);
+    }
+
+    pub Parse(&mut this, tokens: &Vector<Token>) -> *const RootNode {
+        (this.tokens, this.index) = (tokens, 0u64);
+        this.arena.Clear();
+        let root = this.arena.New<RootNode>();
+
+        while this.Current()._type != TokenType::EOF {
+            if this.Match(TokenType::NEWLINE) { continue; }
+            let token = this.Current();
+
+            if token._type == TokenType::IDENTIFIER {
+                if this.Peek(1u64)._type == TokenType::COLON {
+                    root->declarations.PushBack(this.ParseLabel());
+                } else {
+                    root->declarations.PushBack(this.ParseInstruction());
+                }
+            } else {
+                Logger::Log("Unexpected token '" + token.value + "'.", token, LogSeverity::Error);
+                this.Advance();
+            }
+        } ret root;
+    }
+}

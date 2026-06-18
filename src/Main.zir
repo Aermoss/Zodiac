@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#[include "std/io", "std/file", "src/Logger.zir", "src/Lexer.zir" : *]
+#[include "std/io", "std/file", "src/Logger.zir", "src/Lexer.zir", "src/Parser.zir", "src/Assembler.zir" : *]
 
 func PrintVersion(executable: String) {
     WriteLine("Unversioned build of " + executable + ".");
@@ -30,10 +30,6 @@ func PrintUsage(executable: String) {
     WriteLine("  -o <file>                Write output to <file>");
     WriteLine("  --version                Display assembler version");
     WriteLine("  -h, --help               Display this help message");
-}
-
-func FatalErrorHandler(reason: *const i8) {
-    Logger::Log("LLVM", reason, LogSeverity::Fatal);
 }
 
 func main(args: &mut Vector<String>) -> i32 {
@@ -91,7 +87,14 @@ func main(args: &mut Vector<String>) -> i32 {
     let content = _ReadFile(input_file);
     let tokens = lexer.Lex(content, input_file);
 
-    for token in tokens {
-        WriteLine(token.value + ", " + token._type.ToString());
+    let mut parser = Parser();
+    let root = parser.Parse(tokens);
+    if root == null { ret 1i32; }
+
+    let mut assembler = Assembler();
+    let instructions = assembler.Assemble(root);
+
+    for j in 0u64..instructions.Size() {
+        WriteLine(String(instructions[j] as u64, 16u64));
     } ret 0i32;
 }

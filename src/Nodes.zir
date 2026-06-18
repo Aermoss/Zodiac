@@ -1,0 +1,109 @@
+/*
+ * Copyright 2025-2026 Yusuf Rençber
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+#[include "std/str", "std/vec", "std/map", "std/pair", "src/Tokens.zir" : *]
+
+enum NodeType: i32 {
+    ROOT,
+
+    LITERAL, IDENTIFIER,
+    INSTRUCTION, LABEL, OPERAND,
+    BINARY_OPERATION, UNARY_OPERATION,
+}
+
+func ToString(_type: NodeType) -> String {
+    if _type == NodeType::ROOT { ret "ROOT".ToString(); }
+    else if _type == NodeType::INSTRUCTION { ret "INSTRUCTION".ToString(); }
+    else if _type == NodeType::LABEL { ret "LABEL".ToString(); }
+    else if _type == NodeType::OPERAND { ret "OPERAND".ToString(); }
+    else if _type == NodeType::BINARY_OPERATION { ret "BINARY_OPERATION".ToString(); }
+    else if _type == NodeType::UNARY_OPERATION { ret "UNARY_OPERATION".ToString(); }
+    else if _type == NodeType::LITERAL { ret "LITERAL".ToString(); }
+    else if _type == NodeType::IDENTIFIER { ret "IDENTIFIER".ToString(); }
+    else { ret "UNKNOWN".ToString(); }
+}
+
+class Node {
+    pub _type: NodeType,
+    pub start: Token,
+    pub end: Token;
+
+    Node(&mut this, _type: NodeType, start: Token) {
+        (this._type, this.start) = (_type, start);
+    }
+}
+
+class LiteralNode : Node {
+    pub value: String;
+
+    LiteralNode(&mut this, value: String, start: Token) : Node(NodeType::LITERAL, start) {
+        this.value = value;
+    }
+}
+
+class IdentifierNode : Node {
+    pub value: String;
+
+    IdentifierNode(&mut this, value: String, start: Token) : Node(NodeType::IDENTIFIER, start) {
+        this.value = value;
+    }
+}
+
+class BinaryOperationNode : Node {
+    pub left: *const Node, pub right: *const Node, pub operator: TokenType;
+
+    BinaryOperationNode(&mut this, left: *const Node, right: *const Node, operator: TokenType, start: Token) : Node(NodeType::BINARY_OPERATION, start) {
+        (this.left, this.right, this.operator) = (left, right, operator);
+    }
+}
+
+class UnaryOperationNode : Node {
+    pub operand: *const Node, pub operator: TokenType;
+
+    UnaryOperationNode(&mut this, operand: *const Node, operator: TokenType, start: Token) : Node(NodeType::UNARY_OPERATION, start) {
+        (this.operand, this.operator) = (operand, operator);
+    }
+}
+
+class OperandNode : Node {
+    pub expression: *const Node, pub deref: bool;
+
+    OperandNode(&mut this, expression: *const Node, deref: bool, start: Token) : Node(NodeType::OPERAND, start) {
+        (this.expression, this.deref) = (expression, deref);
+    }
+}
+
+class InstructionNode : Node {
+    pub mnemonic: String, pub operands: Vector<*const OperandNode>;
+
+    InstructionNode(&mut this, mnemonic: String, start: Token) : Node(NodeType::INSTRUCTION, start) {
+        this.mnemonic = mnemonic;
+    }
+}
+
+class LabelNode : Node {
+    pub name: String;
+
+    LabelNode(&mut this, name: String, start: Token) : Node(NodeType::LABEL, start) {
+        this.name = name;
+    }
+}
+
+class RootNode : Node {
+    pub declarations: Vector<*const Node>;
+
+    RootNode(&mut this) : Node(NodeType::ROOT, Token(), Token()) {}
+}
