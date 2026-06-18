@@ -26,6 +26,15 @@ enum Opcode: u32 {
     HLT = 0xFFu32
 }
 
+const OPCODE_SHIFT: u32 = 24u32;
+const RD_SHIFT: u32 = 19u32;
+const RS1_SHIFT: u32 = 14u32;
+const RS2_SHIFT: u32 = 9u32;
+
+const IMM14_MASK: u32 = 0x3FFFu32;
+const IMM19_MASK: u32 = 0x7FFFFu32;
+const IMM24_MASK: u32 = 0xFFFFFFu32;
+
 class Assembler {
     priv labels: Vector<String>,
     // priv labels: Map<String, u32>,
@@ -132,48 +141,48 @@ class Assembler {
             else if mnemonic == "hlt" { opcode = Opcode::HLT; }
             else { opcode = Opcode::NOP; }
 
-            result |= (opcode << 24u32);
+            result |= (opcode << OPCODE_SHIFT);
 
             if opcode == Opcode::LD || opcode == Opcode::LDI {
-                result |= (this.AssembleExpression(operands[0u64]->expression) << 19u32);
+                result |= (this.AssembleExpression(operands[0u64]->expression) << RD_SHIFT);
 
                 if opcode == Opcode::LD {
-                    result |= (this.AssembleExpression(operands[1u64]->expression) << 14u32);
-                    result |= (this.AssembleExpression(operands[1u64]->offset) & 0x3FFFu32);
+                    result |= (this.AssembleExpression(operands[1u64]->expression) << RS1_SHIFT);
+                    result |= (this.AssembleExpression(operands[1u64]->offset) & IMM14_MASK);
                 } else {
-                    result |= (this.AssembleExpression(operands[1u64]->expression) & 0x7FFFFu32);
+                    result |= (this.AssembleExpression(operands[1u64]->expression) & IMM19_MASK);
                 }
             } else if opcode == Opcode::ST {
-                result |= (this.AssembleExpression(operands[0u64]->expression) << 19u32);
-                result |= (this.AssembleExpression(operands[1u64]->expression) << 14u32);
-                result |= (this.AssembleExpression(operands[1u64]->offset) & 0x3FFFu32);
+                result |= (this.AssembleExpression(operands[0u64]->expression) << RD_SHIFT);
+                result |= (this.AssembleExpression(operands[1u64]->expression) << RS1_SHIFT);
+                result |= (this.AssembleExpression(operands[1u64]->offset) & IMM14_MASK);
             } else if opcode == Opcode::CMP || opcode == Opcode::CMPI {
-                result |= (this.AssembleExpression(operands[0u64]->expression) << 19u32);
+                result |= (this.AssembleExpression(operands[0u64]->expression) << RD_SHIFT);
 
                 if opcode == Opcode::CMP {
-                    result |= (this.AssembleExpression(operands[1u64]->expression) << 14u32);
+                    result |= (this.AssembleExpression(operands[1u64]->expression) << RS1_SHIFT);
                 } else {
-                    result |= (this.AssembleExpression(operands[1u64]->expression) & 0x7FFFFu32);
+                    result |= (this.AssembleExpression(operands[1u64]->expression) & IMM19_MASK);
                 }
             } else if opcode >= Opcode::J && opcode <= Opcode::JNC {
-                result |= (this.AssembleExpression(operands[0u64]->expression) & 0xFFFFFFu32);
+                result |= (this.AssembleExpression(operands[0u64]->expression) & IMM24_MASK);
             } else if opcode == Opcode::JR {
-                result |= (this.AssembleExpression(operands[0u64]->expression) << 19u32);
+                result |= (this.AssembleExpression(operands[0u64]->expression) << RD_SHIFT);
             } else if opcode >= Opcode::ADD && opcode <= Opcode::SHR {
-                result |= (this.AssembleExpression(operands[0u64]->expression) << 19u32);
-                result |= (this.AssembleExpression(operands[1u64]->expression) << 14u32);
-                result |= (this.AssembleExpression(operands[2u64]->expression) << 9u32);
+                result |= (this.AssembleExpression(operands[0u64]->expression) << RD_SHIFT);
+                result |= (this.AssembleExpression(operands[1u64]->expression) << RS1_SHIFT);
+                result |= (this.AssembleExpression(operands[2u64]->expression) << RS2_SHIFT);
             } else if opcode >= Opcode::ADDI && opcode <= Opcode::SHRI {
-                result |= (this.AssembleExpression(operands[0u64]->expression) << 19u32);
-                result |= (this.AssembleExpression(operands[1u64]->expression) << 14u32);
-                result |= (this.AssembleExpression(operands[2u64]->expression) & 0x3FFFu32);
+                result |= (this.AssembleExpression(operands[0u64]->expression) << RD_SHIFT);
+                result |= (this.AssembleExpression(operands[1u64]->expression) << RS1_SHIFT);
+                result |= (this.AssembleExpression(operands[2u64]->expression) & IMM14_MASK);
             } else if opcode == Opcode::NOT || opcode == Opcode::NOTI {
-                result |= (this.AssembleExpression(operands[0u64]->expression) << 19u32);
+                result |= (this.AssembleExpression(operands[0u64]->expression) << RD_SHIFT);
 
                 if opcode == Opcode::NOT {
-                    result |= (this.AssembleExpression(operands[1u64]->expression) << 14u32);
+                    result |= (this.AssembleExpression(operands[1u64]->expression) << RS1_SHIFT);
                 } else {
-                    result |= (this.AssembleExpression(operands[1u64]->expression) & 0x7FFFFu32);
+                    result |= (this.AssembleExpression(operands[1u64]->expression) & IMM19_MASK);
                 }
             }
 
