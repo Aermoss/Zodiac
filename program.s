@@ -1,3 +1,19 @@
+ldi x31, 0xFFFF
+ldi x1, 90
+st x1, 0(x31)
+ldi x1, 79
+st x1, 0(x31)
+ldi x1, 68
+st x1, 0(x31)
+ldi x1, 73
+st x1, 0(x31)
+ldi x1, 65
+st x1, 0(x31)
+ldi x1, 67
+st x1, 0(x31)
+ldi x1, 10
+st x1, 0(x31)
+add x1, x0, x0
 ldi x31, 0xFFF
 
 loop:

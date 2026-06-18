@@ -72,13 +72,14 @@ logic [31:0] reg_write;
 logic [31:0] regs [0:31];
 
 logic ram_we;
+logic _ram_we;
 logic [31:0] ram_addr;
 logic [31:0] ram_write;
 logic [31:0] ram_read;
 
 ram ram0(
     .clk(clk),
-    .we(ram_we),
+    .we(_ram_we),
     .addr(ram_addr),
     .write(ram_write),
     .read(ram_read)
@@ -141,6 +142,24 @@ end
 
 logic flag_zero;
 logic flag_carry;
+logic uart_we;
+
+uart uart0(
+    .clk(clk),
+    .we(uart_we),
+    .write(ram_write)
+);
+
+always_comb begin
+    uart_we = 0;
+    _ram_we = 0;
+
+    if (ram_addr == 32'hFFFF) begin
+        uart_we = ram_we;
+    end else begin
+        _ram_we = ram_we;
+    end
+end
 
 state_t next_state;
 logic [31:0] next_pc;
