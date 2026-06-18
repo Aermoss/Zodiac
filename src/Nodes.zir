@@ -79,10 +79,10 @@ class UnaryOperationNode : Node {
 }
 
 class OperandNode : Node {
-    pub expression: *const Node, pub deref: bool;
+    pub expression: *const Node, pub offset: *const Node;
 
-    OperandNode(&mut this, expression: *const Node, deref: bool, start: Token) : Node(NodeType::OPERAND, start) {
-        (this.expression, this.deref) = (expression, deref);
+    OperandNode(&mut this, expression: *const Node, offset: *const Node, start: Token) : Node(NodeType::OPERAND, start) {
+        (this.expression, this.offset) = (expression, offset);
     }
 }
 

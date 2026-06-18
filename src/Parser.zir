@@ -160,15 +160,16 @@ class Parser {
 
     priv ParseOperand(&mut this) -> *const OperandNode {
         let token = this.Current();
-        let deref = this.Match(TokenType::LBRACKET);
         let expr = this.ParseExpression();
         if expr == null { ret null; }
 
-        if deref {
-            if !this.Expect2(TokenType::RBRACKET) { ret null; }
+        if this.Match(TokenType::LPAREN) {
+            let reg = this.ParseExpression();
+            if reg == null || !this.Expect2(TokenType::RPAREN) { ret null; }
+            ret this.arena.New<OperandNode>(reg, expr, token);
         }
 
-        ret this.arena.New<OperandNode>(expr, deref, token);
+        ret this.arena.New<OperandNode>(expr, null, token);
     }
 
     pub ParseInstruction(&mut this) -> *const InstructionNode {
@@ -184,8 +185,12 @@ class Parser {
                 let operand = this.ParseOperand();
 
                 if operand != null {
-                    if (mnemonic == "st" || mnemonic == "ld") && index == 1u64 && !operand->deref {
-                        Logger::Log("instruction '" + mnemonic + "' requires dereference operator [] for address operand.", token, LogSeverity::Error);
+                    let state = (mnemonic == "st" || mnemonic == "ld") && index == 1u64;
+
+                    if state && operand->offset == null {
+                        Logger::Log("Instruction '" + mnemonic + "' requires dereference operator 'offset(reg)' for operand " + String(index + 1u64) + ".", token, LogSeverity::Error);
+                    } else if !state && operand->offset != null {
+                        Logger::Log("Instruction '" + mnemonic + "' does not support dereference operator for operand " + String(index + 1u64) + ".", token, LogSeverity::Error);
                     }
 
                     instruction->operands.PushBack(operand);

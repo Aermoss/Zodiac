@@ -81,10 +81,10 @@ always_comb begin
     case (state)
         S_DECODE: begin
             case (ram_read[31:24])
-                OP_LD: ram_addr = regs[ram_read[18:14]];
+                OP_LD: ram_addr = regs[ram_read[18:14]] + ram_read[13:0];
 
                 OP_ST: begin
-                    ram_addr = regs[ram_read[18:14]];
+                    ram_addr = regs[ram_read[18:14]] + ram_read[13:0];
                     ram_write = regs[ram_read[23:19]];
                     ram_we = 1;
                 end

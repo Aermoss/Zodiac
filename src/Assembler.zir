@@ -134,12 +134,14 @@ class Assembler {
 
                 if opcode == Opcode::LD {
                     result |= (this.AssembleExpression(operands[1u64]->expression) << 14u32);
+                    result |= (this.AssembleExpression(operands[1u64]->offset) & 0x3FFFu32);
                 } else {
                     result |= (this.AssembleExpression(operands[1u64]->expression) & 0x7FFFFu32);
                 }
             } else if opcode == Opcode::ST {
                 result |= (this.AssembleExpression(operands[0u64]->expression) << 19u32);
                 result |= (this.AssembleExpression(operands[1u64]->expression) << 14u32);
+                result |= (this.AssembleExpression(operands[1u64]->offset) & 0x3FFFu32);
             } else if opcode == Opcode::CMP || opcode == Opcode::CMPI {
                 result |= (this.AssembleExpression(operands[0u64]->expression) << 19u32);
 
