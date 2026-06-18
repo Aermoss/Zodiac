@@ -13,7 +13,7 @@ ram.sv: program.hex
 sim.out: $(wildcard *.sv)
 	iverilog -o $@ -g2012 $^
 
-dump.vcd: sim.out
+dump.vcd: sim.out program.hex
 	vvp $<
 
 run: dump.vcd

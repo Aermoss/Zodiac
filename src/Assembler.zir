@@ -29,10 +29,13 @@ enum Opcode: u32 {
 class Assembler {
     priv labels: Vector<String>,
     // priv labels: Map<String, u32>,
-    priv addresses: Vector<u32>;
+    priv addresses: Vector<u32>,
+    priv address: u32;
 
     priv AssembleExpression(&mut this, node: *const Node) -> u32 {
-        if node->_type == NodeType::LITERAL {
+        if node->_type == NodeType::ADDRESS {
+            ret this.address;
+        } else if node->_type == NodeType::LITERAL {
             let value = (node as *const LiteralNode)->value;
             if value.StartsWith("0x") { ret value.SubString(2u64).ToInteger(16i64) as u32; }
             else if value.StartsWith("0b") { ret value.SubString(2u64).ToInteger(2i64) as u32; }
@@ -72,7 +75,7 @@ class Assembler {
     }
 
     pub Assemble(&mut this, root: *const RootNode) -> Vector<u32> {
-        let mut address = 0u32;
+        this.address = 0u32;
         let mut instructions: Vector<u32>;
         this.addresses.Clear();
         this.labels.Clear();
@@ -81,11 +84,13 @@ class Assembler {
             if node->_type == NodeType::LABEL {
                 let label = node as *const LabelNode;
                 this.labels.PushBack(label->name);
-                this.addresses.PushBack(address);
+                this.addresses.PushBack(this.address);
             } else if node->_type == NodeType::INSTRUCTION {
-                address += 1u32;
+                this.address += 1u32;
             }
         }
+
+        this.address = 0u32;
 
         for node in root->declarations {
             if node->_type != NodeType::INSTRUCTION {
@@ -173,6 +178,7 @@ class Assembler {
             }
 
             instructions.PushBack(result);
+            this.address += 1u32;
         } ret instructions;
     }
 }

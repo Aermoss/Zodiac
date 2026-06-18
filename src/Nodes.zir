@@ -19,9 +19,9 @@
 enum NodeType: i32 {
     ROOT,
 
-    LITERAL, IDENTIFIER,
     INSTRUCTION, LABEL, OPERAND,
     BINARY_OPERATION, UNARY_OPERATION,
+    LITERAL, IDENTIFIER, ADDRESS,
 }
 
 func ToString(_type: NodeType) -> String {
@@ -33,6 +33,7 @@ func ToString(_type: NodeType) -> String {
     else if _type == NodeType::UNARY_OPERATION { ret "UNARY_OPERATION".ToString(); }
     else if _type == NodeType::LITERAL { ret "LITERAL".ToString(); }
     else if _type == NodeType::IDENTIFIER { ret "IDENTIFIER".ToString(); }
+    else if _type == NodeType::ADDRESS { ret "ADDRESS".ToString(); }
     else { ret "UNKNOWN".ToString(); }
 }
 
@@ -60,6 +61,10 @@ class IdentifierNode : Node {
     IdentifierNode(&mut this, value: String, start: Token) : Node(NodeType::IDENTIFIER, start) {
         this.value = value;
     }
+}
+
+class AddressNode : Node {
+    AddressNode(&mut this, start: Token) : Node(NodeType::ADDRESS, start) {}
 }
 
 class BinaryOperationNode : Node {
@@ -105,5 +110,5 @@ class LabelNode : Node {
 class RootNode : Node {
     pub declarations: Vector<*const Node>;
 
-    RootNode(&mut this) : Node(NodeType::ROOT, Token(), Token()) {}
+    RootNode(&mut this) : Node(NodeType::ROOT, Token()) {}
 }
