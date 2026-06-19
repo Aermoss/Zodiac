@@ -271,7 +271,6 @@ always_comb begin
 
             case (opcode)
                 OP_LI: reg_write = imm19;
-
                 OP_LB: reg_write = {{24{ram_read_byte[7]}}, ram_read_byte};
                 OP_LBU: reg_write = ram_read_byte;
 
