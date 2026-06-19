@@ -20,6 +20,7 @@ enum Opcode: u32 {
     NOP,
     LB, LBU, LH, LHU, LW, LI, LUI, AUIPC, SB, SH, SW,
     B, BR, BL, BEQ, BNE, BLT, BLTU, BGE, BGEU,
+    SLT, SLTU, SLTI, SLTIU,
     ADD, ADDI, SUB, SUBI,
     MUL, MULH, MULHSU, MULHU, DIV, DIVU, REM, REMU,
     AND, ANDI, OR, ORI, XOR, XORI,
@@ -133,6 +134,10 @@ class Assembler {
             else if mnemonic == "bltu" { opcode = Opcode::BLTU; }
             else if mnemonic == "bge" { opcode = Opcode::BGE; }
             else if mnemonic == "bgeu" { opcode = Opcode::BGEU; }
+            else if mnemonic == "slt" { opcode = Opcode::SLT; }
+            else if mnemonic == "sltu" { opcode = Opcode::SLTU; }
+            else if mnemonic == "slti" { opcode = Opcode::SLTI; }
+            else if mnemonic == "sltiu" { opcode = Opcode::SLTIU; }
             else if mnemonic == "add" { opcode = Opcode::ADD; }
             else if mnemonic == "addi" { opcode = Opcode::ADDI; }
             else if mnemonic == "sub" { opcode = Opcode::SUB; }
@@ -185,6 +190,15 @@ class Assembler {
                 result |= (this.AssembleExpression(operands[0u64]->expression) << REG0_SHIFT);
                 result |= (this.AssembleExpression(operands[1u64]->expression) << REG1_SHIFT);
                 result |= ((this.AssembleExpression(operands[2u64]->expression) - this.address) & IMM16_MASK);
+            } if opcode >= Opcode::SLT && opcode <= Opcode::SLTIU {
+                result |= (this.AssembleExpression(operands[0u64]->expression) << REG0_SHIFT);
+                result |= (this.AssembleExpression(operands[1u64]->expression) << REG1_SHIFT);
+
+                if opcode == Opcode::SLT || opcode == Opcode::SLTU {
+                    result |= (this.AssembleExpression(operands[2u64]->expression) << REG2_SHIFT);
+                } else {
+                    result |= (this.AssembleExpression(operands[2u64]->expression) & IMM16_MASK);
+                }
             } else if opcode >= Opcode::ADD && opcode <= Opcode::SRAI {
                 result |= (this.AssembleExpression(operands[0u64]->expression) << REG0_SHIFT);
                 result |= (this.AssembleExpression(operands[1u64]->expression) << REG1_SHIFT);

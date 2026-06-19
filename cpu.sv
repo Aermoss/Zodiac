@@ -26,6 +26,10 @@ typedef enum logic [5:0] {
     OP_BLTU,
     OP_BGE,
     OP_BGEU,
+    OP_SLT,
+    OP_SLTU,
+    OP_SLTI,
+    OP_SLTIU,
     OP_ADD,
     OP_ADDI,
     OP_SUB,
@@ -91,10 +95,10 @@ logic signed [31:0] simm16;
 logic signed [31:0] simm21;
 logic signed [31:0] simm26;
 
-assign simm11 = {{11{imm11[10]}}, imm11};
+assign simm11 = {{21{imm11[10]}}, imm11};
 assign simm16 = {{16{imm16[15]}}, imm16};
-assign simm21 = {{21{imm21[20]}}, imm21};
-assign simm26 = {{26{imm26[25]}}, imm26};
+assign simm21 = {{11{imm21[20]}}, imm21};
+assign simm26 = {{6{imm26[25]}}, imm26};
 
 logic reg_we;
 logic [4:0] reg_addr;
@@ -240,6 +244,7 @@ always_comb begin
                 OP_BGE: next_pc = pc + (!branch_lt ? simm16 : 4);
                 OP_BGEU: next_pc = pc + (!branch_ltu ? simm16 : 4);
 
+                OP_SLT, OP_SLTU, OP_SLTI, OP_SLTIU,
                 OP_ADD, OP_ADDI, OP_SUB, OP_SUBI,
                 OP_MUL, OP_MULH, OP_MULHSU, OP_MULHU, OP_DIV, OP_DIVU, OP_REM, OP_REMU,
                 OP_AND, OP_ANDI, OP_OR, OP_ORI, OP_XOR, OP_XORI,
@@ -308,6 +313,10 @@ always_comb begin
                     reg_write = ram_read;
                 end
 
+                OP_SLT: reg_write = ($signed(regs[reg1]) < $signed(regs[reg2]));
+                OP_SLTU: reg_write = (regs[reg1] < regs[reg2]);
+                OP_SLTI: reg_write = ($signed(regs[reg1]) < simm16);
+                OP_SLTIU: reg_write = (regs[reg1] < simm16);
                 default: reg_write = alu_result;
             endcase
         end
