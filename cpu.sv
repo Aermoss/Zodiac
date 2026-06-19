@@ -8,14 +8,15 @@ typedef enum logic [7:0] {
     OP_LD,
     OP_LDI,
     OP_ST,
-    OP_CMP,
-    OP_CMPI,
-    OP_J,
-    OP_JZ,
-    OP_JNZ,
-    OP_JC,
-    OP_JNC,
-    OP_JR,
+    OP_B,
+    OP_BR,
+    OP_BL,
+    OP_BEQ,
+    OP_BNE,
+    OP_BLT,
+    OP_BLTU,
+    OP_BGE,
+    OP_BGEU,
     OP_ADD,
     OP_SUB,
     OP_AND,
@@ -89,16 +90,12 @@ logic [31:0] alu_left;
 logic [31:0] alu_right;
 alu_op_t alu_op;
 logic [31:0] alu_result;
-logic alu_zero;
-logic alu_carry;
 
 alu alu0(
     .left(alu_left),
     .right(alu_right),
     .alu_op(alu_op),
-    .result(alu_result),
-    .zero(alu_zero),
-    .carry(alu_carry)
+    .result(alu_result)
 );
 
 always_comb begin
@@ -107,8 +104,6 @@ always_comb begin
     alu_op = ALU_OP_ADD;
 
     case (opcode)
-        OP_CMP, OP_CMPI: alu_left = regs[rd];
-
         OP_ADD, OP_SUB, OP_AND, OP_OR, OP_XOR, OP_NOT, OP_SHL, OP_SHR,
         OP_ADDI, OP_SUBI, OP_ANDI, OP_ORI, OP_XORI, OP_SHLI, OP_SHRI:
             alu_left = regs[rs1];
@@ -117,9 +112,6 @@ always_comb begin
     endcase
 
     case (opcode)
-        OP_CMP: alu_right = regs[rs1];
-        OP_CMPI: alu_right = imm19;
-
         OP_ADD, OP_SUB, OP_AND, OP_OR, OP_XOR, OP_SHL, OP_SHR:
             alu_right = regs[rs2];
 
@@ -128,7 +120,6 @@ always_comb begin
     endcase
 
     case (opcode)
-        OP_CMP, OP_CMPI: alu_op = ALU_OP_SUB;
         OP_ADD, OP_ADDI: alu_op = ALU_OP_ADD;
         OP_SUB, OP_SUBI: alu_op = ALU_OP_SUB;
         OP_AND, OP_ANDI: alu_op = ALU_OP_AND;
@@ -140,8 +131,6 @@ always_comb begin
     endcase
 end
 
-logic flag_zero;
-logic flag_carry;
 logic uart_we;
 
 uart uart0(
@@ -160,6 +149,14 @@ always_comb begin
         _ram_we = ram_we;
     end
 end
+
+logic branch_eq;
+logic branch_lt;
+logic branch_ltu;
+
+assign branch_eq = (regs[rd] == regs[rs1]);
+assign branch_lt = ($signed(regs[rd]) < $signed(regs[rs1]));
+assign branch_ltu = (regs[rd] < regs[rs1]);
 
 state_t next_state;
 logic [31:0] next_pc;
@@ -199,14 +196,22 @@ always_comb begin
             next_state = S_FETCH;
 
             case (opcode)
-                OP_NOP, OP_CMP, OP_CMPI: next_pc = pc + 1;
+                OP_NOP: next_pc = pc + 1;
 
-                OP_J: next_pc = imm24;
-                OP_JZ: next_pc = flag_zero ? imm24 : pc + 1;
-                OP_JNZ: next_pc = !flag_zero ? imm24 : pc + 1;
-                OP_JC: next_pc = flag_carry ? imm24 : pc + 1;
-                OP_JNC: next_pc = !flag_carry ? imm24 : pc + 1;
-                OP_JR: next_pc = regs[rd];
+                OP_B: next_pc = imm24;
+                OP_BR: next_pc = regs[rd];
+                OP_BL: begin
+                    reg_we = (rd != 0);
+                    reg_write = pc + 1;
+                    next_pc = imm19;
+                end
+
+                OP_BEQ: next_pc = branch_eq ? imm14 : pc + 1;
+                OP_BNE: next_pc = !branch_eq ? imm14 : pc + 1;
+                OP_BLT: next_pc = branch_lt ? imm14 : pc + 1;
+                OP_BLTU: next_pc = branch_ltu ? imm14 : pc + 1;
+                OP_BGE: next_pc = !branch_lt ? imm14 : pc + 1;
+                OP_BGEU: next_pc = !branch_ltu ? imm14 : pc + 1;
 
                 OP_ADD, OP_SUB, OP_AND, OP_OR, OP_XOR, OP_NOT, OP_SHL, OP_SHR,
                 OP_ADDI, OP_SUBI, OP_ANDI, OP_ORI, OP_XORI, OP_NOTI, OP_SHLI, OP_SHRI:
@@ -252,8 +257,6 @@ always_ff @(posedge clk or posedge reset) begin
         for (i = 0; i < 32; i++)
             regs[i] <= 0;
 
-        flag_zero <= 0;
-        flag_carry <= 0;
         state <= S_FETCH;
         pc <= 0;
         instr <= 0;
@@ -261,13 +264,6 @@ always_ff @(posedge clk or posedge reset) begin
     end else if (!halted) begin
         if (reg_we && reg_addr != 0)
             regs[reg_addr] <= reg_write;
-
-        case (opcode)
-            OP_CMP, OP_CMPI: begin
-                flag_zero <= alu_zero;
-                flag_carry <= alu_carry;
-            end
-        endcase
 
         state <= next_state;
         pc <= next_pc;

@@ -19,8 +19,7 @@
 enum Opcode: u32 {
     NOP,
     LD, LDI, ST,
-    CMP, CMPI,
-    J, JZ, JNZ, JC, JNC, JR,
+    B, BR, BL, BEQ, BNE, BLT, BLTU, BGE, BGEU,
     ADD, SUB, AND, OR, XOR, NOT, SHL, SHR,
     ADDI, SUBI, ANDI, ORI, XORI, NOTI, SHLI, SHRI,
     HLT = 0xFFu32
@@ -114,14 +113,15 @@ class Assembler {
             if mnemonic == "ld" { opcode = Opcode::LD; }
             else if mnemonic == "ldi" { opcode = Opcode::LDI; }
             else if mnemonic == "st" { opcode = Opcode::ST; }
-            else if mnemonic == "cmp" { opcode = Opcode::CMP; }
-            else if mnemonic == "cmpi" { opcode = Opcode::CMPI; }
-            else if mnemonic == "j" { opcode = Opcode::J; }
-            else if mnemonic == "jz" { opcode = Opcode::JZ; }
-            else if mnemonic == "jnz" { opcode = Opcode::JNZ; }
-            else if mnemonic == "jc" { opcode = Opcode::JC; }
-            else if mnemonic == "jnc" { opcode = Opcode::JNC; }
-            else if mnemonic == "jr" { opcode = Opcode::JR; }
+            else if mnemonic == "b" { opcode = Opcode::B; }
+            else if mnemonic == "br" { opcode = Opcode::BR; }
+            else if mnemonic == "bl" { opcode = Opcode::BL; }
+            else if mnemonic == "beq" { opcode = Opcode::BEQ; }
+            else if mnemonic == "bne" { opcode = Opcode::BNE; }
+            else if mnemonic == "blt" { opcode = Opcode::BLT; }
+            else if mnemonic == "bltu" { opcode = Opcode::BLTU; }
+            else if mnemonic == "bge" { opcode = Opcode::BGE; }
+            else if mnemonic == "bgeu" { opcode = Opcode::BGEU; }
             else if mnemonic == "add" { opcode = Opcode::ADD; }
             else if mnemonic == "sub" { opcode = Opcode::SUB; }
             else if mnemonic == "and" { opcode = Opcode::AND; }
@@ -156,18 +156,17 @@ class Assembler {
                 result |= (this.AssembleExpression(operands[0u64]->expression) << RD_SHIFT);
                 result |= (this.AssembleExpression(operands[1u64]->expression) << RS1_SHIFT);
                 result |= (this.AssembleExpression(operands[1u64]->offset) & IMM14_MASK);
-            } else if opcode == Opcode::CMP || opcode == Opcode::CMPI {
-                result |= (this.AssembleExpression(operands[0u64]->expression) << RD_SHIFT);
-
-                if opcode == Opcode::CMP {
-                    result |= (this.AssembleExpression(operands[1u64]->expression) << RS1_SHIFT);
-                } else {
-                    result |= (this.AssembleExpression(operands[1u64]->expression) & IMM19_MASK);
-                }
-            } else if opcode >= Opcode::J && opcode <= Opcode::JNC {
+            } else if opcode == Opcode::B {
                 result |= (this.AssembleExpression(operands[0u64]->expression) & IMM24_MASK);
-            } else if opcode == Opcode::JR {
+            } else if opcode == Opcode::BL {
                 result |= (this.AssembleExpression(operands[0u64]->expression) << RD_SHIFT);
+                result |= (this.AssembleExpression(operands[1u64]->expression) & IMM19_MASK);
+            } else if opcode == Opcode::BR {
+                result |= (this.AssembleExpression(operands[0u64]->expression) << RD_SHIFT);
+            } else if opcode >= Opcode::BEQ && opcode <= Opcode::BGEU {
+                result |= (this.AssembleExpression(operands[0u64]->expression) << RD_SHIFT);
+                result |= (this.AssembleExpression(operands[1u64]->expression) << RS1_SHIFT);
+                result |= (this.AssembleExpression(operands[2u64]->expression) & IMM14_MASK);
             } else if opcode >= Opcode::ADD && opcode <= Opcode::SHR {
                 result |= (this.AssembleExpression(operands[0u64]->expression) << RD_SHIFT);
                 result |= (this.AssembleExpression(operands[1u64]->expression) << RS1_SHIFT);
