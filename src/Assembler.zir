@@ -18,7 +18,7 @@
 
 enum Opcode: u32 {
     NOP,
-    LB, LBU, LH, LHU, LW, LI, SB, SH, SW,
+    LB, LBU, LH, LHU, LW, LI, LUI, AUIPC, SB, SH, SW,
     B, BR, BL, BEQ, BNE, BLT, BLTU, BGE, BGEU,
     ADD, ADDI, SUB, SUBI,
     MUL, MULH, MULHSU, MULHU, DIV, DIVU, REM, REMU,
@@ -119,6 +119,8 @@ class Assembler {
             else if mnemonic == "lhu" { opcode = Opcode::LHU; }
             else if mnemonic == "lw" { opcode = Opcode::LW; }
             else if mnemonic == "li" { opcode = Opcode::LI; }
+            else if mnemonic == "lui" { opcode = Opcode::LUI; }
+            else if mnemonic == "auipc" { opcode = Opcode::AUIPC; }
             else if mnemonic == "sb" { opcode = Opcode::SB; }
             else if mnemonic == "sh" { opcode = Opcode::SH; }
             else if mnemonic == "sw" { opcode = Opcode::SW; }
@@ -166,7 +168,7 @@ class Assembler {
             if opcode >= Opcode::LB && opcode <= Opcode::SW {
                 result |= (this.AssembleExpression(operands[0u64]->expression) << REG0_SHIFT);
 
-                if opcode == Opcode::LI {
+                if opcode >= Opcode::LI && opcode <= Opcode::AUIPC {
                     result |= (this.AssembleExpression(operands[1u64]->expression) & IMM21_MASK);
                 } else {
                     result |= (this.AssembleExpression(operands[1u64]->expression) << REG1_SHIFT);
