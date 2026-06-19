@@ -175,13 +175,13 @@ class Assembler {
                 result |= (this.AssembleExpression(operands[0u64]->expression) & IMM24_MASK);
             } else if opcode == Opcode::BL {
                 result |= (this.AssembleExpression(operands[0u64]->expression) << RD_SHIFT);
-                result |= (this.AssembleExpression(operands[1u64]->expression) & IMM19_MASK);
+                result |= ((this.AssembleExpression(operands[1u64]->expression) - this.address) & IMM19_MASK);
             } else if opcode == Opcode::BR {
                 result |= (this.AssembleExpression(operands[0u64]->expression) << RD_SHIFT);
             } else if opcode >= Opcode::BEQ && opcode <= Opcode::BGEU {
                 result |= (this.AssembleExpression(operands[0u64]->expression) << RD_SHIFT);
                 result |= (this.AssembleExpression(operands[1u64]->expression) << RS1_SHIFT);
-                result |= (this.AssembleExpression(operands[2u64]->expression) & IMM14_MASK);
+                result |= ((this.AssembleExpression(operands[2u64]->expression) - this.address) & IMM14_MASK);
             } else if opcode >= Opcode::ADD && opcode <= Opcode::SRAI {
                 result |= (this.AssembleExpression(operands[0u64]->expression) << RD_SHIFT);
                 result |= (this.AssembleExpression(operands[1u64]->expression) << RS1_SHIFT);

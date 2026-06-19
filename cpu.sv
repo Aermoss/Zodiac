@@ -218,15 +218,15 @@ always_comb begin
                 OP_BL: begin
                     reg_we = 1;
                     reg_write = pc + 4;
-                    next_pc = imm19;
+                    next_pc = pc + imm19;
                 end
 
-                OP_BEQ: next_pc = branch_eq ? imm14 : pc + 4;
-                OP_BNE: next_pc = !branch_eq ? imm14 : pc + 4;
-                OP_BLT: next_pc = branch_lt ? imm14 : pc + 4;
-                OP_BLTU: next_pc = branch_ltu ? imm14 : pc + 4;
-                OP_BGE: next_pc = !branch_lt ? imm14 : pc + 4;
-                OP_BGEU: next_pc = !branch_ltu ? imm14 : pc + 4;
+                OP_BEQ: next_pc = pc + (branch_eq ? imm14 : 4);
+                OP_BNE: next_pc = pc + (!branch_eq ? imm14 : 4);
+                OP_BLT: next_pc = pc + (branch_lt ? imm14 : 4);
+                OP_BLTU: next_pc = pc + (branch_ltu ? imm14 : 4);
+                OP_BGE: next_pc = pc + (!branch_lt ? imm14 : 4);
+                OP_BGEU: next_pc = pc + (!branch_ltu ? imm14 : 4);
 
                 OP_ADD, OP_ADDI, OP_SUB, OP_SUBI,
                 OP_MUL, OP_MULH, OP_MULHSU, OP_MULHU, OP_DIV, OP_DIVU, OP_REM, OP_REMU,
