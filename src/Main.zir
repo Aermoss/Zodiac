@@ -96,9 +96,12 @@ func main(args: &mut Vector<String>) -> i32 {
     let mut result: String;
 
     for instruction in instructions {
-        let mut hex = String(instruction as u64, 16u64);
-        while hex.Length() < 8u64 { hex = "0" + hex; }
-        result += hex + "\n";
+        for i in 0u32..4u32 {
+            let byte = (instruction >> (i * 8u32)) & 0xFFu32;
+            let mut hex = String(byte as u64, 16u64);
+            while hex.Length() < 2u64 { hex = "0" + hex; }
+            result += hex + "\n";
+        }
     }
 
     if output_file.Empty() {

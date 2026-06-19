@@ -1,7 +1,7 @@
+li x31, 0x4000
 bl x30, print
-ldi x31, 0xFFF
-ldi x1, 0
-ldi x2, 10
+li x1, 0
+li x2, 10
 
 loop:
     addi x1, x1, 2
@@ -9,21 +9,50 @@ loop:
     b loop
 
 print:
-    ldi x3, 0xFFFF
-    ldi x1, 90
-    st x1, 0(x3)
-    ldi x1, 79
-    st x1, 0(x3)
-    ldi x1, 68
-    st x1, 0(x3)
-    ldi x1, 73
-    st x1, 0(x3)
-    ldi x1, 65
-    st x1, 0(x3)
-    ldi x1, 67
-    st x1, 0(x3)
-    ldi x1, 10
-    st x1, 0(x3)
+    subi x31, x31, 4
+    sw x30, 0(x31)
+
+    li x2, 0xFFFF
+    li x1, 90
+    sb x1, 0(x2)
+    li x1, 79
+    sb x1, 0(x2)
+    li x1, 68
+    sb x1, 0(x2)
+    li x1, 73
+    sb x1, 0(x2)
+    li x1, 65
+    sb x1, 0(x2)
+    li x1, 67
+    sb x1, 0(x2)
+    li x1, 32
+    sb x1, 0(x2)
+
+    bl x30, other
+
+    li x1, 10
+    sb x1, 0(x2)
+
+    lw x30, 0(x31)
+    addi x31, x31, 4
+    br x30
+
+other:
+    subi x31, x31, 4
+    sw x30, 0(x31)
+
+    li x2, 0xFFFF
+    li x1, 84
+    sb x1, 0(x2)
+    li x1, 69
+    sb x1, 0(x2)
+    li x1, 83
+    sb x1, 0(x2)
+    li x1, 84
+    sb x1, 0(x2)
+
+    lw x30, 0(x31)
+    addi x31, x31, 4
     br x30
 
 exit:

@@ -18,10 +18,10 @@
 
 enum Opcode: u32 {
     NOP,
-    LD, LDI, ST,
+    LB, LBU, LH, LHU, LW, LI, SB, SH, SW,
     B, BR, BL, BEQ, BNE, BLT, BLTU, BGE, BGEU,
-    ADD, SUB, AND, OR, XOR, NOT, SHL, SHR,
-    ADDI, SUBI, ANDI, ORI, XORI, NOTI, SHLI, SHRI,
+    ADD, ADDI, SUB, SUBI, AND, ANDI, OR, ORI,
+    XOR, XORI, NOT, NOTI, SHL, SHLI, SHR, SHRI,
     HLT = 0xFFu32
 }
 
@@ -94,7 +94,7 @@ class Assembler {
                 this.labels.PushBack(label->name);
                 this.addresses.PushBack(this.address);
             } else if node->_type == NodeType::INSTRUCTION {
-                this.address += 1u32;
+                this.address += 4u32;
             }
         }
 
@@ -110,9 +110,15 @@ class Assembler {
             let (mnemonic, operands) = (instruction->mnemonic, instruction->operands);
             let mut opcode: Opcode;
 
-            if mnemonic == "ld" { opcode = Opcode::LD; }
-            else if mnemonic == "ldi" { opcode = Opcode::LDI; }
-            else if mnemonic == "st" { opcode = Opcode::ST; }
+            if mnemonic == "lb" { opcode = Opcode::LB; }
+            else if mnemonic == "lbu" { opcode = Opcode::LBU; }
+            else if mnemonic == "lh" { opcode = Opcode::LH; }
+            else if mnemonic == "lhu" { opcode = Opcode::LHU; }
+            else if mnemonic == "lw" { opcode = Opcode::LW; }
+            else if mnemonic == "li" { opcode = Opcode::LI; }
+            else if mnemonic == "sb" { opcode = Opcode::SB; }
+            else if mnemonic == "sh" { opcode = Opcode::SH; }
+            else if mnemonic == "sw" { opcode = Opcode::SW; }
             else if mnemonic == "b" { opcode = Opcode::B; }
             else if mnemonic == "br" { opcode = Opcode::BR; }
             else if mnemonic == "bl" { opcode = Opcode::BL; }
@@ -123,39 +129,38 @@ class Assembler {
             else if mnemonic == "bge" { opcode = Opcode::BGE; }
             else if mnemonic == "bgeu" { opcode = Opcode::BGEU; }
             else if mnemonic == "add" { opcode = Opcode::ADD; }
-            else if mnemonic == "sub" { opcode = Opcode::SUB; }
-            else if mnemonic == "and" { opcode = Opcode::AND; }
-            else if mnemonic == "or" { opcode = Opcode::OR; }
-            else if mnemonic == "xor" { opcode = Opcode::XOR; }
-            else if mnemonic == "not" { opcode = Opcode::NOT; }
-            else if mnemonic == "shl" { opcode = Opcode::SHL; }
-            else if mnemonic == "shr" { opcode = Opcode::SHR; }
             else if mnemonic == "addi" { opcode = Opcode::ADDI; }
+            else if mnemonic == "sub" { opcode = Opcode::SUB; }
             else if mnemonic == "subi" { opcode = Opcode::SUBI; }
+            else if mnemonic == "and" { opcode = Opcode::AND; }
             else if mnemonic == "andi" { opcode = Opcode::ANDI; }
+            else if mnemonic == "or" { opcode = Opcode::OR; }
             else if mnemonic == "ori" { opcode = Opcode::ORI; }
+            else if mnemonic == "xor" { opcode = Opcode::XOR; }
             else if mnemonic == "xori" { opcode = Opcode::XORI; }
+            else if mnemonic == "not" { opcode = Opcode::NOT; }
             else if mnemonic == "noti" { opcode = Opcode::NOTI; }
+            else if mnemonic == "shl" { opcode = Opcode::SHL; }
             else if mnemonic == "shli" { opcode = Opcode::SHLI; }
+            else if mnemonic == "shr" { opcode = Opcode::SHR; }
             else if mnemonic == "shri" { opcode = Opcode::SHRI; }
             else if mnemonic == "hlt" { opcode = Opcode::HLT; }
-            else { opcode = Opcode::NOP; }
+            else {
+                Logger::Log("Unknown mnemonic: '" + mnemonic + "'.", instruction, LogSeverity::Error);
+                continue;
+            }
 
             result |= (opcode << OPCODE_SHIFT);
 
-            if opcode == Opcode::LD || opcode == Opcode::LDI {
+            if opcode >= Opcode::LB && opcode <= Opcode::SW {
                 result |= (this.AssembleExpression(operands[0u64]->expression) << RD_SHIFT);
 
-                if opcode == Opcode::LD {
+                if opcode == Opcode::LI {
+                    result |= (this.AssembleExpression(operands[1u64]->expression) & IMM19_MASK);
+                } else {
                     result |= (this.AssembleExpression(operands[1u64]->expression) << RS1_SHIFT);
                     result |= (this.AssembleExpression(operands[1u64]->offset) & IMM14_MASK);
-                } else {
-                    result |= (this.AssembleExpression(operands[1u64]->expression) & IMM19_MASK);
                 }
-            } else if opcode == Opcode::ST {
-                result |= (this.AssembleExpression(operands[0u64]->expression) << RD_SHIFT);
-                result |= (this.AssembleExpression(operands[1u64]->expression) << RS1_SHIFT);
-                result |= (this.AssembleExpression(operands[1u64]->offset) & IMM14_MASK);
             } else if opcode == Opcode::B {
                 result |= (this.AssembleExpression(operands[0u64]->expression) & IMM24_MASK);
             } else if opcode == Opcode::BL {
@@ -167,14 +172,15 @@ class Assembler {
                 result |= (this.AssembleExpression(operands[0u64]->expression) << RD_SHIFT);
                 result |= (this.AssembleExpression(operands[1u64]->expression) << RS1_SHIFT);
                 result |= (this.AssembleExpression(operands[2u64]->expression) & IMM14_MASK);
-            } else if opcode >= Opcode::ADD && opcode <= Opcode::SHR {
+            } else if opcode >= Opcode::ADD && opcode <= Opcode::SHRI {
                 result |= (this.AssembleExpression(operands[0u64]->expression) << RD_SHIFT);
                 result |= (this.AssembleExpression(operands[1u64]->expression) << RS1_SHIFT);
-                result |= (this.AssembleExpression(operands[2u64]->expression) << RS2_SHIFT);
-            } else if opcode >= Opcode::ADDI && opcode <= Opcode::SHRI {
-                result |= (this.AssembleExpression(operands[0u64]->expression) << RD_SHIFT);
-                result |= (this.AssembleExpression(operands[1u64]->expression) << RS1_SHIFT);
-                result |= (this.AssembleExpression(operands[2u64]->expression) & IMM14_MASK);
+
+                if (Opcode::ADD % 2u32 == opcode % 2u32) {
+                    result |= (this.AssembleExpression(operands[2u64]->expression) << RS2_SHIFT);
+                } else {
+                    result |= (this.AssembleExpression(operands[2u64]->expression) & IMM14_MASK);
+                }
             } else if opcode == Opcode::NOT || opcode == Opcode::NOTI {
                 result |= (this.AssembleExpression(operands[0u64]->expression) << RD_SHIFT);
 
@@ -186,7 +192,7 @@ class Assembler {
             }
 
             instructions.PushBack(result);
-            this.address += 1u32;
+            this.address += 4u32;
         } ret instructions;
     }
 }

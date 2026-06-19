@@ -188,7 +188,7 @@ class Parser {
                 let operand = this.ParseOperand();
 
                 if operand != null {
-                    let state = (mnemonic == "st" || mnemonic == "ld") && index == 1u64;
+                    let state = (mnemonic == "lb" || mnemonic == "lbu" || mnemonic == "lh" || mnemonic == "lhu" || mnemonic == "lw" || mnemonic == "sb" || mnemonic == "sh" || mnemonic == "sw") && index == 1u64;
 
                     if state && operand->offset == null {
                         Logger::Log("Instruction '" + mnemonic + "' requires dereference operator 'offset(reg)' for operand " + String(index + 1u64) + ".", token, LogSeverity::Error);

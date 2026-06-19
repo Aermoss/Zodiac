@@ -5,9 +5,15 @@ module cpu(
 
 typedef enum logic [7:0] {
     OP_NOP,
-    OP_LD,
-    OP_LDI,
-    OP_ST,
+    OP_LB,
+    OP_LBU,
+    OP_LH,
+    OP_LHU,
+    OP_LW,
+    OP_LI,
+    OP_SB,
+    OP_SH,
+    OP_SW,
     OP_B,
     OP_BR,
     OP_BL,
@@ -18,20 +24,20 @@ typedef enum logic [7:0] {
     OP_BGE,
     OP_BGEU,
     OP_ADD,
-    OP_SUB,
-    OP_AND,
-    OP_OR,
-    OP_XOR,
-    OP_NOT,
-    OP_SHL,
-    OP_SHR,
     OP_ADDI,
+    OP_SUB,
     OP_SUBI,
+    OP_AND,
     OP_ANDI,
+    OP_OR,
     OP_ORI,
+    OP_XOR,
     OP_XORI,
+    OP_NOT,
     OP_NOTI,
+    OP_SHL,
     OP_SHLI,
+    OP_SHR,
     OP_SHRI,
     OP_HLT = 8'hFF
 } opcode_t;
@@ -72,8 +78,8 @@ logic [4:0] reg_addr;
 logic [31:0] reg_write;
 logic [31:0] regs [0:31];
 
-logic ram_we;
-logic _ram_we;
+logic [3:0] ram_we;
+logic [3:0] _ram_we;
 logic [31:0] ram_addr;
 logic [31:0] ram_write;
 logic [31:0] ram_read;
@@ -131,7 +137,7 @@ always_comb begin
     endcase
 end
 
-logic uart_we;
+logic [3:0] uart_we;
 
 uart uart0(
     .clk(clk),
@@ -185,9 +191,9 @@ always_comb begin
         S_DECODE: begin
             next_instr = ram_read;
 
-            case (opcode_t'(ram_read[31:24]))
-                OP_LD, OP_ST: next_state = S_MEMORY;
-                OP_LDI: next_state = S_WRITEBACK;
+            case (next_instr[31:24])
+                OP_LI: next_state = S_WRITEBACK;
+                OP_LB, OP_LBU, OP_LH, OP_LHU, OP_LW, OP_SB, OP_SH, OP_SW: next_state = S_MEMORY;
                 default: next_state = S_EXECUTE;
             endcase
         end
@@ -196,22 +202,22 @@ always_comb begin
             next_state = S_FETCH;
 
             case (opcode)
-                OP_NOP: next_pc = pc + 1;
+                OP_NOP: next_pc = pc + 4;
 
                 OP_B: next_pc = imm24;
                 OP_BR: next_pc = regs[rd];
                 OP_BL: begin
-                    reg_we = (rd != 0);
-                    reg_write = pc + 1;
+                    reg_we = 1;
+                    reg_write = pc + 4;
                     next_pc = imm19;
                 end
 
-                OP_BEQ: next_pc = branch_eq ? imm14 : pc + 1;
-                OP_BNE: next_pc = !branch_eq ? imm14 : pc + 1;
-                OP_BLT: next_pc = branch_lt ? imm14 : pc + 1;
-                OP_BLTU: next_pc = branch_ltu ? imm14 : pc + 1;
-                OP_BGE: next_pc = !branch_lt ? imm14 : pc + 1;
-                OP_BGEU: next_pc = !branch_ltu ? imm14 : pc + 1;
+                OP_BEQ: next_pc = branch_eq ? imm14 : pc + 4;
+                OP_BNE: next_pc = !branch_eq ? imm14 : pc + 4;
+                OP_BLT: next_pc = branch_lt ? imm14 : pc + 4;
+                OP_BLTU: next_pc = branch_ltu ? imm14 : pc + 4;
+                OP_BGE: next_pc = !branch_lt ? imm14 : pc + 4;
+                OP_BGEU: next_pc = !branch_ltu ? imm14 : pc + 4;
 
                 OP_ADD, OP_SUB, OP_AND, OP_OR, OP_XOR, OP_NOT, OP_SHL, OP_SHR,
                 OP_ADDI, OP_SUBI, OP_ANDI, OP_ORI, OP_XORI, OP_NOTI, OP_SHLI, OP_SHRI:
@@ -225,25 +231,43 @@ always_comb begin
             ram_addr = regs[rs1] + imm14;
 
             case (opcode)
-                OP_LD: next_state = S_WRITEBACK;
+                OP_LB, OP_LBU, OP_LH, OP_LHU, OP_LW: next_state = S_WRITEBACK;
 
-                OP_ST: begin
-                    ram_we = 1;
+                OP_SB: begin
+                    ram_we = 4'b0001 << ram_addr[1:0];
+                    ram_write = {24'b0, regs[rd][7:0]} << (8 * ram_addr[1:0]);
+                    next_state = S_FETCH;
+                    next_pc = pc + 4;
+                end
+
+                OP_SH: begin
+                    ram_we = 4'b0011 << (2 * ram_addr[1]);
+                    ram_write = {16'b0, regs[rd][15:0]} << (16 * ram_addr[1]);
+                    next_state = S_FETCH;
+                    next_pc = pc + 4;
+                end
+
+                OP_SW: begin
+                    ram_we = 4'b1111;
                     ram_write = regs[rd];
                     next_state = S_FETCH;
-                    next_pc = pc + 1;
+                    next_pc = pc + 4;
                 end
             endcase
         end
 
         S_WRITEBACK: begin
-            reg_we = (rd != 0);
+            reg_we = 1;
             next_state = S_FETCH;
-            next_pc = pc + 1;
+            next_pc = pc + 4;
 
             case (opcode)
-                OP_LD: reg_write = ram_read;
-                OP_LDI: reg_write = imm19;
+                OP_LI: reg_write = imm19;
+                OP_LB: reg_write = {{24{ram_read[7]}}, ram_read[7:0]};
+                OP_LBU: reg_write = {24'b0, ram_read[7:0]};
+                OP_LH: reg_write = {{16{ram_read[15]}}, ram_read[15:0]};
+                OP_LHU: reg_write = {16'b0, ram_read[15:0]};
+                OP_LW: reg_write = ram_read;
                 default: reg_write = alu_result;
             endcase
         end
