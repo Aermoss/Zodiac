@@ -241,6 +241,7 @@ always_comb begin
                 end
 
                 OP_SH: begin
+                    assert(ram_addr[1:0] == 0);
                     ram_we = 4'b0011 << (2 * ram_addr[1]);
                     ram_write = {16'b0, regs[rd][15:0]} << (16 * ram_addr[1]);
                     next_state = S_FETCH;
@@ -248,6 +249,7 @@ always_comb begin
                 end
 
                 OP_SW: begin
+                    assert(ram_addr[1:0] == 0);
                     ram_we = 4'b1111;
                     ram_write = regs[rd];
                     next_state = S_FETCH;
@@ -263,11 +265,32 @@ always_comb begin
 
             case (opcode)
                 OP_LI: reg_write = imm19;
-                OP_LB: reg_write = {{24{ram_read[7]}}, ram_read[7:0]};
-                OP_LBU: reg_write = {24'b0, ram_read[7:0]};
-                OP_LH: reg_write = {{16{ram_read[15]}}, ram_read[15:0]};
-                OP_LHU: reg_write = {16'b0, ram_read[15:0]};
-                OP_LW: reg_write = ram_read;
+
+                OP_LB, OP_LBU: begin
+                    reg_write = {
+                        opcode == OP_LB
+                            ? {24{ram_read[8 * ram_addr[1:0] + 7]}}
+                            : 24'b0,
+                        ram_read[8 * ram_addr[1:0]+:8]
+                    };
+                end
+
+                OP_LH, OP_LHU: begin
+                    assert(ram_addr[1:0] == 0);
+
+                    reg_write = {
+                        opcode == OP_LH
+                            ? {16{ram_read[16 * ram_addr[1] + 15]}}
+                            : 16'b0,
+                        ram_read[16 * ram_addr[1]+:16]
+                    };
+                end
+
+                OP_LW: begin
+                    assert(ram_addr[1:0] == 0);
+                    reg_write = ram_read;
+                end
+
                 default: reg_write = alu_result;
             endcase
         end
