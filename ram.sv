@@ -9,12 +9,10 @@ module ram #(
 );
 
 localparam WORD_DEPTH = BYTE_DEPTH / 4;
-
 logic [31:0] mem [0:WORD_DEPTH - 1];
 
 wire [$clog2(WORD_DEPTH) - 1:0] word_addr;
-
-assign word_addr = addr[31:2];
+assign word_addr = addr[2 + $clog2(WORD_DEPTH) - 1:2];
 
 initial begin
     $readmemh("program.hex", mem);
