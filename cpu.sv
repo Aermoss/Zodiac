@@ -164,6 +164,12 @@ assign branch_eq = (regs[rd] == regs[rs1]);
 assign branch_lt = ($signed(regs[rd]) < $signed(regs[rs1]));
 assign branch_ltu = (regs[rd] < regs[rs1]);
 
+logic [7:0] ram_read_byte;
+logic [15:0] ram_read_half;
+
+assign ram_read_byte = ram_read[8 * ram_addr[1:0]+:8];
+assign ram_read_half = ram_read[16 * ram_addr[1]+:16];
+
 state_t next_state;
 logic [31:0] next_pc;
 logic [31:0] next_instr;
@@ -266,24 +272,22 @@ always_comb begin
             case (opcode)
                 OP_LI: reg_write = imm19;
 
-                OP_LB, OP_LBU: begin
-                    reg_write = {
-                        opcode == OP_LB
-                            ? {24{ram_read[8 * ram_addr[1:0] + 7]}}
-                            : 24'b0,
-                        ram_read[8 * ram_addr[1:0]+:8]
-                    };
+                OP_LB: reg_write = {{24{ram_read_byte[7]}}, ram_read_byte};
+                OP_LBU: reg_write = ram_read_byte;
+
+                OP_LH: begin
+                    assert(!ram_addr[0]);
+                    reg_write = {{16{ram_read_half[15]}}, ram_read_half};
                 end
 
-                OP_LH, OP_LHU: begin
-                    assert(ram_addr[1:0] == 0);
+                OP_LHU: begin
+                    assert(!ram_addr[0]);
+                    reg_write = ram_read_half;
+                end
 
-                    reg_write = {
-                        opcode == OP_LH
-                            ? {16{ram_read[16 * ram_addr[1] + 15]}}
-                            : 16'b0,
-                        ram_read[16 * ram_addr[1]+:16]
-                    };
+                OP_LW: begin
+                    assert(ram_addr[1:0] == 0);
+                    reg_write = ram_read;
                 end
 
                 OP_LW: begin
