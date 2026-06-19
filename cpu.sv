@@ -4,7 +4,7 @@ module cpu(
     output logic [31:0] debug
 );
 
-typedef enum logic [7:0] {
+typedef enum logic [5:0] {
     OP_NOP,
     OP_LB,
     OP_LBU,
@@ -48,7 +48,7 @@ typedef enum logic [7:0] {
     OP_SRLI,
     OP_SRA,
     OP_SRAI,
-    OP_HLT = 8'hFF
+    OP_HLT = 6'h3F
 } opcode_t;
 
 typedef enum logic [2:0] {
@@ -67,22 +67,22 @@ logic halted;
 assign debug = pc;
 
 opcode_t opcode;
-logic [4:0] rd;
-logic [4:0] rs1;
-logic [4:0] rs2;
-logic [8:0] imm9;
-logic [13:0] imm14;
-logic [18:0] imm19;
-logic [23:0] imm24;
+logic [4:0] reg0;
+logic [4:0] reg1;
+logic [4:0] reg2;
+logic [10:0] imm11;
+logic [15:0] imm16;
+logic [20:0] imm21;
+logic [25:0] imm26;
 
-assign opcode = opcode_t'(instr[31:24]);
-assign rd = instr[23:19];
-assign rs1 = instr[18:14];
-assign rs2 = instr[13:9];
-assign imm9 = instr[8:0];
-assign imm14 = instr[13:0];
-assign imm19 = instr[18:0];
-assign imm24 = instr[23:0];
+assign opcode = opcode_t'(instr[31:26]);
+assign reg0 = instr[25:21];
+assign reg1 = instr[20:16];
+assign reg2 = instr[15:11];
+assign imm11 = instr[10:0];
+assign imm16 = instr[15:0];
+assign imm21 = instr[20:0];
+assign imm26 = instr[25:0];
 
 logic reg_we;
 logic [4:0] reg_addr;
@@ -116,9 +116,9 @@ alu alu0(
 );
 
 always_comb begin
-    alu_left = regs[rs1];
+    alu_left = regs[reg1];
     alu_right = (opcode == OP_ADDI) || (opcode == OP_SUBI) || (opcode == OP_ANDI) || (opcode == OP_ORI) || (opcode == OP_XORI)
-        || (opcode == OP_SLLI) || (opcode == OP_SRLI) || (opcode == OP_SRAI) ? imm14 : regs[rs2];
+        || (opcode == OP_SLLI) || (opcode == OP_SRLI) || (opcode == OP_SRAI) ? imm16 : regs[reg2];
     alu_op = ALU_OP_ADD;
 
     case (opcode)
@@ -163,9 +163,9 @@ logic branch_eq;
 logic branch_lt;
 logic branch_ltu;
 
-assign branch_eq = (regs[rd] == regs[rs1]);
-assign branch_lt = ($signed(regs[rd]) < $signed(regs[rs1]));
-assign branch_ltu = (regs[rd] < regs[rs1]);
+assign branch_eq = (regs[reg0] == regs[reg1]);
+assign branch_lt = ($signed(regs[reg0]) < $signed(regs[reg1]));
+assign branch_ltu = (regs[reg0] < regs[reg1]);
 
 logic [7:0] ram_read_byte;
 logic [15:0] ram_read_half;
@@ -185,7 +185,7 @@ always_comb begin
     next_halted = halted;
 
     reg_we = 0;
-    reg_addr = rd;
+    reg_addr = reg0;
     reg_write = 0;
 
     ram_we = 0;
@@ -200,7 +200,7 @@ always_comb begin
         S_DECODE: begin
             next_instr = ram_read;
 
-            case (next_instr[31:24])
+            case (next_instr[31:26])
                 OP_LI: next_state = S_WRITEBACK;
                 OP_LB, OP_LBU, OP_LH, OP_LHU, OP_LW, OP_SB, OP_SH, OP_SW: next_state = S_MEMORY;
                 default: next_state = S_EXECUTE;
@@ -213,20 +213,20 @@ always_comb begin
             case (opcode)
                 OP_NOP: next_pc = pc + 4;
 
-                OP_B: next_pc = imm24;
-                OP_BR: next_pc = regs[rd];
+                OP_B: next_pc = imm26;
+                OP_BR: next_pc = regs[reg0];
                 OP_BL: begin
                     reg_we = 1;
                     reg_write = pc + 4;
-                    next_pc = pc + imm19;
+                    next_pc = pc + imm21;
                 end
 
-                OP_BEQ: next_pc = pc + (branch_eq ? imm14 : 4);
-                OP_BNE: next_pc = pc + (!branch_eq ? imm14 : 4);
-                OP_BLT: next_pc = pc + (branch_lt ? imm14 : 4);
-                OP_BLTU: next_pc = pc + (branch_ltu ? imm14 : 4);
-                OP_BGE: next_pc = pc + (!branch_lt ? imm14 : 4);
-                OP_BGEU: next_pc = pc + (!branch_ltu ? imm14 : 4);
+                OP_BEQ: next_pc = pc + (branch_eq ? imm16 : 4);
+                OP_BNE: next_pc = pc + (!branch_eq ? imm16 : 4);
+                OP_BLT: next_pc = pc + (branch_lt ? imm16 : 4);
+                OP_BLTU: next_pc = pc + (branch_ltu ? imm16 : 4);
+                OP_BGE: next_pc = pc + (!branch_lt ? imm16 : 4);
+                OP_BGEU: next_pc = pc + (!branch_ltu ? imm16 : 4);
 
                 OP_ADD, OP_ADDI, OP_SUB, OP_SUBI,
                 OP_MUL, OP_MULH, OP_MULHSU, OP_MULHU, OP_DIV, OP_DIVU, OP_REM, OP_REMU,
@@ -239,14 +239,14 @@ always_comb begin
         end
 
         S_MEMORY: begin
-            ram_addr = regs[rs1] + imm14;
+            ram_addr = regs[reg1] + imm16;
 
             case (opcode)
                 OP_LB, OP_LBU, OP_LH, OP_LHU, OP_LW: next_state = S_WRITEBACK;
 
                 OP_SB: begin
                     ram_we = 4'b0001 << ram_addr[1:0];
-                    ram_write = {24'b0, regs[rd][7:0]} << (8 * ram_addr[1:0]);
+                    ram_write = {24'b0, regs[reg0][7:0]} << (8 * ram_addr[1:0]);
                     next_state = S_FETCH;
                     next_pc = pc + 4;
                 end
@@ -254,7 +254,7 @@ always_comb begin
                 OP_SH: begin
                     assert(ram_addr[1:0] == 0);
                     ram_we = 4'b0011 << (2 * ram_addr[1]);
-                    ram_write = {16'b0, regs[rd][15:0]} << (16 * ram_addr[1]);
+                    ram_write = {16'b0, regs[reg0][15:0]} << (16 * ram_addr[1]);
                     next_state = S_FETCH;
                     next_pc = pc + 4;
                 end
@@ -262,7 +262,7 @@ always_comb begin
                 OP_SW: begin
                     assert(ram_addr[1:0] == 0);
                     ram_we = 4'b1111;
-                    ram_write = regs[rd];
+                    ram_write = regs[reg0];
                     next_state = S_FETCH;
                     next_pc = pc + 4;
                 end
@@ -275,7 +275,7 @@ always_comb begin
             next_pc = pc + 4;
 
             case (opcode)
-                OP_LI: reg_write = imm19;
+                OP_LI: reg_write = imm21;
                 OP_LB: reg_write = {{24{ram_read_byte[7]}}, ram_read_byte};
                 OP_LBU: reg_write = ram_read_byte;
 
