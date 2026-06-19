@@ -1,6 +1,7 @@
 module cpu(
     input logic clk,
-    input logic reset
+    input logic reset,
+    output logic [31:0] debug
 );
 
 typedef enum logic [7:0] {
@@ -27,18 +28,26 @@ typedef enum logic [7:0] {
     OP_ADDI,
     OP_SUB,
     OP_SUBI,
+    OP_MUL,
+    OP_MULH,
+    OP_MULHSU,
+    OP_MULHU,
+    OP_DIV,
+    OP_DIVU,
+    OP_REM,
+    OP_REMU,
     OP_AND,
     OP_ANDI,
     OP_OR,
     OP_ORI,
     OP_XOR,
     OP_XORI,
-    OP_NOT,
-    OP_NOTI,
-    OP_SHL,
-    OP_SHLI,
-    OP_SHR,
-    OP_SHRI,
+    OP_SLL,
+    OP_SLLI,
+    OP_SRL,
+    OP_SRLI,
+    OP_SRA,
+    OP_SRAI,
     OP_HLT = 8'hFF
 } opcode_t;
 
@@ -54,6 +63,8 @@ state_t state;
 logic [31:0] pc;
 logic [31:0] instr;
 logic halted;
+
+assign debug = pc;
 
 opcode_t opcode;
 logic [4:0] rd;
@@ -105,35 +116,27 @@ alu alu0(
 );
 
 always_comb begin
-    alu_left = 0;
-    alu_right = 0;
+    alu_left = regs[rs1];
+    alu_right = (opcode == OP_ADDI) || (opcode == OP_SUBI) || (opcode == OP_ANDI) || (opcode == OP_ORI) || (opcode == OP_XORI)
+        || (opcode == OP_SLLI) || (opcode == OP_SRLI) || (opcode == OP_SRAI) ? imm14 : regs[rs2];
     alu_op = ALU_OP_ADD;
 
     case (opcode)
-        OP_ADD, OP_SUB, OP_AND, OP_OR, OP_XOR, OP_NOT, OP_SHL, OP_SHR,
-        OP_ADDI, OP_SUBI, OP_ANDI, OP_ORI, OP_XORI, OP_SHLI, OP_SHRI:
-            alu_left = regs[rs1];
-
-        OP_NOTI: alu_left = imm19;
-    endcase
-
-    case (opcode)
-        OP_ADD, OP_SUB, OP_AND, OP_OR, OP_XOR, OP_SHL, OP_SHR:
-            alu_right = regs[rs2];
-
-        OP_ADDI, OP_SUBI, OP_ANDI, OP_ORI, OP_XORI, OP_SHLI, OP_SHRI:
-            alu_right = imm14;
-    endcase
-
-    case (opcode)
-        OP_ADD, OP_ADDI: alu_op = ALU_OP_ADD;
         OP_SUB, OP_SUBI: alu_op = ALU_OP_SUB;
+        OP_MUL: alu_op = ALU_OP_MUL;
+        OP_MULH: alu_op = ALU_OP_MULH;
+        OP_MULHSU: alu_op = ALU_OP_MULHSU;
+        OP_MULHU: alu_op = ALU_OP_MULHU;
+        OP_DIV: alu_op = ALU_OP_DIV;
+        OP_DIVU: alu_op = ALU_OP_DIVU;
+        OP_REM: alu_op = ALU_OP_REM;
+        OP_REMU: alu_op = ALU_OP_REMU;
         OP_AND, OP_ANDI: alu_op = ALU_OP_AND;
         OP_OR, OP_ORI: alu_op = ALU_OP_OR;
         OP_XOR, OP_XORI: alu_op = ALU_OP_XOR;
-        OP_NOT, OP_NOTI: alu_op = ALU_OP_NOT;
-        OP_SHL, OP_SHLI: alu_op = ALU_OP_SHL;
-        OP_SHR, OP_SHRI: alu_op = ALU_OP_SHR;
+        OP_SLL, OP_SLLI: alu_op = ALU_OP_SLL;
+        OP_SRL, OP_SRLI: alu_op = ALU_OP_SRL;
+        OP_SRA, OP_SRAI: alu_op = ALU_OP_SRA;
     endcase
 end
 
@@ -225,8 +228,10 @@ always_comb begin
                 OP_BGE: next_pc = !branch_lt ? imm14 : pc + 4;
                 OP_BGEU: next_pc = !branch_ltu ? imm14 : pc + 4;
 
-                OP_ADD, OP_SUB, OP_AND, OP_OR, OP_XOR, OP_NOT, OP_SHL, OP_SHR,
-                OP_ADDI, OP_SUBI, OP_ANDI, OP_ORI, OP_XORI, OP_NOTI, OP_SHLI, OP_SHRI:
+                OP_ADD, OP_ADDI, OP_SUB, OP_SUBI,
+                OP_MUL, OP_MULH, OP_MULHSU, OP_MULHU, OP_DIV, OP_DIVU, OP_REM, OP_REMU,
+                OP_AND, OP_ANDI, OP_OR, OP_ORI, OP_XOR, OP_XORI,
+                OP_SLL, OP_SLLI, OP_SRL, OP_SRLI, OP_SRA, OP_SRAI:
                     next_state = S_WRITEBACK;
 
                 OP_HLT: next_halted = 1;

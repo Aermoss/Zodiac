@@ -1,12 +1,20 @@
-typedef enum logic [2:0] {
+typedef enum logic [3:0] {
     ALU_OP_ADD,
     ALU_OP_SUB,
+    ALU_OP_MUL,
+    ALU_OP_MULH,
+    ALU_OP_MULHSU,
+    ALU_OP_MULHU,
+    ALU_OP_DIV,
+    ALU_OP_DIVU,
+    ALU_OP_REM,
+    ALU_OP_REMU,
     ALU_OP_AND,
     ALU_OP_OR,
     ALU_OP_XOR,
-    ALU_OP_NOT,
-    ALU_OP_SHL,
-    ALU_OP_SHR
+    ALU_OP_SLL,
+    ALU_OP_SRL,
+    ALU_OP_SRA
 } alu_op_t;
 
 module alu(
@@ -16,16 +24,34 @@ module alu(
     output logic [31:0] result
 );
 
+logic signed [63:0] ss_prod;
+logic signed [63:0] su_prod;
+logic [63:0] uu_prod;
+
+assign ss_prod = $signed(left) * $signed(right);
+assign su_prod = $signed({left[31], left}) * $signed({1'b0, right});
+assign uu_prod = left * right;
+
 always_comb begin
+    result = 0;
+
     case (alu_op)
         ALU_OP_ADD: result = left + right;
         ALU_OP_SUB: result = left - right;
+        ALU_OP_MUL: result = ss_prod[31:0];
+        ALU_OP_MULH: result = ss_prod[63:32];
+        ALU_OP_MULHSU: result = su_prod[63:32];
+        ALU_OP_MULHU: result = uu_prod[63:32];
+        ALU_OP_DIV: result = (right == 0) ? 32'hFFFFFFFF : ($signed(left) / $signed(right));
+        ALU_OP_DIVU: result = (right == 0) ? 32'hFFFFFFFF : (left / right);
+        ALU_OP_REM: result = (right == 0) ? left : ($signed(left) % $signed(right));
+        ALU_OP_REMU: result = (right == 0) ? left : (left % right);
         ALU_OP_AND: result = left & right;
         ALU_OP_OR: result = left | right;
         ALU_OP_XOR: result = left ^ right;
-        ALU_OP_NOT: result = ~left;
-        ALU_OP_SHL: result = left << right;
-        ALU_OP_SHR: result = left >> right;
+        ALU_OP_SLL: result = left << right[4:0];
+        ALU_OP_SRL: result = left >> right[4:0];
+        ALU_OP_SRA: result = $signed(left) >>> right[4:0]; 
     endcase
 end
 

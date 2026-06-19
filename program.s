@@ -1,10 +1,10 @@
 li x31, 0x4000
 bl x30, print
-li x1, 0
+li x1, 2
 li x2, 10
 
 loop:
-    addi x1, x1, 2
+    mul x1, x1, x1
     beq x1, x2, exit
     b loop
 
