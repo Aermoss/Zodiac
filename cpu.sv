@@ -269,7 +269,6 @@ always_comb begin
                 end
 
                 OP_SH: begin
-                    assert(ram_addr[1:0] == 0);
                     ram_we = 4'b0011 << (2 * ram_addr[1]);
                     ram_write = {16'b0, regs[reg0][15:0]} << (16 * ram_addr[1]);
                     next_state = S_FETCH;
@@ -277,7 +276,6 @@ always_comb begin
                 end
 
                 OP_SW: begin
-                    assert(ram_addr[1:0] == 0);
                     ram_we = 4'b1111;
                     ram_write = regs[reg0];
                     next_state = S_FETCH;
@@ -292,27 +290,19 @@ always_comb begin
             next_pc = pc + 4;
 
             case (opcode)
+                OP_LB, OP_LBU, OP_LH, OP_LHU, OP_LW:
+                    ram_addr = regs[reg1] + simm16;
+            endcase
+
+            case (opcode)
                 OP_LI: reg_write = imm21;
                 OP_LUI: reg_write = imm21 << 11;
                 OP_AUIPC: reg_write = pc + (imm21 << 11);
                 OP_LB: reg_write = {{24{ram_read_byte[7]}}, ram_read_byte};
                 OP_LBU: reg_write = ram_read_byte;
-
-                OP_LH: begin
-                    assert(!ram_addr[0]);
-                    reg_write = {{16{ram_read_half[15]}}, ram_read_half};
-                end
-
-                OP_LHU: begin
-                    assert(!ram_addr[0]);
-                    reg_write = ram_read_half;
-                end
-
-                OP_LW: begin
-                    assert(ram_addr[1:0] == 0);
-                    reg_write = ram_read;
-                end
-
+                OP_LH: reg_write = {{16{ram_read_half[15]}}, ram_read_half};
+                OP_LHU: reg_write = ram_read_half;
+                OP_LW: reg_write = ram_read;
                 OP_SLT: reg_write = ($signed(regs[reg1]) < $signed(regs[reg2]));
                 OP_SLTU: reg_write = (regs[reg1] < regs[reg2]);
                 OP_SLTI: reg_write = ($signed(regs[reg1]) < simm16);
@@ -337,6 +327,23 @@ always_ff @(posedge clk or posedge reset) begin
     end else if (!halted) begin
         if (reg_we && reg_addr != 0)
             regs[reg_addr] <= reg_write;
+
+        case (state)
+            S_MEMORY: begin
+                case (opcode)
+                    OP_SH: assert(ram_addr[1:0] == 0);
+                    OP_SW: assert(ram_addr[1:0] == 0);
+                endcase
+            end
+
+            S_WRITEBACK: begin
+                case (opcode)
+                    OP_LH: assert(ram_addr[0] == 0);
+                    OP_LHU: assert(ram_addr[0] == 0);
+                    OP_LW: assert(ram_addr[1:0] == 0);
+                endcase
+            end
+        endcase
 
         state <= next_state;
         pc <= next_pc;
