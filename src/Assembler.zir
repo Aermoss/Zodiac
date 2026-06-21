@@ -86,6 +86,22 @@ class Assembler {
         } ret 0u32;
     }
 
+    priv AssembleOperand(&mut this, operand: *const OperandNode) -> u32 {
+        let mut value = this.AssembleExpression(operand->expression);
+
+        if operand->offset != null {
+            if operand->offset->_type == NodeType::IDENTIFIER {
+                let name = (operand->offset as *const IdentifierNode)->value;
+
+                if name == "hi" {
+                    value = value >> 11u32;
+                } else if name == "lo" {
+                    value = value & IMM11_MASK;
+                }
+            }
+        } ret value;
+    }
+
     pub Assemble(&mut this, root: *const RootNode) -> Vector<u32> {
         this.address = 0u32;
         let mut instructions: Vector<u32>;
@@ -98,7 +114,28 @@ class Assembler {
                 this.labels.PushBack(label->name);
                 this.addresses.PushBack(this.address);
             } else if node->_type == NodeType::INSTRUCTION {
-                this.address += 4u32;
+                let instruction = node as *const InstructionNode;
+                let (mnemonic, operands) = (instruction->mnemonic, instruction->operands);
+
+                if mnemonic == ".p2align" {
+                    let align = 1u32 << this.AssembleExpression(operands[0u64]->expression);
+                    let remainder = this.address % align;
+
+                    if remainder != 0u32 {
+                        this.address += (align - remainder);
+                    }
+                } else if mnemonic == ".asciz" {
+                    let mut size = 0u32;
+
+                    for operand in operands {
+                        let literal = operand->expression as *const LiteralNode;
+                        size += (literal->value.Length() + 4u64) as u32;
+                    }
+
+                    this.address += size;
+                } else {
+                    this.address += 4u32;
+                }
             }
         }
 
@@ -109,9 +146,51 @@ class Assembler {
                 continue;
             }
 
-            let mut result = 0u32;
             let instruction = node as *const InstructionNode;
             let (mnemonic, operands) = (instruction->mnemonic, instruction->operands);
+
+            if mnemonic == ".p2align" {
+                let align = 1u32 << this.AssembleExpression(operands[0u64]->expression);
+                let remainder = this.address % align;
+
+                if remainder != 0u32 {
+                    let padding = align - remainder;
+                    for _ in 0u32..(padding / 4u32) { instructions.PushBack(0u32); }
+                    this.address += padding;
+                } continue;
+            } else if mnemonic == ".asciz" {
+                for operand in operands {
+                    let (mut word, mut index) = (0u32, 0u32);
+                    let literal = operand->expression as *const LiteralNode;
+                    let value = literal->value;
+
+                    for i in 0u64..value.Length() {
+                        let c = value.Data()[i] as u8;
+                        word |= (c as u32) << (index * 8u32);
+                        index += 1u32;
+
+                        if index == 4u32 {
+                            instructions.PushBack(word);
+                            (word, index) = (0u32, 0u32);
+                            this.address += 4u32;
+                        }
+                    }
+
+                    word |= 0u32 << (index * 8u32);
+                    index += 1u32;
+
+                    if index == 4u32 {
+                        instructions.PushBack(word);
+                        (word, index) = (0u32, 0u32);
+                        this.address += 4u32;
+                    } else {
+                        instructions.PushBack(word);
+                        this.address += 4u32;
+                    }
+                } continue;
+            }
+
+            let mut result = 0u32;
             let mut opcode: Opcode;
 
             if mnemonic == "lb" { opcode = Opcode::LB; }
@@ -174,7 +253,7 @@ class Assembler {
                 result |= (this.AssembleExpression(operands[0u64]->expression) << REG0_SHIFT);
 
                 if opcode >= Opcode::LI && opcode <= Opcode::AUIPC {
-                    result |= (this.AssembleExpression(operands[1u64]->expression) & IMM21_MASK);
+                    result |= (this.AssembleOperand(operands[1u64]) & IMM21_MASK);
                 } else {
                     result |= (this.AssembleExpression(operands[1u64]->expression) << REG1_SHIFT);
                     result |= (this.AssembleExpression(operands[1u64]->offset) & IMM16_MASK);
@@ -197,7 +276,7 @@ class Assembler {
                 if opcode == Opcode::SLT || opcode == Opcode::SLTU {
                     result |= (this.AssembleExpression(operands[2u64]->expression) << REG2_SHIFT);
                 } else {
-                    result |= (this.AssembleExpression(operands[2u64]->expression) & IMM16_MASK);
+                    result |= (this.AssembleOperand(operands[2u64]) & IMM16_MASK);
                 }
             } else if opcode >= Opcode::ADD && opcode <= Opcode::SRAI {
                 result |= (this.AssembleExpression(operands[0u64]->expression) << REG0_SHIFT);
@@ -206,7 +285,7 @@ class Assembler {
                 if (Opcode::ADD % 2u32 == opcode % 2u32) || (opcode >= Opcode::MUL && opcode <= Opcode::REMU) {
                     result |= (this.AssembleExpression(operands[2u64]->expression) << REG2_SHIFT);
                 } else {
-                    result |= (this.AssembleExpression(operands[2u64]->expression) & IMM16_MASK);
+                    result |= (this.AssembleOperand(operands[2u64]) & IMM16_MASK);
                 }
             }
 

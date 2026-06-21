@@ -19,7 +19,7 @@
 enum TokenType: i32 {
     UNKNOWN, EOF, NEWLINE,
 
-    IDENTIFIER, NUMBER,
+    IDENTIFIER, NUMBER, STRING, CHAR,
     PLUS, MINUS, MUL, DIV, MOD, AND, OR, XOR, NOT, LSHIFT, RSHIFT,
     LPAREN, RPAREN, LBRACE, RBRACE, LBRACKET, RBRACKET,
 
@@ -31,6 +31,8 @@ func ToString(_type: TokenType) -> String {
     else if _type == TokenType::NEWLINE { ret "NEWLINE".ToString(); }
     else if _type == TokenType::IDENTIFIER { ret "IDENTIFIER".ToString(); }
     else if _type == TokenType::NUMBER { ret "NUMBER".ToString(); }
+    else if _type == TokenType::STRING { ret "STRING".ToString(); }
+    else if _type == TokenType::CHAR { ret "CHAR".ToString(); }
     else if _type == TokenType::PLUS { ret "PLUS".ToString(); }
     else if _type == TokenType::MINUS { ret "MINUS".ToString(); }
     else if _type == TokenType::MUL { ret "MUL".ToString(); }

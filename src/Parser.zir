@@ -102,12 +102,12 @@ class Parser {
     priv ParsePrimary(&mut this) -> *const Node {
         let token = this.Current();
 
-        if token._type == TokenType::NUMBER {
-            this.Advance();
-            ret this.arena.New<LiteralNode>(token.value, token);
-        } else if token._type == TokenType::IDENTIFIER {
+        if token._type == TokenType::IDENTIFIER {
             this.Advance();
             ret this.arena.New<IdentifierNode>(token.value, token);
+        } else if token._type == TokenType::NUMBER || token._type == TokenType::STRING || token._type == TokenType::CHAR {
+            this.Advance();
+            ret this.arena.New<LiteralNode>(token.value, token);
         } else if token._type == TokenType::DOLLAR {
             this.Advance();
             ret this.arena.New<AddressNode>(token);
@@ -189,10 +189,18 @@ class Parser {
 
                 if operand != null {
                     let state = (mnemonic == "lb" || mnemonic == "lbu" || mnemonic == "lh" || mnemonic == "lhu" || mnemonic == "lw" || mnemonic == "sb" || mnemonic == "sh" || mnemonic == "sw") && index == 1u64;
+                    let mut is_reloc = false;
+
+                    if operand->offset != null {
+                        if operand->offset->_type == NodeType::IDENTIFIER {
+                            let value = (operand->offset as *const IdentifierNode)->value;
+                            if value == "hi" || value == "lo" { is_reloc = true; }
+                        }
+                    }
 
                     if state && operand->offset == null {
                         Logger::Log("Instruction '" + mnemonic + "' requires dereference operator 'offset(reg)' for operand " + String(index + 1u64) + ".", token, LogSeverity::Error);
-                    } else if !state && operand->offset != null {
+                    } else if !state && operand->offset != null && !is_reloc {
                         Logger::Log("Instruction '" + mnemonic + "' does not support dereference operator for operand " + String(index + 1u64) + ".", token, LogSeverity::Error);
                     }
 
