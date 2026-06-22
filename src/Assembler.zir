@@ -114,98 +114,112 @@ class Assembler {
             } else if node->_type == NodeType::INSTRUCTION {
                 let instruction = node as *const InstructionNode;
                 let (mnemonic, operands) = (instruction->mnemonic, instruction->operands);
+                let directive = mnemonic.StartsWith(".");
 
-                if mnemonic == ".byte" {
-                    this.address += operands.Size() as u32;
-                } else if mnemonic == ".half" {
-                    this.address += (operands.Size() * 2u64) as u32;
-                } else if mnemonic == ".word" {
-                    this.address += (operands.Size() * 4u64) as u32;
-                } else if mnemonic == ".string" {
-                    for operand in operands {
-                        let literal = operand->expression as *const LiteralNode;
-                        this.address += (literal->value.Length() + 1u64) as u32;
-                    }
-                } else if mnemonic == ".align" {
-                    let align = this.AssembleExpression(operands[0u64]->expression);
-                    let remainder = this.address % align;
+                if directive {
+                    if mnemonic == ".byte" {
+                        this.address += operands.Size() as u32;
+                    } else if mnemonic == ".half" {
+                        this.address += (operands.Size() * 2u64) as u32;
+                    } else if mnemonic == ".word" {
+                        this.address += (operands.Size() * 4u64) as u32;
+                    } else if mnemonic == ".string" {
+                        for operand in operands {
+                            let literal = operand->expression as *const LiteralNode;
+                            this.address += (literal->value.Length() + 1u64) as u32;
+                        }
+                    } else if mnemonic == ".align" {
+                        let align = this.AssembleExpression(operands[0u64]->expression);
+                        let remainder = this.address % align;
 
-                    if remainder != 0u32 {
-                        this.address += (align - remainder);
-                    }
-                } else if mnemonic == ".space" {
-                    this.address += this.AssembleExpression(operands[0u64]->expression);
-                } else {
-                    this.address += 4u32;
+                        if remainder != 0u32 {
+                            this.address += (align - remainder);
+                        }
+                    } else if mnemonic == ".space" {
+                        this.address += this.AssembleExpression(operands[0u64]->expression);
+                    } continue;
                 }
+
+                let remainder = this.address % 4u32;
+
+                if remainder != 0u32 {
+                    this.address += 4u32 - remainder;
+                } this.address += 4u32;
             }
         }
 
         let mut bytes: Vector<u8>;
-        this.address = 0u32;
 
         for node in root->declarations {
+            let address = bytes.Size() as u32;
+
             if node->_type != NodeType::INSTRUCTION {
                 continue;
             }
 
             let instruction = node as *const InstructionNode;
             let (mnemonic, operands) = (instruction->mnemonic, instruction->operands);
+            let directive = mnemonic.StartsWith(".");
             let mut opcode: Opcode;
 
-            if mnemonic == ".byte" {
-                for operand in operands {
-                    bytes.PushBack(this.AssembleExpression(operand->expression) as u8);
-                    this.address += 1u32;
-                } continue;
-            } else if mnemonic == ".half" {
-                for operand in operands {
-                    let value = this.AssembleExpression(operand->expression);
-                    bytes.PushBack(value as u8);
-                    bytes.PushBack((value >> 8u32) as u8);
-                    this.address += 2u32;
-                } continue;
-            } else if mnemonic == ".word" {
-                for operand in operands {
-                    let value = this.AssembleExpression(operand->expression);
-                    bytes.PushBack(value as u8);
-                    bytes.PushBack((value >> 8u32) as u8);
-                    bytes.PushBack((value >> 16u32) as u8);
-                    bytes.PushBack((value >> 24u32) as u8);
-                    this.address += 4u32;
-                } continue;
-            } else if mnemonic == ".string" {
-                for operand in operands {
-                    let literal = operand->expression as *const LiteralNode;
-                    let value = literal->value;
-
-                    for i in 0u64..value.Length() {
-                        bytes.PushBack(value.Data()[i] as u8);
-                        this.address += 1u32;
+            if directive {
+                if mnemonic == ".byte" {
+                    for operand in operands {
+                        bytes.PushBack(this.AssembleExpression(operand->expression) as u8);
                     }
+                } else if mnemonic == ".half" {
+                    for operand in operands {
+                        let value = this.AssembleExpression(operand->expression);
+                        bytes.PushBack(value as u8);
+                        bytes.PushBack((value >> 8u32) as u8);
+                    }
+                } else if mnemonic == ".word" {
+                    for operand in operands {
+                        let value = this.AssembleExpression(operand->expression);
+                        bytes.PushBack(value as u8);
+                        bytes.PushBack((value >> 8u32) as u8);
+                        bytes.PushBack((value >> 16u32) as u8);
+                        bytes.PushBack((value >> 24u32) as u8);
+                    }
+                } else if mnemonic == ".string" {
+                    for operand in operands {
+                        let literal = operand->expression as *const LiteralNode;
+                        let value = literal->value;
 
-                    bytes.PushBack(0u8);
-                    this.address += 1u32;
-                } continue;
-            } else if mnemonic == ".align" {
-                let align = this.AssembleExpression(operands[0u64]->expression);
-                let remainder = this.address % align;
+                        for i in 0u64..value.Length() {
+                            bytes.PushBack(value.Data()[i] as u8);
+                        } bytes.PushBack(0u8);
+                    }
+                } else if mnemonic == ".align" {
+                    let align = this.AssembleExpression(operands[0u64]->expression);
+                    let remainder = address % align;
 
-                if remainder != 0u32 {
-                    let padding = align - remainder;
+                    if remainder != 0u32 {
+                        let padding = align - remainder;
 
-                    for _ in 0u32..padding {
+                        for _ in 0u32..padding {
+                            bytes.PushBack(0u8);
+                        }
+                    }
+                } else if mnemonic == ".space" {
+                    let space = this.AssembleExpression(operands[0u64]->expression);
+
+                    for _ in 0u32..space {
                         bytes.PushBack(0u8);
-                        this.address += 1u32;
                     }
+                } else {
+                    Logger::Log("Unknown directive: '" + mnemonic + "'.", instruction, LogSeverity::Error);
                 } continue;
-            } else if mnemonic == ".space" {
-                let space = this.AssembleExpression(operands[0u64]->expression);
+            }
 
-                for _ in 0u32..space {
+            let remainder = address % 4u32;
+
+            if remainder != 0u32 {
+                let padding = 4u32 - remainder;
+
+                for _ in 0u32..padding {
                     bytes.PushBack(0u8);
-                    this.address += 1u32;
-                } continue;
+                }
             }
 
             if mnemonic == "lb" { opcode = Opcode::LB; }
@@ -274,16 +288,16 @@ class Assembler {
                     word |= (this.AssembleExpression(operands[1u64]->offset) & IMM16_MASK);
                 }
             } else if opcode == Opcode::B {
-                word |= (this.AssembleExpression(operands[0u64]->expression) & IMM26_MASK);
+                word |= ((this.AssembleExpression(operands[0u64]->expression) >> 2u32) & IMM26_MASK);
             } else if opcode == Opcode::BL {
                 word |= (this.AssembleExpression(operands[0u64]->expression) << REG0_SHIFT);
-                word |= ((this.AssembleExpression(operands[1u64]->expression) - this.address) & IMM21_MASK);
+                word |= (((this.AssembleExpression(operands[1u64]->expression) - address) >> 2u32) & IMM21_MASK);
             } else if opcode == Opcode::BR {
                 word |= (this.AssembleExpression(operands[0u64]->expression) << REG0_SHIFT);
             } else if opcode >= Opcode::BEQ && opcode <= Opcode::BGEU {
                 word |= (this.AssembleExpression(operands[0u64]->expression) << REG0_SHIFT);
                 word |= (this.AssembleExpression(operands[1u64]->expression) << REG1_SHIFT);
-                word |= ((this.AssembleExpression(operands[2u64]->expression) - this.address) & IMM16_MASK);
+                word |= (((this.AssembleExpression(operands[2u64]->expression) - address) >> 2u32) & IMM16_MASK);
             } if opcode >= Opcode::SLT && opcode <= Opcode::SLTIU {
                 word |= (this.AssembleExpression(operands[0u64]->expression) << REG0_SHIFT);
                 word |= (this.AssembleExpression(operands[1u64]->expression) << REG1_SHIFT);
@@ -308,17 +322,6 @@ class Assembler {
             bytes.PushBack((word >> 8u32) as u8);
             bytes.PushBack((word >> 16u32) as u8);
             bytes.PushBack((word >> 24u32) as u8);
-            this.address += 4u32;
-        }
-
-        let remainder = bytes.Size() % 4u64;
-
-        if remainder != 0u64 {
-            let padding = 4u64 - remainder;
-
-            for _ in 0u64..padding {
-                bytes.PushBack(0u8);
-            }
         }
 
         let mut i = 0u64;

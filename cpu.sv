@@ -226,20 +226,20 @@ always_comb begin
             next_state = S_FETCH;
 
             case (opcode)
-                OP_B: next_pc = imm26;
+                OP_B: next_pc = (imm26 << 2);
                 OP_BR: next_pc = regs[reg0];
                 OP_BL: begin
-                    next_pc = pc + simm21;
                     reg_write = pc + 4;
+                    next_pc = pc + (simm21 << 2);
                     reg_we = 1;
                 end
 
-                OP_BEQ: next_pc = pc + (branch_eq ? simm16 : 4);
-                OP_BNE: next_pc = pc + (!branch_eq ? simm16 : 4);
-                OP_BLT: next_pc = pc + (branch_lt ? simm16 : 4);
-                OP_BLTU: next_pc = pc + (branch_ltu ? simm16 : 4);
-                OP_BGE: next_pc = pc + (!branch_lt ? simm16 : 4);
-                OP_BGEU: next_pc = pc + (!branch_ltu ? simm16 : 4);
+                OP_BEQ: next_pc = pc + (branch_eq ? (simm16 << 2) : 4);
+                OP_BNE: next_pc = pc + (!branch_eq ? (simm16 << 2) : 4);
+                OP_BLT: next_pc = pc + (branch_lt ? (simm16 << 2) : 4);
+                OP_BLTU: next_pc = pc + (branch_ltu ? (simm16 << 2) : 4);
+                OP_BGE: next_pc = pc + (!branch_lt ? (simm16 << 2) : 4);
+                OP_BGEU: next_pc = pc + (!branch_ltu ? (simm16 << 2) : 4);
 
                 OP_SLT, OP_SLTU, OP_SLTI, OP_SLTIU,
                 OP_ADD, OP_ADDI, OP_SUB, OP_SUBI,
