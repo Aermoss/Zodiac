@@ -183,8 +183,7 @@ class Assembler {
                     }
                 } else if mnemonic == ".string" {
                     for operand in operands {
-                        let literal = operand->expression as *const LiteralNode;
-                        let value = literal->value;
+                        let value = (operand->expression as *const LiteralNode)->value;
 
                         for i in 0u64..value.Length() {
                             bytes.PushBack(value.Data()[i] as u8);
@@ -202,9 +201,7 @@ class Assembler {
                         }
                     }
                 } else if mnemonic == ".space" {
-                    let space = this.AssembleExpression(operands[0u64]->expression);
-
-                    for _ in 0u32..space {
+                    for _ in 0u32..this.AssembleExpression(operands[0u64]->expression) {
                         bytes.PushBack(0u8);
                     }
                 } else {
@@ -324,16 +321,24 @@ class Assembler {
             bytes.PushBack((word >> 24u32) as u8);
         }
 
-        let mut i = 0u64;
+        let remainder = bytes.Size() % 4u64;
+
+        if remainder != 0u64 {
+            let padding = 4u64 - remainder;
+
+            for _ in 0u64..padding {
+                bytes.PushBack(0u8);
+            }
+        }
+
         let mut words: Vector<u32>;
 
-        while i < bytes.Size() {
-            let mut word = bytes[i] as u32;
-            word |= (bytes[i + 1u64] as u32) << 8u32;
-            word |= (bytes[i + 2u64] as u32) << 16u32;
-            word |= (bytes[i + 3u64] as u32) << 24u32;
+        for i in 0u64..(bytes.Size() / 4u64) {
+            let mut word = bytes[i * 4u64] as u32;
+            word |= (bytes[i * 4u64 + 1u64] as u32) << 8u32;
+            word |= (bytes[i * 4u64 + 2u64] as u32) << 16u32;
+            word |= (bytes[i * 4u64 + 3u64] as u32) << 24u32;
             words.PushBack(word);
-            i += 4u64;
         } ret words;
     }
 }
