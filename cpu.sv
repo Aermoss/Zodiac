@@ -5,7 +5,6 @@ module cpu(
 );
 
 typedef enum logic [5:0] {
-    OP_NOP,
     OP_LB,
     OP_LBU,
     OP_LH,
@@ -227,8 +226,6 @@ always_comb begin
             next_state = S_FETCH;
 
             case (opcode)
-                OP_NOP: next_pc = pc + 4;
-
                 OP_B: next_pc = imm26;
                 OP_BR: next_pc = regs[reg0];
                 OP_BL: begin
@@ -306,7 +303,7 @@ always_comb begin
                 OP_SLT: reg_write = ($signed(regs[reg1]) < $signed(regs[reg2]));
                 OP_SLTU: reg_write = (regs[reg1] < regs[reg2]);
                 OP_SLTI: reg_write = ($signed(regs[reg1]) < simm16);
-                OP_SLTIU: reg_write = (regs[reg1] < simm16);
+                OP_SLTIU: reg_write = (regs[reg1] < {{16{1'b0}}, imm16});
                 default: reg_write = alu_result;
             endcase
         end
@@ -331,7 +328,7 @@ always_ff @(posedge clk or posedge reset) begin
         case (state)
             S_MEMORY: begin
                 case (opcode)
-                    OP_SH: assert(ram_addr[1:0] == 0);
+                    OP_SH: assert(ram_addr[0] == 0);
                     OP_SW: assert(ram_addr[1:0] == 0);
                 endcase
             end

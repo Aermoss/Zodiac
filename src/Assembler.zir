@@ -17,7 +17,6 @@
 #[include "std/str", "std/vec", "std/map", "src/Nodes.zir" : *]
 
 enum Opcode: u32 {
-    NOP,
     LB, LBU, LH, LHU, LW, LI, LUI, AUIPC, SB, SH, SW,
     B, BR, BL, BEQ, BNE, BLT, BLTU, BGE, BGEU,
     SLT, SLTU, SLTI, SLTIU,
