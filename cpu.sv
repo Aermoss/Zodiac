@@ -126,8 +126,6 @@ logic mem_op_in_wb;
 logic [31:0] wb_pc;
 logic [31:0] wb_instr;
 logic [31:0] wb_result;
-logic [7:0] wb_result_byte;
-logic [15:0] wb_result_half;
 logic [31:0] wb_addr;
 opcode_t wb_opcode;
 logic [4:0] wb_reg_addr;
@@ -247,19 +245,13 @@ always_comb begin
         ex_reg2_fwd = ex_reg2;
 end
 
-logic load_use_hazard;
+logic hazard_stall;
 
-assign load_use_hazard = (ex_opcode == OP_LB || ex_opcode == OP_LBU || ex_opcode == OP_LH || ex_opcode == OP_LHU || ex_opcode == OP_LW) && (ex_reg_addr != 0) && (
+assign hazard_stall = (ex_opcode == OP_LB || ex_opcode == OP_LBU || ex_opcode == OP_LH || ex_opcode == OP_LHU || ex_opcode == OP_LW) && (ex_reg_addr != 0) && (
     (reads_reg0(id_opcode) && id_instr[25:21] == ex_reg_addr) ||
     (reads_reg1(id_opcode) && id_instr[20:16] == ex_reg_addr) ||
     (reads_reg2(id_opcode) && id_instr[15:11] == ex_reg_addr)
 );
-
-logic hazard_stall;
-logic mem_stall;
-
-assign hazard_stall = load_use_hazard;
-assign mem_stall = mem_access;
 
 always_comb begin
     alu_left = ex_reg1_fwd;
@@ -298,11 +290,10 @@ always_comb begin
     uart_we = 0;
     _ram_we = 0;
 
-    if (ram_addr == 32'hFFFF) begin
+    if (ram_addr == 32'hFFFF)
         uart_we = ram_we;
-    end else begin
+    else
         _ram_we = ram_we;
-    end
 end
 
 logic branch_eq;
@@ -312,16 +303,6 @@ logic branch_ltu;
 assign branch_eq = (ex_reg0_fwd == ex_reg1_fwd);
 assign branch_lt = ($signed(ex_reg0_fwd) < $signed(ex_reg1_fwd));
 assign branch_ltu = (ex_reg0_fwd < ex_reg1_fwd);
-
-assign wb_result_byte = ram_read[8 * wb_addr[1:0]+:8];
-assign wb_result_half = ram_read[16 * wb_addr[1]+:16];
-
-always_comb begin
-    if (mem_access)
-        ram_addr = mem_addr;
-    else
-        ram_addr = if_pc;
-end
 
 always_comb begin
     should_take_branch = 0;
@@ -337,7 +318,6 @@ always_comb begin
         OP_LI: ex_result = ex_imm21;
         OP_LUI: ex_result = ex_imm21 << 11;
         OP_AUIPC: ex_result = ex_pc + (ex_imm21 << 11);
-
         OP_SLT: ex_result = ($signed(ex_reg1_fwd) < $signed(ex_reg2_fwd));
         OP_SLTU: ex_result = (ex_reg1_fwd < ex_reg2_fwd);
         OP_SLTI: ex_result = ($signed(ex_reg1_fwd) < ex_simm16);
@@ -365,9 +345,15 @@ always_comb begin
         OP_BLTU: should_take_branch = branch_ltu;
         OP_BGE: should_take_branch = !branch_lt;
         OP_BGEU: should_take_branch = !branch_ltu;
-
         OP_HLT: should_halt = 1;
     endcase
+end
+
+always_comb begin
+    if (mem_access)
+        ram_addr = mem_addr;
+    else
+        ram_addr = if_pc;
 end
 
 always_comb begin
@@ -399,6 +385,12 @@ always_comb begin
     endcase
 end
 
+logic [7:0] ram_read_byte;
+logic [15:0] ram_read_half;
+
+assign ram_read_byte = ram_read[8 * wb_addr[1:0]+:8];
+assign ram_read_half = ram_read[16 * wb_addr[1]+:16];
+
 always_comb begin
     reg_addr = wb_reg_addr;
     reg_write = 0;
@@ -408,17 +400,16 @@ always_comb begin
         OP_LI, OP_LUI, OP_AUIPC,
         OP_SLT, OP_SLTU, OP_SLTI, OP_SLTIU,
         OP_ADD, OP_ADDI, OP_SUB, OP_SUBI,
-        OP_MUL, OP_MULH, OP_MULHSU, OP_MULHU, OP_DIV, OP_DIVU, OP_REM, OP_REMU,
+        OP_MUL, OP_MULH, OP_MULHSU, OP_MULHU,
+        OP_DIV, OP_DIVU, OP_REM, OP_REMU,
         OP_AND, OP_ANDI, OP_OR, OP_ORI, OP_XOR, OP_XORI,
         OP_SLL, OP_SLLI, OP_SRL, OP_SRLI, OP_SRA, OP_SRAI,
         OP_BL: reg_write = wb_result;
-
-        OP_LB: reg_write = {{24{wb_result_byte[7]}}, wb_result_byte};
-        OP_LBU: reg_write = wb_result_byte;
-        OP_LH: reg_write = {{16{wb_result_half[15]}}, wb_result_half};
-        OP_LHU: reg_write = wb_result_half;
+        OP_LB: reg_write = {{24{ram_read_byte[7]}}, ram_read_byte};
+        OP_LBU: reg_write = ram_read_byte;
+        OP_LH: reg_write = {{16{ram_read_half[15]}}, ram_read_half};
+        OP_LHU: reg_write = ram_read_half;
         OP_LW: reg_write = ram_read;
-
         default: reg_we = 0;
     endcase
 end
