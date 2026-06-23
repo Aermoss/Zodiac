@@ -1,10 +1,10 @@
 module cpu(
     input logic clk,
-    input logic reset,
-    output logic [31:0] debug
+    input logic reset
 );
 
 typedef enum logic [5:0] {
+    OP_NOP,
     OP_LB,
     OP_LBU,
     OP_LH,
@@ -56,53 +56,102 @@ typedef enum logic [5:0] {
     OP_HLT = 6'h3F
 } opcode_t;
 
-typedef enum logic [2:0] {
-    S_FETCH,
-    S_DECODE,
-    S_EXECUTE,
-    S_MEMORY,
-    S_WRITEBACK
-} state_t;
-
-state_t state;
-logic [31:0] pc;
-logic [31:0] instr;
 logic halted;
-
-assign debug = pc;
-
-opcode_t opcode;
-logic [4:0] reg0;
-logic [4:0] reg1;
-logic [4:0] reg2;
-logic [10:0] imm11;
-logic [15:0] imm16;
-logic [20:0] imm21;
-logic [25:0] imm26;
-
-assign opcode = opcode_t'(instr[31:26]);
-assign reg0 = instr[25:21];
-assign reg1 = instr[20:16];
-assign reg2 = instr[15:11];
-assign imm11 = instr[10:0];
-assign imm16 = instr[15:0];
-assign imm21 = instr[20:0];
-assign imm26 = instr[25:0];
-
-logic signed [31:0] simm11;
-logic signed [31:0] simm16;
-logic signed [31:0] simm21;
-logic signed [31:0] simm26;
-
-assign simm11 = {{21{imm11[10]}}, imm11};
-assign simm16 = {{16{imm16[15]}}, imm16};
-assign simm21 = {{11{imm21[20]}}, imm21};
-assign simm26 = {{6{imm26[25]}}, imm26};
 
 logic reg_we;
 logic [4:0] reg_addr;
 logic [31:0] reg_write;
 logic [31:0] regs [0:31];
+
+logic [31:0] if_pc;
+logic [31:0] if_instr;
+
+logic [31:0] id_pc;
+logic [31:0] id_instr;
+
+opcode_t id_opcode;
+logic [4:0] id_reg_addr;
+logic [31:0] id_reg0;
+logic [31:0] id_reg1;
+logic [31:0] id_reg2;
+logic [10:0] id_imm11;
+logic [15:0] id_imm16;
+logic [20:0] id_imm21;
+logic [25:0] id_imm26;
+
+assign id_opcode = opcode_t'(id_instr[31:26]);
+assign id_reg_addr = id_instr[25:21];
+assign id_reg0 = regs[id_instr[25:21]];
+assign id_reg1 = regs[id_instr[20:16]];
+assign id_reg2 = regs[id_instr[15:11]];
+assign id_imm11 = id_instr[10:0];
+assign id_imm16 = id_instr[15:0];
+assign id_imm21 = id_instr[20:0];
+assign id_imm26 = id_instr[25:0];
+
+logic signed [31:0] id_simm11;
+logic signed [31:0] id_simm16;
+logic signed [31:0] id_simm21;
+logic signed [31:0] id_simm26;
+
+assign id_simm11 = {{21{id_imm11[10]}}, id_imm11};
+assign id_simm16 = {{16{id_imm16[15]}}, id_imm16};
+assign id_simm21 = {{11{id_imm21[20]}}, id_imm21};
+assign id_simm26 = {{6{id_imm26[25]}}, id_imm26};
+
+logic [31:0] ex_pc;
+logic [31:0] ex_instr;
+
+opcode_t ex_opcode;
+logic [4:0] ex_reg_addr;
+logic [31:0] ex_reg0;
+logic [31:0] ex_reg1;
+logic [31:0] ex_reg2;
+logic [10:0] ex_imm11;
+logic [15:0] ex_imm16;
+logic [20:0] ex_imm21;
+logic [25:0] ex_imm26;
+
+logic signed [31:0] ex_simm11;
+logic signed [31:0] ex_simm16;
+logic signed [31:0] ex_simm21;
+logic signed [31:0] ex_simm26;
+
+logic [31:0] mem_pc;
+logic [31:0] mem_instr;
+
+opcode_t mem_opcode;
+logic [4:0] mem_reg_addr;
+logic [31:0] mem_reg0;
+logic [31:0] mem_reg1;
+logic [31:0] mem_reg2;
+logic [10:0] mem_imm11;
+logic [15:0] mem_imm16;
+logic [20:0] mem_imm21;
+logic [25:0] mem_imm26;
+
+logic signed [31:0] mem_simm11;
+logic signed [31:0] mem_simm16;
+logic signed [31:0] mem_simm21;
+logic signed [31:0] mem_simm26;
+
+logic [31:0] wb_pc;
+logic [31:0] wb_instr;
+
+opcode_t wb_opcode;
+logic [4:0] wb_reg_addr;
+logic [31:0] wb_reg0;
+logic [31:0] wb_reg1;
+logic [31:0] wb_reg2;
+logic [10:0] wb_imm11;
+logic [15:0] wb_imm16;
+logic [20:0] wb_imm21;
+logic [25:0] wb_imm26;
+
+logic signed [31:0] wb_simm11;
+logic signed [31:0] wb_simm16;
+logic signed [31:0] wb_simm21;
+logic signed [31:0] wb_simm26;
 
 logic [3:0] ram_we;
 logic [3:0] _ram_we;
@@ -131,12 +180,12 @@ alu alu0(
 );
 
 always_comb begin
-    alu_left = regs[reg1];
-    alu_right = (opcode == OP_ADDI) || (opcode == OP_SUBI) || (opcode == OP_ANDI) || (opcode == OP_ORI) || (opcode == OP_XORI)
-        ? simm16 : ((opcode == OP_SLLI) || (opcode == OP_SRLI) || (opcode == OP_SRAI) ? imm16 : regs[reg2]);
+    alu_left = ex_reg1;
+    alu_right = (ex_opcode == OP_ADDI) || (ex_opcode == OP_SUBI) || (ex_opcode == OP_ANDI) || (ex_opcode == OP_ORI) || (ex_opcode == OP_XORI)
+        ? ex_simm16 : ((ex_opcode == OP_SLLI) || (ex_opcode == OP_SRLI) || (ex_opcode == OP_SRAI) ? ex_imm16 : ex_reg2);
     alu_op = ALU_OP_ADD;
 
-    case (opcode)
+    case (ex_opcode)
         OP_SUB, OP_SUBI: alu_op = ALU_OP_SUB;
         OP_MUL: alu_op = ALU_OP_MUL;
         OP_MULH: alu_op = ALU_OP_MULH;
@@ -178,135 +227,128 @@ logic branch_eq;
 logic branch_lt;
 logic branch_ltu;
 
-assign branch_eq = (regs[reg0] == regs[reg1]);
-assign branch_lt = ($signed(regs[reg0]) < $signed(regs[reg1]));
-assign branch_ltu = (regs[reg0] < regs[reg1]);
+assign branch_eq = (ex_reg0 == ex_reg1);
+assign branch_lt = ($signed(ex_reg0) < $signed(ex_reg1));
+assign branch_ltu = (ex_reg0 < ex_reg1);
 
-logic [7:0] ram_read_byte;
-logic [15:0] ram_read_half;
+logic [31:0] ex_result;
+logic [31:0] mem_result;
+logic [31:0] wb_result;
 
-assign ram_read_byte = ram_read[8 * ram_addr[1:0]+:8];
-assign ram_read_half = ram_read[16 * ram_addr[1]+:16];
+logic [31:0] ex_addr;
+logic [31:0] mem_addr;
+logic [31:0] wb_addr;
 
-state_t next_state;
-logic [31:0] next_pc;
-logic [31:0] next_instr;
-logic next_halted;
+logic [7:0] wb_result_byte;
+logic [15:0] wb_result_half;
+
+assign wb_result_byte = wb_result[8 * wb_addr[1:0]+:8];
+assign wb_result_half = wb_result[16 * wb_addr[1]+:16];
+
+logic mem_access;
+
+logic branch_taken;
+logic [31:0] branch_target;
+
+logic should_halt;
 
 always_comb begin
-    next_state = state;
-    next_pc = pc;
-    next_instr = instr;
-    next_halted = halted;
+    if (mem_access)
+        ram_addr = mem_addr;
+    else
+        ram_addr = if_pc;
+end
 
-    reg_we = 0;
-    reg_addr = reg0;
-    reg_write = 0;
+always_comb begin
+    branch_taken = 0;
+    branch_target = ex_pc + (ex_simm16 << 2);
+    should_halt = 0;
+    ex_result = alu_result;
+    ex_addr = 0;
 
-    ram_we = 0;
-    ram_addr = pc;
+    case (ex_opcode)
+        OP_LB, OP_LBU, OP_LH, OP_LHU, OP_LW, OP_SB, OP_SH, OP_SW:
+            ex_addr = ex_reg1 + ex_simm16;
+
+        OP_B: begin
+            branch_target = (ex_imm26 << 2);
+            branch_taken = 1;
+        end
+
+        OP_BR: begin
+            branch_target = ex_reg0;
+            branch_taken = 1;
+        end
+
+        OP_BL: begin
+            ex_result = ex_pc + 4;
+            branch_taken = 1;
+        end
+
+        OP_BEQ: branch_taken = branch_eq;
+        OP_BNE: branch_taken = !branch_eq;
+        OP_BLT: branch_taken = branch_lt;
+        OP_BLTU: branch_taken = branch_ltu;
+        OP_BGE: branch_taken = !branch_lt;
+        OP_BGEU: branch_taken = !branch_ltu;
+
+        OP_HLT: should_halt = 1;
+    endcase
+end
+
+always_comb begin
     ram_write = 0;
+    mem_access = 0;
+    ram_we = 0;
 
-    case (state)
-        S_FETCH: begin
-            next_state = S_DECODE;
+    case (mem_opcode)
+        OP_LB, OP_LBU, OP_LH, OP_LHU, OP_LW:
+            mem_access = 1;
+
+        OP_SB: begin
+            ram_we = 4'b0001 << ram_addr[1:0];
+            ram_write = {24'b0, mem_reg0[7:0]} << (8 * ram_addr[1:0]);
+            mem_access = 1;
         end
 
-        S_DECODE: begin
-            next_instr = ram_read;
-
-            case (next_instr[31:26])
-                OP_LI, OP_LUI, OP_AUIPC: next_state = S_WRITEBACK;
-                OP_LB, OP_LBU, OP_LH, OP_LHU, OP_LW, OP_SB, OP_SH, OP_SW: next_state = S_MEMORY;
-                default: next_state = S_EXECUTE;
-            endcase
+        OP_SH: begin
+            ram_we = 4'b0011 << (2 * ram_addr[1]);
+            ram_write = {16'b0, mem_reg0[15:0]} << (16 * ram_addr[1]);
+            mem_access = 1;
         end
 
-        S_EXECUTE: begin
-            next_state = S_FETCH;
-
-            case (opcode)
-                OP_B: next_pc = (imm26 << 2);
-                OP_BR: next_pc = regs[reg0];
-                OP_BL: begin
-                    reg_write = pc + 4;
-                    next_pc = pc + (simm21 << 2);
-                    reg_we = 1;
-                end
-
-                OP_BEQ: next_pc = pc + (branch_eq ? (simm16 << 2) : 4);
-                OP_BNE: next_pc = pc + (!branch_eq ? (simm16 << 2) : 4);
-                OP_BLT: next_pc = pc + (branch_lt ? (simm16 << 2) : 4);
-                OP_BLTU: next_pc = pc + (branch_ltu ? (simm16 << 2) : 4);
-                OP_BGE: next_pc = pc + (!branch_lt ? (simm16 << 2) : 4);
-                OP_BGEU: next_pc = pc + (!branch_ltu ? (simm16 << 2) : 4);
-
-                OP_SLT, OP_SLTU, OP_SLTI, OP_SLTIU,
-                OP_ADD, OP_ADDI, OP_SUB, OP_SUBI,
-                OP_MUL, OP_MULH, OP_MULHSU, OP_MULHU, OP_DIV, OP_DIVU, OP_REM, OP_REMU,
-                OP_AND, OP_ANDI, OP_OR, OP_ORI, OP_XOR, OP_XORI,
-                OP_SLL, OP_SLLI, OP_SRL, OP_SRLI, OP_SRA, OP_SRAI:
-                    next_state = S_WRITEBACK;
-
-                OP_HLT: next_halted = 1;
-            endcase
+        OP_SW: begin
+            ram_we = 4'b1111;
+            ram_write = mem_reg0;
+            mem_access = 1;
         end
+    endcase
+end
 
-        S_MEMORY: begin
-            ram_addr = regs[reg1] + simm16;
+always_comb begin
+    reg_addr = wb_reg_addr;
+    reg_write = 0;
+    reg_we = 1;
 
-            case (opcode)
-                OP_LB, OP_LBU, OP_LH, OP_LHU, OP_LW: next_state = S_WRITEBACK;
-
-                OP_SB: begin
-                    ram_we = 4'b0001 << ram_addr[1:0];
-                    ram_write = {24'b0, regs[reg0][7:0]} << (8 * ram_addr[1:0]);
-                    next_state = S_FETCH;
-                    next_pc = pc + 4;
-                end
-
-                OP_SH: begin
-                    ram_we = 4'b0011 << (2 * ram_addr[1]);
-                    ram_write = {16'b0, regs[reg0][15:0]} << (16 * ram_addr[1]);
-                    next_state = S_FETCH;
-                    next_pc = pc + 4;
-                end
-
-                OP_SW: begin
-                    ram_we = 4'b1111;
-                    ram_write = regs[reg0];
-                    next_state = S_FETCH;
-                    next_pc = pc + 4;
-                end
-            endcase
-        end
-
-        S_WRITEBACK: begin
-            reg_we = 1;
-            next_state = S_FETCH;
-            next_pc = pc + 4;
-
-            case (opcode)
-                OP_LB, OP_LBU, OP_LH, OP_LHU, OP_LW:
-                    ram_addr = regs[reg1] + simm16;
-            endcase
-
-            case (opcode)
-                OP_LI: reg_write = imm21;
-                OP_LUI: reg_write = imm21 << 11;
-                OP_AUIPC: reg_write = pc + (imm21 << 11);
-                OP_LB: reg_write = {{24{ram_read_byte[7]}}, ram_read_byte};
-                OP_LBU: reg_write = ram_read_byte;
-                OP_LH: reg_write = {{16{ram_read_half[15]}}, ram_read_half};
-                OP_LHU: reg_write = ram_read_half;
-                OP_LW: reg_write = ram_read;
-                OP_SLT: reg_write = ($signed(regs[reg1]) < $signed(regs[reg2]));
-                OP_SLTU: reg_write = (regs[reg1] < regs[reg2]);
-                OP_SLTI: reg_write = ($signed(regs[reg1]) < simm16);
-                OP_SLTIU: reg_write = (regs[reg1] < {{16{1'b0}}, imm16});
-                default: reg_write = alu_result;
-            endcase
-        end
+    case (wb_opcode)
+        OP_LI: reg_write = wb_imm21;
+        OP_LUI: reg_write = wb_imm21 << 11;
+        OP_AUIPC: reg_write = wb_pc + (wb_imm21 << 11);
+        OP_LB: reg_write = {{24{wb_result_byte[7]}}, wb_result_byte};
+        OP_LBU: reg_write = wb_result_byte;
+        OP_LH: reg_write = {{16{wb_result_half[15]}}, wb_result_half};
+        OP_LHU: reg_write = wb_result_half;
+        OP_LW: reg_write = wb_result;
+        OP_SLT: reg_write = ($signed(wb_reg1) < $signed(wb_reg2));
+        OP_SLTU: reg_write = (wb_reg1 < wb_reg2);
+        OP_SLTI: reg_write = ($signed(wb_reg1) < wb_simm16);
+        OP_SLTIU: reg_write = (wb_reg1 < {{16{1'b0}}, wb_imm16});
+        OP_ADD, OP_ADDI, OP_SUB, OP_SUBI,
+        OP_MUL, OP_MULH, OP_MULHSU, OP_MULHU, OP_DIV, OP_DIVU, OP_REM, OP_REMU,
+        OP_AND, OP_ANDI, OP_OR, OP_ORI, OP_XOR, OP_XORI,
+        OP_SLL, OP_SLLI, OP_SRL, OP_SRLI, OP_SRA, OP_SRAI,
+        OP_BL: reg_write = wb_result;
+        default: reg_we = 0;
     endcase
 end
 
@@ -317,37 +359,129 @@ always_ff @(posedge clk or posedge reset) begin
         for (i = 0; i < 32; i++)
             regs[i] <= 0;
 
-        state <= S_FETCH;
-        pc <= 0;
-        instr <= 0;
+        if_pc <= 0;
+        if_instr <= 0;
+
+        id_pc <= 0;
+        id_instr <= 0;
+
+        ex_pc <= 0;
+        ex_instr <= 0;
+        ex_opcode <= OP_NOP;
+        ex_reg_addr <= 0;
+        ex_reg0 <= 0;
+        ex_reg1 <= 0;
+        ex_reg2 <= 0;
+        ex_imm11 <= 0;
+        ex_imm16 <= 0;
+        ex_imm21 <= 0;
+        ex_imm26 <= 0;
+        ex_simm11 <= 0;
+        ex_simm16 <= 0;
+        ex_simm21 <= 0;
+        ex_simm26 <= 0;
+
+        mem_pc <= 0;
+        mem_instr <= 0;
+        mem_result <= 0;
+        mem_opcode <= OP_NOP;
+        mem_reg_addr <= 0;
+        mem_reg0 <= 0;
+        mem_reg1 <= 0;
+        mem_reg2 <= 0;
+        mem_imm11 <= 0;
+        mem_imm16 <= 0;
+        mem_imm21 <= 0;
+        mem_imm26 <= 0;
+        mem_simm11 <= 0;
+        mem_simm16 <= 0;
+        mem_simm21 <= 0;
+        mem_simm26 <= 0;
+
+        wb_pc <= 0;
+        wb_instr <= 0;
+        wb_result <= 0;
+        wb_opcode <= OP_NOP;
+        wb_reg_addr <= 0;
+        wb_reg0 <= 0;
+        wb_reg1 <= 0;
+        wb_reg2 <= 0;
+        wb_imm11 <= 0;
+        wb_imm16 <= 0;
+        wb_imm21 <= 0;
+        wb_imm26 <= 0;
+        wb_simm11 <= 0;
+        wb_simm16 <= 0;
+        wb_simm21 <= 0;
+        wb_simm26 <= 0;
+
         halted <= 0;
-    end else if (!halted) begin
+    end else begin
         if (reg_we && reg_addr != 0)
             regs[reg_addr] <= reg_write;
 
-        case (state)
-            S_MEMORY: begin
-                case (opcode)
-                    OP_SH: assert(ram_addr[0] == 0);
-                    OP_SW: assert(ram_addr[1:0] == 0);
-                endcase
-            end
+        if_pc <= !halted ? (branch_taken ? branch_target : (!mem_access ? if_pc + 4 : 0)) : 0;
+        if_instr <= !halted ? (branch_taken ? 0 : (!mem_access ? ram_read : 0)) : 0;
 
-            S_WRITEBACK: begin
-                case (opcode)
-                    OP_LH: assert(ram_addr[0] == 0);
-                    OP_LHU: assert(ram_addr[0] == 0);
-                    OP_LW: assert(ram_addr[1:0] == 0);
-                endcase
-            end
-        endcase
+        id_pc <= branch_taken ? 0 : if_pc;
+        id_instr <= branch_taken ? 0 : if_instr;
 
-        state <= next_state;
-        pc <= next_pc;
-        instr <= next_instr;
-        halted <= next_halted;
-    end else begin
-        $finish;
+        ex_pc <= id_pc;
+        ex_instr <= id_instr;
+        ex_opcode <= id_opcode;
+        ex_reg_addr <= id_reg_addr;
+        ex_reg0 <= id_reg0;
+        ex_reg1 <= id_reg1;
+        ex_reg2 <= id_reg2;
+        ex_imm11 <= id_imm11;
+        ex_imm16 <= id_imm16;
+        ex_imm21 <= id_imm21;
+        ex_imm26 <= id_imm26;
+        ex_simm11 <= id_simm11;
+        ex_simm16 <= id_simm16;
+        ex_simm21 <= id_simm21;
+        ex_simm26 <= id_simm26;
+
+        mem_pc <= ex_pc;
+        mem_instr <= ex_instr;
+        mem_result <= ex_result;
+        mem_addr <= ex_addr;
+        mem_opcode <= ex_opcode;
+        mem_reg_addr <= ex_reg_addr;
+        mem_reg0 <= ex_reg0;
+        mem_reg1 <= ex_reg1;
+        mem_reg2 <= ex_reg2;
+        mem_imm11 <= ex_imm11;
+        mem_imm16 <= ex_imm16;
+        mem_imm21 <= ex_imm21;
+        mem_imm26 <= ex_imm26;
+        mem_simm11 <= ex_simm11;
+        mem_simm16 <= ex_simm16;
+        mem_simm21 <= ex_simm21;
+        mem_simm26 <= ex_simm26;
+
+        wb_pc <= mem_pc;
+        wb_instr <= mem_instr;
+        wb_result <= mem_result;
+        wb_opcode <= mem_opcode;
+        wb_reg_addr <= mem_reg_addr;
+        wb_reg0 <= mem_reg0;
+        wb_reg1 <= mem_reg1;
+        wb_reg2 <= mem_reg2;
+        wb_imm11 <= mem_imm11;
+        wb_imm16 <= mem_imm16;
+        wb_imm21 <= mem_imm21;
+        wb_imm26 <= mem_imm26;
+        wb_simm11 <= mem_simm11;
+        wb_simm16 <= mem_simm16;
+        wb_simm21 <= mem_simm21;
+        wb_simm26 <= mem_simm26;
+
+        if (should_halt)
+            halted <= 1;
+
+        if (halted && if_instr == 0 && id_instr == 0 && ex_instr == 0 && mem_instr == 0 && wb_instr == 0)
+            $finish;
     end
 end
 

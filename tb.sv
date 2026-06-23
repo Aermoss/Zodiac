@@ -23,6 +23,9 @@ initial begin
     reset = 1;
     @(negedge clk);
     reset = 0;
+    #1000
+
+    $finish;
 end
 
 endmodule

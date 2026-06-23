@@ -17,6 +17,7 @@
 #[include "std/str", "std/vec", "std/map", "src/Nodes.zir" : *]
 
 enum Opcode: u32 {
+    NOP,
     LB, LBU, LH, LHU, LW, LI, LUI, AUIPC, SB, SH, SW,
     B, BR, BL, BEQ, BNE, BLT, BLTU, BGE, BGEU,
     SLT, SLTU, SLTI, SLTIU,
@@ -219,7 +220,8 @@ class Assembler {
                 }
             }
 
-            if mnemonic == "lb" { opcode = Opcode::LB; }
+            if mnemonic == "nop" { opcode = Opcode::NOP; }
+            else if mnemonic == "lb" { opcode = Opcode::LB; }
             else if mnemonic == "lbu" { opcode = Opcode::LBU; }
             else if mnemonic == "lh" { opcode = Opcode::LH; }
             else if mnemonic == "lhu" { opcode = Opcode::LHU; }
