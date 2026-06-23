@@ -158,6 +158,13 @@ alu alu0(
     .result(alu_result)
 );
 
+function automatic logic is_load_op(opcode_t opcode);
+    case (opcode)
+        OP_LB, OP_LBU, OP_LH, OP_LHU, OP_LW: return 1;
+        default: return 0;
+    endcase
+endfunction
+
 function automatic logic is_mem_op(opcode_t opcode);
     case (opcode)
         OP_LB, OP_LBU, OP_LH, OP_LHU, OP_LW,
@@ -247,7 +254,7 @@ end
 
 logic hazard_stall;
 
-assign hazard_stall = (ex_opcode == OP_LB || ex_opcode == OP_LBU || ex_opcode == OP_LH || ex_opcode == OP_LHU || ex_opcode == OP_LW) && (ex_reg_addr != 0) && (
+assign hazard_stall = is_load_op(ex_opcode) && (ex_reg_addr != 0) && (
     (reads_reg0(id_opcode) && id_instr[25:21] == ex_reg_addr) ||
     (reads_reg1(id_opcode) && id_instr[20:16] == ex_reg_addr) ||
     (reads_reg2(id_opcode) && id_instr[15:11] == ex_reg_addr)
