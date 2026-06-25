@@ -10,7 +10,6 @@ typedef enum logic [5:0] {
     OP_LH,
     OP_LHU,
     OP_LW,
-    OP_LI,
     OP_LUI,
     OP_AUIPC,
     OP_SB,
@@ -185,7 +184,7 @@ endfunction
 function automatic logic reads_reg1(opcode_t opcode);
     case (opcode)
         OP_NOP,
-        OP_LI, OP_LUI, OP_AUIPC,
+        OP_LUI, OP_AUIPC,
         OP_B,
         OP_HLT: return 0;
         default: return 1;
@@ -208,7 +207,7 @@ logic mem_writes_reg;
 
 always_comb begin
     case (mem_opcode)
-        OP_LI, OP_LUI, OP_AUIPC,
+        OP_LUI, OP_AUIPC,
         OP_SLT, OP_SLTU, OP_SLTI, OP_SLTIU,
         OP_ADD, OP_ADDI, OP_SUB, OP_SUBI,
         OP_MUL, OP_MULH, OP_MULHSU, OP_MULHU, OP_DIV, OP_DIVU, OP_REM, OP_REMU,
@@ -262,8 +261,8 @@ assign hazard_stall = is_load_op(ex_opcode) && (ex_reg_addr != 0) && (
 
 always_comb begin
     alu_left = ex_reg1_fwd;
-    alu_right = (ex_opcode == OP_ADDI) || (ex_opcode == OP_SUBI) || (ex_opcode == OP_ANDI) || (ex_opcode == OP_ORI) || (ex_opcode == OP_XORI)
-        ? ex_simm16 : ((ex_opcode == OP_SLLI) || (ex_opcode == OP_SRLI) || (ex_opcode == OP_SRAI) ? ex_imm16 : ex_reg2_fwd);
+    alu_right = (ex_opcode == OP_ANDI) || (ex_opcode == OP_ORI) || (ex_opcode == OP_XORI) || (ex_opcode == OP_SLLI) || (ex_opcode == OP_SRLI) || (ex_opcode == OP_SRAI)
+        ? ex_imm16 : ((ex_opcode == OP_ADDI) || (ex_opcode == OP_SUBI) ? ex_simm16 : ex_reg2_fwd);
     alu_op = ALU_OP_ADD;
 
     case (ex_opcode)
@@ -322,7 +321,6 @@ always_comb begin
         OP_LB, OP_LBU, OP_LH, OP_LHU, OP_LW, OP_SB, OP_SH, OP_SW:
             ex_addr = ex_reg1_fwd + ex_simm16;
 
-        OP_LI: ex_result = ex_imm21;
         OP_LUI: ex_result = ex_imm21 << 11;
         OP_AUIPC: ex_result = ex_pc + (ex_imm21 << 11);
         OP_SLT: ex_result = ($signed(ex_reg1_fwd) < $signed(ex_reg2_fwd));
@@ -404,7 +402,7 @@ always_comb begin
     reg_we = 1;
 
     case (wb_opcode)
-        OP_LI, OP_LUI, OP_AUIPC,
+        OP_LUI, OP_AUIPC,
         OP_SLT, OP_SLTU, OP_SLTI, OP_SLTIU,
         OP_ADD, OP_ADDI, OP_SUB, OP_SUBI,
         OP_MUL, OP_MULH, OP_MULHSU, OP_MULHU,

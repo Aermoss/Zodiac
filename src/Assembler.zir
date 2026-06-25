@@ -18,7 +18,7 @@
 
 enum Opcode: u32 {
     NOP,
-    LB, LBU, LH, LHU, LW, LI, LUI, AUIPC, SB, SH, SW,
+    LB, LBU, LH, LHU, LW, LUI, AUIPC, SB, SH, SW,
     B, BR, BL, BEQ, BNE, BLT, BLTU, BGE, BGEU,
     SLT, SLTU, SLTI, SLTIU,
     ADD, ADDI, SUB, SUBI,
@@ -38,11 +38,23 @@ const IMM16_MASK: u32 = (1u32 << 16u32) - 1u32;
 const IMM21_MASK: u32 = (1u32 << 21u32) - 1u32;
 const IMM26_MASK: u32 = (1u32 << 26u32) - 1u32;
 
+const IMM11_SMAX: u32 = (1u32 << 10u32) - 1u32;
+const IMM16_SMAX: u32 = (1u32 << 15u32) - 1u32;
+const IMM21_SMAX: u32 = (1u32 << 20u32) - 1u32;
+const IMM26_SMAX: u32 = (1u32 << 25u32) - 1u32;
+
+const IMM11_SMIN: u32 = 0u32 - (1u32 << 10u32);
+const IMM16_SMIN: u32 = 0u32 - (1u32 << 15u32);
+const IMM21_SMIN: u32 = 0u32 - (1u32 << 20u32);
+const IMM26_SMIN: u32 = 0u32 - (1u32 << 25u32);
+
 class Assembler {
     priv labels: Vector<String>,
     // priv labels: Map<String, u32>,
     priv addresses: Vector<u32>,
-    priv address: u32;
+    priv address: u32,
+    priv sizes: Vector<u32>,
+    priv relaxing: bool;
 
     priv AssembleExpression(&mut this, node: *const Node) -> u32 {
         if node->_type == NodeType::ADDRESS {
@@ -64,6 +76,10 @@ class Assembler {
 
             if index != -1i64 {
                 ret this.addresses[index as u64];
+            } else {
+                if !this.relaxing {
+                    Logger::Log("Unknown label: '" + value + "'.", node, LogSeverity::Error);
+                } ret 0u32;
             }
         } else if node->_type == NodeType::BINARY_OPERATION {
             let binary = node as *const BinaryOperationNode;
@@ -78,12 +94,23 @@ class Assembler {
             else if binary->operator == TokenType::AND { ret left & right; }
             else if binary->operator == TokenType::OR { ret left | right; }
             else if binary->operator == TokenType::XOR { ret left ^ right; }
+            else {
+                Logger::Log("Unknown binary operation: '" + binary->operator.ToString() + "'.", binary, LogSeverity::Error);
+                ret 0u32;
+            }
         } else if node->_type == NodeType::UNARY_OPERATION {
             let unary = node as *const UnaryOperationNode;
             let operand = this.AssembleExpression(unary->operand);
             if unary->operator == TokenType::MINUS { ret 0u32 - operand; }
             else if unary->operator == TokenType::NOT { ret !operand; }
-        } ret 0u32;
+            else {
+                Logger::Log("Unknown unary operation: '" + unary->operator.ToString() + "'.", unary, LogSeverity::Error);
+                ret 0u32;
+            }
+        } else {
+            Logger::Log("Unknown expression: '" + node->_type.ToString() + "'.", node, LogSeverity::Error);
+            ret 0u32;
+        }
     }
 
     priv AssembleOperand(&mut this, operand: *const OperandNode) -> u32 {
@@ -106,49 +133,110 @@ class Assembler {
         this.address = 0u32;
         this.addresses.Clear();
         this.labels.Clear();
+        this.sizes.Clear();
+        this.relaxing = true;
+        let mut pass = 0u64;
 
-        for node in root->declarations {
-            if node->_type == NodeType::LABEL {
-                let label = node as *const LabelNode;
-                this.labels.PushBack(label->name);
-                this.addresses.PushBack(this.address);
-            } else if node->_type == NodeType::INSTRUCTION {
-                let instruction = node as *const InstructionNode;
-                let (mnemonic, operands) = (instruction->mnemonic, instruction->operands);
-                let directive = mnemonic.StartsWith(".");
+        loop {
+            let mut changed = false;
+            let mut label_index = 0u64;
+            let mut instruction_index = 0u64;
+            this.address = 0u32;
 
-                if directive {
-                    if mnemonic == ".byte" {
-                        this.address += operands.Size() as u32;
-                    } else if mnemonic == ".half" {
-                        this.address += (operands.Size() * 2u64) as u32;
-                    } else if mnemonic == ".word" {
-                        this.address += (operands.Size() * 4u64) as u32;
-                    } else if mnemonic == ".string" {
-                        for operand in operands {
-                            let literal = operand->expression as *const LiteralNode;
-                            this.address += (literal->value.Length() + 1u64) as u32;
+            for node in root->declarations {
+                if node->_type == NodeType::LABEL {
+                    if pass == 0u64 {
+                        this.labels.PushBack((node as *const LabelNode)->name);
+                        this.addresses.PushBack(this.address);
+                    } else {
+                        if this.addresses[label_index] != this.address {
+                            this.addresses[label_index] = this.address;
+                            changed = true;
                         }
-                    } else if mnemonic == ".align" {
-                        let align = this.AssembleExpression(operands[0u64]->expression);
-                        let remainder = this.address % align;
+                    } label_index += 1u64;
+                } else if node->_type == NodeType::INSTRUCTION {
+                    let instruction = node as *const InstructionNode;
+                    let (mnemonic, operands) = (instruction->mnemonic, instruction->operands);
+                    let directive = mnemonic.StartsWith(".");
 
-                        if remainder != 0u32 {
-                            this.address += (align - remainder);
+                    if directive {
+                        if mnemonic == ".byte" {
+                            this.address += operands.Size() as u32;
+                        } else if mnemonic == ".half" {
+                            this.address += (operands.Size() * 2u64) as u32;
+                        } else if mnemonic == ".word" {
+                            this.address += (operands.Size() * 4u64) as u32;
+                        } else if mnemonic == ".string" {
+                            for operand in operands {
+                                let literal = operand->expression as *const LiteralNode;
+                                this.address += (literal->value.Length() + 1u64) as u32;
+                            }
+                        } else if mnemonic == ".align" {
+                            let align = this.AssembleExpression(operands[0u64]->expression);
+                            let remainder = this.address % align;
+
+                            if remainder != 0u32 {
+                                this.address += (align - remainder);
+                            }
+                        } else if mnemonic == ".space" {
+                            this.address += this.AssembleExpression(operands[0u64]->expression);
+                        } continue;
+                    }
+
+                    let remainder = this.address % 4u32;
+
+                    if remainder != 0u32 {
+                        this.address += 4u32 - remainder;
+                    }
+
+                    if mnemonic == "la" || mnemonic == "li" { 
+                        let mut size = 8u32;
+
+                        if pass == 0u64 {
+                            size = 4u32;
+                        } else {
+                            if operands.Size() >= 2u64 {
+                                let immediate = this.AssembleExpression(operands[1u64]->expression);
+
+                                if (immediate <= IMM16_SMAX) || (immediate >= IMM16_SMIN) {
+                                    size = 4u32;
+                                } else if (immediate & IMM11_MASK) == 0u32 {
+                                    size = 4u32;
+                                }
+                            }
                         }
-                    } else if mnemonic == ".space" {
-                        this.address += this.AssembleExpression(operands[0u64]->expression);
-                    } continue;
+
+                        if pass == 0u64 {
+                            this.sizes.PushBack(size);
+                        } else {
+                            let old_size = this.sizes[instruction_index];
+
+                            if old_size == 8u32 || size == 8u32 {
+                                size = 8u32;
+                            }
+
+                            if old_size != size {
+                                this.sizes[instruction_index] = size;
+                                changed = true;
+                            }
+                        } this.address += size;
+                    } else {
+                        if pass == 0u64 {
+                            this.sizes.PushBack(4u32);
+                        } this.address += 4u32;
+                    } instruction_index += 1u64;
                 }
+            }
 
-                let remainder = this.address % 4u32;
-
-                if remainder != 0u32 {
-                    this.address += 4u32 - remainder;
-                } this.address += 4u32;
+            if !changed && pass != 0u64 {
+                break;
+            } else {
+                pass += 1u64;
             }
         }
 
+        this.relaxing = false;
+        let mut instruction_index = 0u64;
         let mut bytes: Vector<u8>;
 
         for node in root->declarations {
@@ -220,13 +308,52 @@ class Assembler {
                 }
             }
 
+            if mnemonic == "li" || mnemonic == "la" {
+                let register = this.AssembleExpression(operands[0u64]->expression);
+                let immediate = this.AssembleExpression(operands[1u64]->expression);
+
+                if this.sizes[instruction_index] == 4u32 {
+                    let word = (immediate <= IMM16_SMAX) || (immediate >= IMM16_SMIN) ?
+                        (Opcode::ADDI << OPCODE_SHIFT) | (register << REG0_SHIFT) | (0u32 << REG1_SHIFT) | (immediate & IMM16_MASK) :
+                        (Opcode::LUI << OPCODE_SHIFT) | (register << REG0_SHIFT) | ((immediate >> 11u32) & IMM21_MASK);
+
+                    bytes.PushBack(word as u8);
+                    bytes.PushBack((word >> 8u32) as u8);
+                    bytes.PushBack((word >> 16u32) as u8);
+                    bytes.PushBack((word >> 24u32) as u8);
+                } else {
+                    let upper = (Opcode::LUI << OPCODE_SHIFT) | (register << REG0_SHIFT) | ((immediate >> 11u32) & IMM21_MASK);
+                    bytes.PushBack(upper as u8);
+                    bytes.PushBack((upper >> 8u32) as u8);
+                    bytes.PushBack((upper >> 16u32) as u8);
+                    bytes.PushBack((upper >> 24u32) as u8);
+
+                    let lower = (Opcode::ORI << OPCODE_SHIFT) | (register << REG0_SHIFT) | (register << REG1_SHIFT) | (immediate & IMM11_MASK);
+                    bytes.PushBack(lower as u8);
+                    bytes.PushBack((lower >> 8u32) as u8);
+                    bytes.PushBack((lower >> 16u32) as u8);
+                    bytes.PushBack((lower >> 24u32) as u8);
+                }
+
+                instruction_index += 1u64;
+                continue;
+            }
+
+            /* if mnemonic == "nop" {
+                let word = (Opcode::ADDI << OPCODE_SHIFT) | (0u32 << REG0_SHIFT) | (0u32 << REG1_SHIFT) | (0u32 & IMM16_MASK);
+                bytes.PushBack(word as u8);
+                bytes.PushBack((word >> 8u32) as u8);
+                bytes.PushBack((word >> 16u32) as u8);
+                bytes.PushBack((word >> 24u32) as u8);
+                continue;
+            } */
+
             if mnemonic == "nop" { opcode = Opcode::NOP; }
             else if mnemonic == "lb" { opcode = Opcode::LB; }
             else if mnemonic == "lbu" { opcode = Opcode::LBU; }
             else if mnemonic == "lh" { opcode = Opcode::LH; }
             else if mnemonic == "lhu" { opcode = Opcode::LHU; }
             else if mnemonic == "lw" { opcode = Opcode::LW; }
-            else if mnemonic == "li" { opcode = Opcode::LI; }
             else if mnemonic == "lui" { opcode = Opcode::LUI; }
             else if mnemonic == "auipc" { opcode = Opcode::AUIPC; }
             else if mnemonic == "sb" { opcode = Opcode::SB; }
@@ -280,7 +407,7 @@ class Assembler {
             if opcode >= Opcode::LB && opcode <= Opcode::SW {
                 word |= (this.AssembleExpression(operands[0u64]->expression) << REG0_SHIFT);
 
-                if opcode >= Opcode::LI && opcode <= Opcode::AUIPC {
+                if opcode == Opcode::LUI || opcode == Opcode::AUIPC {
                     word |= (this.AssembleOperand(operands[1u64]) & IMM21_MASK);
                 } else {
                     word |= (this.AssembleExpression(operands[1u64]->expression) << REG1_SHIFT);
@@ -321,6 +448,7 @@ class Assembler {
             bytes.PushBack((word >> 8u32) as u8);
             bytes.PushBack((word >> 16u32) as u8);
             bytes.PushBack((word >> 24u32) as u8);
+            instruction_index += 1u64;
         }
 
         let remainder = bytes.Size() % 4u64;

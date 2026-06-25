@@ -149,8 +149,7 @@ main:
     add x1, x0, x0
     sw x1, 4(x31)
     sw x1, 8(x31)
-    lui x1, hi(.L.str)
-    ori x1, x1, lo(.L.str)
+    la x1, .L.str
     bl x30, print
     addi x1, x0, 5
     bl x30, factorial
