@@ -1,0 +1,309 @@
+/*
+ * Copyright 2025-2026 Yusuf Rençber
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+#[include "std/str", "std/vec", "std/map", "std/file", "src/Common/Common.zir" : *]
+
+extern "C" {
+    func fopen(pathname: *const i8, mode: *const i8) -> *mut void;
+    func fread(ptr: *mut void, size: u64, nmemb: u64, stream: *mut void) -> u64;
+    func fclose(stream: *mut void) -> i32;
+}
+
+class ObjectFile {
+    pub file: String,
+    pub section_types: Vector<SectionType>,
+    pub section_words: Vector<Vector<u32>>,
+    pub symbol_names: Vector<String>,
+    pub symbol_sections: Vector<SectionType>,
+    pub symbol_offsets: Vector<u32>,
+    pub symbol_bindings: Vector<BindingType>,
+    pub relocation_sections: Vector<SectionType>,
+    pub relocation_offsets: Vector<u32>,
+    pub relocation_types: Vector<RelocationType>,
+    pub relocation_symbols: Vector<String>;
+
+    pub Load(&mut this, _file: &String) -> bool {
+        this.file = _file;
+        let file = fopen(_file.Data(), "rb");
+        if file == null { ret false; }
+
+        let mut magic = 0u32;
+        fread(&mut magic, 4u64, 1u64, file);
+
+        if magic != 0x4A424F5Au32 {
+            fclose(file);
+            ret false;
+        }
+
+        let mut text_word_count = 0u32;
+        fread(&mut text_word_count, 4u64, 1u64, file);
+
+        let mut data_word_count = 0u32;
+        fread(&mut data_word_count, 4u64, 1u64, file);
+
+        let mut symbol_count = 0u32;
+        fread(&mut symbol_count, 4u64, 1u64, file);
+
+        let mut relocation_count = 0u32;
+        fread(&mut relocation_count, 4u64, 1u64, file);
+
+        if text_word_count > 0u32 {
+            this.section_types.PushBack(SectionType::Text);
+            let mut words: Vector<u32>;
+            words.Resize(text_word_count as u64);
+            fread(words.Data(), 4u64, text_word_count as u64, file);
+            this.section_words.PushBack(words);
+        }
+
+        if data_word_count > 0u32 {
+            this.section_types.PushBack(SectionType::Data);
+            let mut words: Vector<u32>;
+            words.Resize(data_word_count as u64);
+            fread(words.Data(), 4u64, data_word_count as u64, file);
+            this.section_words.PushBack(words);
+        }
+
+        for i in 0u32..symbol_count {
+            let mut length = 0u32;
+            fread(&mut length, 4u64, 1u64, file);
+            let buffer = new i8[length as u64 + 1u64];
+            fread(buffer, 1u64, length as u64, file);
+            buffer[length as u64] = 0i8;
+            this.symbol_names.PushBack(String(buffer));
+            del[] buffer;
+
+            let mut section = 0u32;
+            fread(&mut section, 4u64, 1u64, file);
+            this.symbol_sections.PushBack(section);
+
+            let mut offset = 0u32;
+            fread(&mut offset, 4u64, 1u64, file);
+            this.symbol_offsets.PushBack(offset);
+
+            let mut binding = 0u32;
+            fread(&mut binding, 4u64, 1u64, file);
+            this.symbol_bindings.PushBack(binding);
+        }
+
+        for i in 0u32..relocation_count {
+            let mut section = 0u32;
+            fread(&mut section, 4u64, 1u64, file);
+            this.relocation_sections.PushBack(section);
+
+            let mut offset = 0u32;
+            fread(&mut offset, 4u64, 1u64, file);
+            this.relocation_offsets.PushBack(offset);
+
+            let mut _type = 0u32;
+            fread(&mut _type, 4u64, 1u64, file);
+            this.relocation_types.PushBack(_type);
+
+            let mut length = 0u32;
+            fread(&mut length, 4u64, 1u64, file);
+            let buffer = new i8[length as u64 + 1u64];
+            fread(buffer, 1u64, length as u64, file);
+            buffer[length as u64] = 0i8;
+            this.relocation_symbols.PushBack(String(buffer));
+            del[] buffer;
+        }
+
+        fclose(file);
+        ret true;
+    }
+}
+
+class Linker {
+    pub objects: Vector<ObjectFile>,
+    priv global_symbol_names: Vector<String>,
+    priv global_symbol_addresses: Vector<u32>,
+    priv merged_sections: Vector<SectionType>,
+    priv merged_section_words: Vector<Vector<u32>>,
+    priv section_bases: Vector<u32>;
+ 
+    pub Link(&mut this, output_filename: &String) -> bool {
+        let mut unique_sections: Vector<SectionType>;
+        unique_sections.PushBack(SectionType::Text);
+        unique_sections.PushBack(SectionType::Data);
+ 
+        for section in unique_sections {
+            let mut found = false;
+
+            for object in this.objects {
+                for _type in object.section_types {
+                    if _type == section {
+                        found = true;
+                        break;
+                    }
+                }
+
+                if found {
+                    break;
+                }
+            }
+
+            if found {
+                this.merged_sections.PushBack(section);
+            }
+        }
+ 
+        let mut current_base = 0u32;
+        let mut object_section_bases: Vector<u32>;
+        object_section_bases.Resize(this.objects.Size() * 4u64);
+
+        for i in 0u64..object_section_bases.Size() {
+            object_section_bases[i] = 0u32;
+        }
+ 
+        for section in this.merged_sections {
+            this.section_bases.PushBack(current_base);
+            let mut merged_words: Vector<u32>;
+ 
+            for index in 0u64..this.objects.Size() {
+                let object = this.objects[index];
+                let mut section_index = -1i64;
+
+                for i in 0u64..object.section_types.Size() {
+                    if object.section_types[i] == section {
+                        section_index = i as i64;
+                        break;
+                    }
+                }
+ 
+                if section_index != -1i64 {
+                    let offset_in_merged = merged_words.Size() * 4u64;
+                    let final_base_address = current_base + (offset_in_merged as u32);
+                    let key_index = index * 4u64 + section as u64;
+                    object_section_bases[key_index] = final_base_address;
+ 
+                    for word in object.section_words[section_index as u64] {
+                        merged_words.PushBack(word);
+                    }
+                }
+            }
+
+            this.merged_section_words.PushBack(merged_words);
+            let last_index = this.merged_section_words.Size() - 1u64;
+            let last_words = this.merged_section_words[last_index];
+            current_base = current_base + (last_words.Size() * 4u64) as u32;
+        }
+
+        for index in 0u64..this.objects.Size() {
+            let object = this.objects[index];
+
+            for i in 0u64..object.symbol_names.Size() {
+                let name: String = object.symbol_names[i];
+                let section: SectionType = object.symbol_sections[i];
+                let offset: u32 = object.symbol_offsets[i];
+                let binding: BindingType = object.symbol_bindings[i];
+ 
+                let key_index = index * 4u64 + section as u64;
+                let section_base: u32 = object_section_bases[key_index];
+                let final_address = section_base + offset;
+                let mut key_name: String;
+
+                if binding == BindingType::Local {
+                    key_name = String(index as i64) + ":" + name;
+                } else {
+                    key_name = name;
+                }
+ 
+                if binding == BindingType::Global {
+                    if this.global_symbol_names.Index(key_name) != -1i64 {
+                        WriteLine("Duplicate global symbol definition '" + key_name + "'.");
+                        ret false;
+                    }
+                }
+
+                this.global_symbol_names.PushBack(key_name);
+                this.global_symbol_addresses.PushBack(final_address);
+            }
+        }
+ 
+        for index in 0u64..this.objects.Size() {
+            let object = this.objects[index];
+
+            for i in 0u64..object.relocation_sections.Size() {
+                let relocation_section: SectionType = object.relocation_sections[i];
+                let relocation_offset: u32 = object.relocation_offsets[i];
+                let relocation_type: RelocationType = object.relocation_types[i];
+                let relocation_symbol: String = object.relocation_symbols[i];
+                let local_symbol = String(index as i64) + ":" + relocation_symbol;
+                let mut symbol_index = this.global_symbol_names.Index(local_symbol);
+
+                if symbol_index == -1i64 {
+                    symbol_index = this.global_symbol_names.Index(relocation_symbol);
+                }
+ 
+                if symbol_index == -1i64 {
+                    WriteLine("Undefined symbol '" + relocation_symbol + "' referenced in " + object.file + ".");
+                    ret false;
+                }
+ 
+                let target_address: u32 = this.global_symbol_addresses[symbol_index as u64];
+                let key_index = index * 4u64 + relocation_section as u64;
+                let section_base: u32 = object_section_bases[key_index];
+                let pc = section_base + relocation_offset;
+                let mut merged_section_index = -1i64;
+
+                for j in 0u64..this.merged_sections.Size() {
+                    if this.merged_sections[j] == relocation_section {
+                        merged_section_index = j as i64;
+                        break;
+                    }
+                }
+
+                let merged_section_base: u32 = this.section_bases[merged_section_index as u64];
+                let word_index = ((pc - merged_section_base) / 4u32) as u64;
+                let mut word: u32 = this.merged_section_words[merged_section_index as u64][word_index];
+
+                if relocation_type == RelocationType::AbsoluteUpper21 {
+                    word = (word & !IMM21_MASK) | ((target_address >> 11u32) & IMM21_MASK);
+                } else if relocation_type == RelocationType::AbsoluteLower11 {
+                    word = (word & !IMM11_MASK) | (target_address & IMM11_MASK);
+                } else if relocation_type == RelocationType::PcRelativeUpper21 {
+                    word = (word & !IMM21_MASK) | (((target_address - pc) >> 11u32) & IMM21_MASK);
+                } else if relocation_type == RelocationType::PcRelativeLower11 {
+                    word = (word & !IMM16_MASK) | (((target_address - pc) & IMM11_MASK) & IMM16_MASK);
+                } else if relocation_type == RelocationType::Branch16 {
+                    word = (word & !IMM16_MASK) | (((target_address - pc) >> 2u32) & IMM16_MASK);
+                } else if relocation_type == RelocationType::Branch21 {
+                    word = (word & !IMM21_MASK) | (((target_address - pc) >> 2u32) & IMM21_MASK);
+                } else if relocation_type == RelocationType::Branch26 {
+                    word = (word & !IMM26_MASK) | ((target_address >> 2u32) & IMM26_MASK);
+                } else if relocation_type == RelocationType::Absolute32 {
+                    word = target_address;
+                } else {
+                    WriteLine("Unknown relocation type.");
+                    ret false;
+                }
+
+                this.merged_section_words[merged_section_index as u64][word_index] = word;
+            }
+        }
+
+        let mut result = String();
+
+        for section in this.merged_section_words {
+            for word in section {
+                let mut hex = String(word as u64, 16u64);
+                while hex.Length() < 8u64 { hex = "0" + hex; }
+                result += hex + "\n";
+            }
+        }
+
+        ret _WriteFile(output_filename, result);
+    }
+}

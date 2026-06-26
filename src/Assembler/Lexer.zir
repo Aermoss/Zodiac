@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#[include "std/str", "std/vec", "src/Logger.zir", "src/Tokens.zir" : *]
+#[include "std/str", "std/vec", "src/Assembler/Tokens.zir", "src/Common/Logger.zir" : *]
 
 class Lexer {
     priv row: u64, priv column: u64,

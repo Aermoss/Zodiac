@@ -1,6 +1,5 @@
-li x31, 0x4000 ; Initialize stack pointer
-bl x30, main
-hlt
+.text
+.global main
 
 fibonacci:
     addi x31, x31, -16

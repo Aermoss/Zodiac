@@ -15,7 +15,7 @@
  */
 
 #[include "std/str", "std/vec", "std/map", "std/pair", "std/arena",
-    "src/Logger.zir", "src/Lexer.zir", "src/Nodes.zir" : *]
+    "src/Assembler/Lexer.zir", "src/Assembler/Nodes.zir", "src/Common/Logger.zir" : *]
 
 class Parser {
     priv arena: Arena,

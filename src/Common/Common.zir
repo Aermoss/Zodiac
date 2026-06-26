@@ -1,0 +1,80 @@
+/*
+ * Copyright 2025-2026 Yusuf Rençber
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+#[include "std/str" : *]
+
+enum Opcode: u32 {
+    NOP,
+    LB, LBU, LH, LHU, LW, LUI, AUIPC, SB, SH, SW,
+    B, BR, BL, BEQ, BNE, BLT, BLTU, BGE, BGEU,
+    SLT, SLTU, SLTI, SLTIU,
+    ADD, ADDI, SUB, SUBI,
+    MUL, MULH, MULHSU, MULHU, DIV, DIVU, REM, REMU,
+    AND, ANDI, OR, ORI, XOR, XORI,
+    SLL, SLLI, SRL, SRLI, SRA, SRAI,
+    HLT = 0xFFu32
+}
+
+const OPCODE_SHIFT: u32 = 26u32;
+const REG0_SHIFT: u32 = 21u32;
+const REG1_SHIFT: u32 = 16u32;
+const REG2_SHIFT: u32 = 11u32;
+
+const IMM11_MASK: u32 = (1u32 << 11u32) - 1u32;
+const IMM16_MASK: u32 = (1u32 << 16u32) - 1u32;
+const IMM21_MASK: u32 = (1u32 << 21u32) - 1u32;
+const IMM26_MASK: u32 = (1u32 << 26u32) - 1u32;
+
+const IMM11_SMAX: u32 = (1u32 << 10u32) - 1u32;
+const IMM16_SMAX: u32 = (1u32 << 15u32) - 1u32;
+const IMM21_SMAX: u32 = (1u32 << 20u32) - 1u32;
+const IMM26_SMAX: u32 = (1u32 << 25u32) - 1u32;
+
+const IMM11_SMIN: u32 = 0u32 - (1u32 << 10u32);
+const IMM16_SMIN: u32 = 0u32 - (1u32 << 15u32);
+const IMM21_SMIN: u32 = 0u32 - (1u32 << 20u32);
+const IMM26_SMIN: u32 = 0u32 - (1u32 << 25u32);
+
+enum SectionType: u32 {
+    Text, Data
+}
+
+enum BindingType: u32 {
+    Local, Global
+}
+
+enum RelocationType: u32 {
+    None,
+    AbsoluteUpper21,
+    AbsoluteLower11,
+    PcRelativeUpper21,
+    PcRelativeLower11,
+    Branch16,
+    Branch21,
+    Branch26,
+    Absolute32
+}
+
+class Relocation {
+    pub section: SectionType,
+    pub offset: u32,
+    pub _type: RelocationType,
+    pub symbol: String;
+
+    Relocation(&mut this, section: SectionType, offset: u32, _type: RelocationType, symbol: &String) {
+        (this.section, this.offset, this._type, this.symbol) = (section, offset, _type, symbol);
+    }
+}

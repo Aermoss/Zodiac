@@ -14,7 +14,8 @@
  * limitations under the License.
  */
 
-#[include "std/io", "std/file", "src/Logger.zir", "src/Lexer.zir", "src/Parser.zir", "src/Assembler.zir" : *]
+#[include "std/io", "std/file", "src/Assembler/Lexer.zir", "src/Assembler/Parser.zir",
+    "src/Assembler/Assembler.zir", "src/Common/Logger.zir" : *]
 
 func PrintVersion(executable: String) {
     WriteLine("Unversioned build of " + executable + ".");
@@ -92,19 +93,16 @@ func main(args: &mut Vector<String>) -> i32 {
     if root == null { ret 1i32; }
 
     let mut assembler = Assembler();
-    let instructions = assembler.Assemble(root);
-    let mut result: String;
-
-    for instruction in instructions {
-        let mut hex = String(instruction as u64, 16u64);
-        while hex.Length() < 8u64 { hex = "0" + hex; }
-        result += hex + "\n";
+    if !assembler.Assemble(root) {
+        ret 1i32;
     }
 
     if output_file.Empty() {
-        output_file = SplitExtension(input_file).left + ".hex";
+        output_file = SplitExtension(input_file).left + ".o";
     }
 
-    _WriteFile(output_file, result);
+    if !assembler.WriteObjectFile(output_file) {
+        ret 1i32;
+    }
     ret 0i32;
 }
