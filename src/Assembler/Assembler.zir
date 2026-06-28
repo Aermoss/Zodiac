@@ -96,8 +96,8 @@ class Assembler {
         }
     }
 
-    pub WriteObjectFile(&mut this, filename: &String) -> bool {
-        let file = fopen(filename.Data(), "wb");
+    pub WriteObjectFile(&mut this, file_name: &String) -> bool {
+        let file = fopen(file_name.Data(), "wb");
 
         if file == null {
             ret false;

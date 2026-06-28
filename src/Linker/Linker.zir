@@ -23,17 +23,17 @@ extern "C" {
 }
 
 class ObjectFile {
-    pub file: String,
+    pub file_name: String,
     pub sections: Vector<Vector<u32>>,
     pub section_bases: Vector<u32>,
     pub symbols: Vector<Symbol>,
     pub relocations: Vector<Relocation>;
 
-    pub Load(&mut this, _file: &String) -> bool {
-        this.file = _file;
+    pub Load(&mut this, file_name: &String) -> bool {
+        this.file_name = file_name;
         this.sections.Resize(SECTION_COUNT);
         this.section_bases.Resize(SECTION_COUNT);
-        let file = fopen(_file.Data(), "rb");
+        let file = fopen(file_name.Data(), "rb");
         if file == null { ret false; }
 
         let mut magic = 0u32;
@@ -108,18 +108,16 @@ class Linker {
     priv sections: Vector<Vector<u32>>,
     priv section_bases: Vector<u32>;
  
-    pub Link(&mut this, output_filename: &String) -> bool {
+    pub Link(&mut this, file_name: &String) -> bool {
         this.sections.Resize(SECTION_COUNT);
         this.section_bases.Resize(SECTION_COUNT);
 
-        for i in 0u64..this.objects.Size() {
-            let object = this.objects[i];
+        for object in this.objects {
+            for i in 0u64..object.sections.Size() {
+                object.section_bases[i] = (this.sections[i].Size() as u32) * 4u32;
 
-            for j in 0u64..object.sections.Size() {
-                object.section_bases[j] = (this.sections[j].Size() as u32) * 4u32;
-
-                for word in object.sections[j] {
-                    this.sections[j].PushBack(word);
+                for word in object.sections[i] {
+                    this.sections[i].PushBack(word);
                 }
             }
         }
@@ -129,7 +127,7 @@ class Linker {
         for i in 0u64..this.sections.Size() {
             this.section_bases[i] = offset;
 
-            if i != 0u64 {
+            if offset != 0u32 {
                 for object in this.objects {
                     object.section_bases[i] += offset;
                 }
@@ -138,20 +136,17 @@ class Linker {
             offset += this.sections[i].Size() as u32;
         }
 
-        for index in 0u64..this.objects.Size() {
-            let object = this.objects[index];
+        for i in 0u64..this.objects.Size() {
+            let object = this.objects[i];
 
-            for i in 0u64..object.symbols.Size() {
-                let symbol = object.symbols[i];
+            for symbol in object.symbols {
                 this.symbol_addresses.PushBack(object.section_bases[symbol.section as u64] + symbol.offset);
                 let mut name = symbol.name;
 
                 if symbol.binding == BindingType::Local {
-                    name = String(index as i64) + ":" + symbol.name;
-                }
- 
-                if symbol.binding == BindingType::Global {
-                    if this.symbol_names.Index(name) != -1i64 {
+                    name = String(i as i64) + ":" + name;
+                } else if symbol.binding == BindingType::Global {
+                    if this.symbol_names.Contains(name) {
                         WriteLine("Duplicate global symbol definition '" + name + "'.");
                         ret false;
                     }
@@ -161,19 +156,18 @@ class Linker {
             }
         }
 
-        for index in 0u64..this.objects.Size() {
-            let object = this.objects[index];
+        for i in 0u64..this.objects.Size() {
+            let object = this.objects[i];
 
-            for i in 0u64..object.relocations.Size() {
-                let relocation = object.relocations[i];
-                let mut symbol_index = this.symbol_names.Index(String(index as i64) + ":" + relocation.symbol);
+            for relocation in object.relocations {
+                let mut symbol_index = this.symbol_names.Index(String(i as i64) + ":" + relocation.symbol);
 
                 if symbol_index == -1i64 {
                     symbol_index = this.symbol_names.Index(relocation.symbol);
                 }
  
                 if symbol_index == -1i64 {
-                    WriteLine("Undefined symbol '" + relocation.symbol + "' referenced in " + object.file + ".");
+                    WriteLine("Undefined symbol '" + relocation.symbol + "' referenced in " + object.file_name + ".");
                     ret false;
                 }
  
@@ -217,6 +211,6 @@ class Linker {
             }
         }
 
-        ret _WriteFile(output_filename, result);
+        ret _WriteFile(file_name, result);
     }
 }
