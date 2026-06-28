@@ -51,16 +51,6 @@ class Assembler {
         ret this.sections[section as u64].Size() as u32;
     }
 
-    priv PadSection(&mut this, section: SectionType) {
-        let remainder = this.GetSectionSize(section) % 4u32;
-
-        if remainder != 0u32 {
-            for _ in 0u32..(4u32 - remainder) {
-                this.WriteByte(section, 0u8);
-            }
-        }
-    }
-
     priv IsRegister(&mut this, value: &String) -> bool {
         if !value.StartsWith("x") { ret false; }
         if value.Length() < 2u64 || value.Length() > 3u64 { ret false; }
@@ -388,8 +378,13 @@ class Assembler {
                 } continue;
             }
 
-            this.PadSection(this.section);
-            offset = this.GetSectionSize(this.section);
+            let remainder = offset % 4u32;
+
+            if remainder != 0u32 {
+                for _ in 0u32..(4u32 - remainder) {
+                    this.WriteByte(this.section, 0u8);
+                } offset += (4u32 - remainder);
+            }
 
             if mnemonic == "la" {
                 let register = this.AssembleExpression(operands[0u64]->expression);
@@ -593,8 +588,14 @@ class Assembler {
             index += 1u64;
         }
 
-        this.PadSection(SectionType::Text);
-        this.PadSection(SectionType::Data);
-        ret true;
+        for section in this.sections {
+            let remainder = section.Size() % 4u64;
+
+            if remainder != 0u64 {
+                for _ in 0u64..(4u64 - remainder) {
+                    section.PushBack(0u8);
+                }
+            }
+        } ret true;
     }
 }

@@ -104,5 +104,7 @@ func main(args: &mut Vector<String>) -> i32 {
 
     if !assembler.WriteObjectFile(output_file) {
         ret 1i32;
-    } ret 0i32;
+    }
+
+    ret Logger::HasError() ? 1i32 : 0i32;
 }
