@@ -24,20 +24,15 @@ extern "C" {
 }
 
 class Assembler {
-    priv labels: Vector<String>,
-    priv addresses: Vector<u32>,
-    priv sections: Vector<SectionType>,
     priv section: SectionType,
-    priv sizes: Vector<u32>,
+    priv sections: Vector<Vector<u8>>,
+    priv symbols: Vector<Symbol>,
     priv relocations: Vector<Relocation>,
-    priv text_bytes: Vector<u8>,
-    priv data_bytes: Vector<u8>,
     priv globals: Vector<String>,
     priv externs: Vector<String>;
 
     priv WriteByte(&mut this, section: SectionType, value: u8) {
-        if section == SectionType::Text { this.text_bytes.PushBack(value); }
-        else { this.data_bytes.PushBack(value); }
+        this.sections[section as u64].PushBack(value);
     }
 
     priv WriteHalf(&mut this, section: SectionType, value: u16) {
@@ -53,8 +48,7 @@ class Assembler {
     }
 
     priv GetSectionSize(&mut this, section: SectionType) -> u32 {
-        if section == SectionType::Text { ret this.text_bytes.Size() as u32; }
-        else { ret this.data_bytes.Size() as u32; }
+        ret this.sections[section as u64].Size() as u32;
     }
 
     priv PadSection(&mut this, section: SectionType) {
@@ -106,54 +100,37 @@ class Assembler {
         let mut magic = 0x4A424F5Au32;
         fwrite(&mut magic, 4u64, 1u64, file);
 
-        let mut text_word_count = (this.text_bytes.Size() / 4u64) as u32;
-        fwrite(&mut text_word_count, 4u64, 1u64, file);
+        for section in this.sections {
+            let mut word_count = (section.Size() / 4u64) as u32;
+            fwrite(&mut word_count, 4u64, 1u64, file);
+        }
 
-        let mut data_word_count = (this.data_bytes.Size() / 4u64) as u32;
-        fwrite(&mut data_word_count, 4u64, 1u64, file);
-
-        let mut symbol_count = this.labels.Size() as u32;
+        let mut symbol_count = this.symbols.Size() as u32;
         fwrite(&mut symbol_count, 4u64, 1u64, file);
 
         let mut relocation_count = this.relocations.Size() as u32;
         fwrite(&mut relocation_count, 4u64, 1u64, file);
 
-        for i in 0u64..(this.text_bytes.Size() / 4u64) {
-            let mut word = this.text_bytes[i * 4u64] as u32;
-            word |= (this.text_bytes[i * 4u64 + 1u64] as u32) << 8u32;
-            word |= (this.text_bytes[i * 4u64 + 2u64] as u32) << 16u32;
-            word |= (this.text_bytes[i * 4u64 + 3u64] as u32) << 24u32;
-            fwrite(&mut word, 4u64, 1u64, file);
-        }
-
-        for i in 0u64..(this.data_bytes.Size() / 4u64) {
-            let mut word = this.data_bytes[i * 4u64] as u32;
-            word |= (this.data_bytes[i * 4u64 + 1u64] as u32) << 8u32;
-            word |= (this.data_bytes[i * 4u64 + 2u64] as u32) << 16u32;
-            word |= (this.data_bytes[i * 4u64 + 3u64] as u32) << 24u32;
-            fwrite(&mut word, 4u64, 1u64, file);
-        }
-
-        for i in 0u64..this.labels.Size() {
-            let name = this.labels[i];
-            let mut binding = BindingType::Local;
-
-            if this.globals.Index(name) != -1i64 {
-                binding = BindingType::Global;
-            } else if !name.StartsWith(".") && this.globals.Empty() {
-                binding = BindingType::Global;
+        for section in this.sections {
+            for i in 0u64..(section.Size() / 4u64) {
+                let mut word = section[i * 4u64] as u32;
+                word |= (section[i * 4u64 + 1u64] as u32) << 8u32;
+                word |= (section[i * 4u64 + 2u64] as u32) << 16u32;
+                word |= (section[i * 4u64 + 3u64] as u32) << 24u32;
+                fwrite(&mut word, 4u64, 1u64, file);
             }
+        }
 
-            let mut length = name.Length() as u32;
+        for symbol in this.symbols {
+            let mut length = symbol.name.Length() as u32;
             fwrite(&mut length, 4u64, 1u64, file);
-            fwrite(name.Data(), 1u64, length as u64, file);
-            fwrite(this.sections[i], 4u64, 1u64, file);
-            fwrite(this.addresses[i], 4u64, 1u64, file);
-            fwrite(&mut binding, 4u64, 1u64, file);
+            fwrite(symbol.name.Data(), 1u64, length as u64, file);
+            fwrite(&mut symbol.section, 4u64, 1u64, file);
+            fwrite(&mut symbol.offset, 4u64, 1u64, file);
+            fwrite(&mut symbol.binding, 4u64, 1u64, file);
         }
  
-        for i in 0u64..this.relocations.Size() {
-            let relocation = this.relocations[i];
+        for relocation in this.relocations {
             fwrite(&mut relocation.section, 4u64, 1u64, file);
             fwrite(&mut relocation.offset, 4u64, 1u64, file);
             fwrite(&mut relocation._type, 4u64, 1u64, file);
@@ -182,13 +159,15 @@ class Assembler {
                 ret value.SubString(1u64).ToInteger(10i64) as u32;
             }
 
-            let index = this.labels.Index(value);
-
-            if index != -1i64 {
-                ret this.addresses[index as u64];
-            } else {
-                ret 0u32;
+            for symbol in this.symbols {
+                if symbol.name == value {
+                    ret symbol.offset;
+                }
             }
+
+            if this.externs.Index(value) == -1i64 {
+                Logger::Log("Unknown identifier: '" + value + "'.", node, LogSeverity::Error);
+            } ret 0u32;
         } else if node->_type == NodeType::BINARY_OPERATION {
             let binary = node as *const BinaryOperationNode;
             let left = this.AssembleExpression(binary->left);
@@ -222,26 +201,38 @@ class Assembler {
     }
 
     pub Assemble(&mut this, root: *const RootNode) -> bool {
-        this.labels.Clear();
-        this.addresses.Clear();
+        this.section = SectionType::Text;
         this.sections.Clear();
+        this.sections.Resize(SECTION_COUNT);
+        this.symbols.Clear();
         this.relocations.Clear();
-        this.sizes.Clear();
-        this.text_bytes.Clear();
-        this.data_bytes.Clear();
         this.globals.Clear();
         this.externs.Clear();
+
         let mut section_sizes: Vector<u32>;
-        section_sizes.Resize(2u64);
-        section_sizes[SectionType::Text as u64] = 0u32;
-        section_sizes[SectionType::Data as u64] = 0u32;
-        this.section = SectionType::Text;
+        section_sizes.Resize(SECTION_COUNT);
+
+        for i in 0u64..section_sizes.Size() {
+            section_sizes[i] = 0u32;
+        }
  
         for node in root->declarations {
             if node->_type == NodeType::LABEL {
-                this.labels.PushBack((node as *const LabelNode)->name);
-                this.addresses.PushBack(section_sizes[this.section as u64]);
-                this.sections.PushBack(this.section);
+                let name = (node as *const LabelNode)->name;
+                let mut found = false;
+
+                for symbol in this.symbols {
+                    if symbol.name == name {
+                        Logger::Log("Duplicate symbol: '" + name + "'.", node, LogSeverity::Error);
+                        found = true;
+                        break;
+                    }
+                }
+
+                if !found {
+                    let binding = this.globals.Index(name) != -1i64 ? BindingType::Global : BindingType::Local;
+                    this.symbols.PushBack(Symbol(name, this.section, section_sizes[this.section as u64], binding));
+                }
             } else if node->_type == NodeType::INSTRUCTION {
                 let instruction = node as *const InstructionNode;
                 let (mnemonic, operands) = (instruction->mnemonic, instruction->operands);
@@ -279,6 +270,13 @@ class Assembler {
 
                                 if this.globals.Index(value) == -1i64 {
                                     this.globals.PushBack(value);
+
+                                    for symbol in this.symbols {
+                                        if symbol.name == value {
+                                            symbol.binding = BindingType::Global;
+                                            break;
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -326,7 +324,6 @@ class Assembler {
                 }
 
                 section_sizes[this.section as u64] += size;
-                this.sizes.PushBack(size);
             }
         }
 
@@ -417,10 +414,10 @@ class Assembler {
                 } else {
                     let immediate = this.AssembleExpression(operands[1u64]->expression);
 
-                    if this.sizes[index] == 4u32 {
-                        this.WriteWord(this.section, (immediate <= IMM16_SMAX) || (immediate >= IMM16_SMIN) ?
-                            (Opcode::ADDI << OPCODE_SHIFT) | (register << REG0_SHIFT) | (0u32 << REG1_SHIFT) | (immediate & IMM16_MASK) :
-                            (Opcode::LUI << OPCODE_SHIFT) | (register << REG0_SHIFT) | ((immediate >> 11u32) & IMM21_MASK));
+                    if (immediate <= IMM16_SMAX) || (immediate >= IMM16_SMIN) {
+                        this.WriteWord(this.section, (Opcode::ADDI << OPCODE_SHIFT) | (register << REG0_SHIFT) | (0u32 << REG1_SHIFT) | (immediate & IMM16_MASK));
+                    } else if (immediate & IMM11_MASK) == 0u32 {
+                        this.WriteWord(this.section, (Opcode::LUI << OPCODE_SHIFT) | (register << REG0_SHIFT) | ((immediate >> 11u32) & IMM21_MASK));
                     } else {
                         this.WriteWord(this.section, (Opcode::LUI << OPCODE_SHIFT) | (register << REG0_SHIFT) | ((immediate >> 11u32) & IMM21_MASK));
                         this.WriteWord(this.section, (Opcode::ORI << OPCODE_SHIFT) | (register << REG0_SHIFT) | (register << REG1_SHIFT) | (immediate & IMM11_MASK));
@@ -466,15 +463,13 @@ class Assembler {
 
             if pseudo {
                 let _index = _zero ? 1u64 : 2u64;
-                let source = this.AssembleExpression(operands[0u64]->expression);
-                let mut target = 0u32;
+                let target = this.AssembleExpression(operands[_index]->expression);
 
                 if this.IsRelocatable(operands[_index]->expression) {
                     this.relocations.PushBack(Relocation(this.section, offset, RelocationType::Branch16, (operands[_index]->expression as *const IdentifierNode)->value));
-                } else {
-                    target = this.AssembleExpression(operands[_index]->expression);
                 }
 
+                let source = this.AssembleExpression(operands[0u64]->expression);
                 let other = _zero ? 0u32 : this.AssembleExpression(operands[1u64]->expression);
                 let (left, right) = ((reverse ? other : source), (reverse ? source : other));
                 this.WriteWord(this.section, (opcode << OPCODE_SHIFT) | (left << REG0_SHIFT) | (right << REG1_SHIFT) | (target & IMM16_MASK));
@@ -549,18 +544,17 @@ class Assembler {
                     word |= (this.AssembleExpression(operands[1u64]->offset) & IMM16_MASK);
                 }
             } else if opcode == Opcode::B {
+                word |= (((this.AssembleExpression(operands[0u64]->expression) - offset) >> 2u32) & IMM26_MASK);
+
                 if this.IsRelocatable(operands[0u64]->expression) {
                     this.relocations.PushBack(Relocation(this.section, offset, RelocationType::Branch26, (operands[0u64]->expression as *const IdentifierNode)->value));
-                } else {
-                    word |= (((this.AssembleExpression(operands[0u64]->expression) - offset) >> 2u32) & IMM26_MASK);
                 }
             } else if opcode == Opcode::BL {
                 word |= (this.AssembleExpression(operands[0u64]->expression) << REG0_SHIFT);
+                word |= (((this.AssembleExpression(operands[1u64]->expression) - offset) >> 2u32) & IMM21_MASK);
 
                 if this.IsRelocatable(operands[1u64]->expression) {
                     this.relocations.PushBack(Relocation(this.section, offset, RelocationType::Branch21, (operands[1u64]->expression as *const IdentifierNode)->value));
-                } else {
-                    word |= (((this.AssembleExpression(operands[1u64]->expression) - offset) >> 2u32) & IMM21_MASK);
                 }
             } else if opcode == Opcode::BR {
                 word |= (this.AssembleExpression(operands[0u64]->expression) << REG0_SHIFT);
@@ -570,11 +564,10 @@ class Assembler {
             } else if opcode >= Opcode::BEQ && opcode <= Opcode::BGEU {
                 word |= (this.AssembleExpression(operands[0u64]->expression) << REG0_SHIFT);
                 word |= (this.AssembleExpression(operands[1u64]->expression) << REG1_SHIFT);
+                word |= (((this.AssembleExpression(operands[2u64]->expression) - offset) >> 2u32) & IMM16_MASK);
 
                 if this.IsRelocatable(operands[2u64]->expression) {
                     this.relocations.PushBack(Relocation(this.section, offset, RelocationType::Branch16, (operands[2u64]->expression as *const IdentifierNode)->value));
-                } else {
-                    word |= (((this.AssembleExpression(operands[2u64]->expression) - offset) >> 2u32) & IMM16_MASK);
                 }
             } else if opcode >= Opcode::SLT && opcode <= Opcode::SLTIU {
                 word |= (this.AssembleExpression(operands[0u64]->expression) << REG0_SHIFT);

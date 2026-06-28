@@ -92,4 +92,8 @@ class Symbol {
     Symbol(&mut this, name: &String) {
         this.name = name;
     }
+
+    Symbol(&mut this, name: &String, section: SectionType, offset: u32, binding: BindingType) {
+        (this.name, this.section, this.offset, this.binding) = (name, section, offset, binding);
+    }
 }
