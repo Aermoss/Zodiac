@@ -397,8 +397,8 @@ class Assembler {
             if mnemonic == "la" {
                 let register = this.AssembleExpression(operands[0u64]->expression);
                 let label = (operands[1u64]->expression as *const IdentifierNode)->value;
-                this.WriteWord(this.section, (Opcode::AUIPC << OPCODE_SHIFT) | (register << REG0_SHIFT) | 0u32);
-                this.WriteWord(this.section, (Opcode::ADDI << OPCODE_SHIFT) | (register << REG0_SHIFT) | (register << REG1_SHIFT) | 0u32);
+                this.WriteWord(this.section, (Opcode::AUIPC << OPCODE_SHIFT) | (register << REG0_SHIFT) | (0u32 & IMM21_MASK));
+                this.WriteWord(this.section, (Opcode::ADDI << OPCODE_SHIFT) | (register << REG0_SHIFT) | (register << REG1_SHIFT) | (0u32 & IMM16_MASK));
                 this.relocations.PushBack(Relocation(this.section, offset, RelocationType::PcRelativeUpper21, label));
                 this.relocations.PushBack(Relocation(this.section, offset + 4u32, RelocationType::PcRelativeLower11, label));
                 index += 1u64;
@@ -410,8 +410,8 @@ class Assembler {
 
                 if this.IsRelocatable(operands[1u64]->expression) {
                     let label = (operands[1u64]->expression as *const IdentifierNode)->value;
-                    this.WriteWord(this.section, (Opcode::LUI << OPCODE_SHIFT) | (register << REG0_SHIFT) | 0u32);
-                    this.WriteWord(this.section, (Opcode::ORI << OPCODE_SHIFT) | (register << REG0_SHIFT) | (register << REG1_SHIFT) | 0u32);
+                    this.WriteWord(this.section, (Opcode::LUI << OPCODE_SHIFT) | (register << REG0_SHIFT) | (0u32 & IMM21_MASK));
+                    this.WriteWord(this.section, (Opcode::ORI << OPCODE_SHIFT) | (register << REG0_SHIFT) | (register << REG1_SHIFT) | (0u32 & IMM16_MASK));
                     this.relocations.PushBack(Relocation(this.section, offset, RelocationType::AbsoluteUpper21, label));
                     this.relocations.PushBack(Relocation(this.section, offset + 4u32, RelocationType::AbsoluteLower11, label));
                 } else {
@@ -432,6 +432,56 @@ class Assembler {
             }
 
             let mut opcode: Opcode;
+            let (mut pseudo, mut reverse, mut _zero, mut negative, mut register) = (true, false, true, false, true);
+            if mnemonic == "mv" { (opcode, register) = (Opcode::ADDI, false); }
+            else if mnemonic == "not" { (opcode, _zero, negative, register) = (Opcode::XORI, false, true, false); }
+            else if mnemonic == "neg" { (opcode, reverse) = (Opcode::SUB, true); }
+            else if mnemonic == "seqz" { (opcode, _zero, register) = (Opcode::SLTIU, false, false); }
+            else if mnemonic == "snez" { (opcode, reverse) = (Opcode::SLTU, true); }
+            else if mnemonic == "sltz" { opcode = Opcode::SLT; }
+            else if mnemonic == "sgtz" { (opcode, reverse) = (Opcode::SLT, true); }
+            else { pseudo = false; }
+
+            if pseudo {
+                let destination = this.AssembleExpression(operands[0u64]->expression);
+                let source = this.AssembleExpression(operands[1u64]->expression);
+                let other = (_zero ? 0u32 : (negative ? -1i32 as u32 : 1u32));
+                let (left, right) = ((reverse ? other : source), (reverse ? source : other));
+                this.WriteWord(this.section, (opcode << OPCODE_SHIFT) | (destination << REG0_SHIFT) | (left << REG1_SHIFT) | (register ? (right << REG2_SHIFT) : (right & IMM16_MASK)));
+                index += 1u64;
+                continue;
+            }
+
+            if mnemonic == "beqz" { opcode = Opcode::BEQ; }
+            else if mnemonic == "bnez" { opcode = Opcode::BNE; }
+            else if mnemonic == "blez" { (opcode, reverse) = (Opcode::BGE, true); }
+            else if mnemonic == "bgez" { opcode = Opcode::BGE; }
+            else if mnemonic == "bltz" { opcode = Opcode::BLT; }
+            else if mnemonic == "bgtz" { (opcode, reverse) = (Opcode::BLT, true); }
+            else if mnemonic == "bgt" { (opcode, reverse, _zero) = (Opcode::BLT, true, false); }
+            else if mnemonic == "ble" { (opcode, reverse, _zero) = (Opcode::BGE, true, false); }
+            else if mnemonic == "bgtu" { (opcode, reverse, _zero) = (Opcode::BLTU, true, false); }
+            else if mnemonic == "bleu" { (opcode, reverse, _zero) = (Opcode::BGE, true, false); }
+            else { pseudo = false; }
+
+            if pseudo {
+                let _index = _zero ? 1u64 : 2u64;
+                let source = this.AssembleExpression(operands[0u64]->expression);
+                let mut target = 0u32;
+
+                if this.IsRelocatable(operands[_index]->expression) {
+                    let label = (operands[_index]->expression as *const IdentifierNode)->value;
+                    this.relocations.PushBack(Relocation(this.section, offset, RelocationType::Branch16, label));
+                } else {
+                    target = this.AssembleExpression(operands[_index]->expression);
+                }
+
+                let other = _zero ? 0u32 : this.AssembleExpression(operands[1u64]->expression);
+                let (left, right) = ((reverse ? other : source), (reverse ? source : other));
+                this.WriteWord(this.section, (opcode << OPCODE_SHIFT) | (left << REG0_SHIFT) | (right << REG1_SHIFT) | (target & IMM16_MASK));
+                index += 1u64;
+                continue;
+            }
 
             if mnemonic == "nop" { opcode = Opcode::NOP; }
             else if mnemonic == "lb" { opcode = Opcode::LB; }
