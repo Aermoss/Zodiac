@@ -183,13 +183,13 @@ class Linker {
                 } else if relocation._type == RelocationType::PcRelativeUpper21 {
                     word = (word & !IMM21_MASK) | (((target - pc) >> 11u32) & IMM21_MASK);
                 } else if relocation._type == RelocationType::PcRelativeLower11 {
-                    word = (word & !IMM16_MASK) | ((((target - pc) + 4u32) & IMM11_MASK) & IMM16_MASK);
+                    word = (word & !IMM16_MASK) | (((target - (pc - 4u32)) & IMM11_MASK) & IMM16_MASK);
                 } else if relocation._type == RelocationType::Branch16 {
                     word = (word & !IMM16_MASK) | (((target - pc) >> 2u32) & IMM16_MASK);
                 } else if relocation._type == RelocationType::Branch21 {
                     word = (word & !IMM21_MASK) | (((target - pc) >> 2u32) & IMM21_MASK);
                 } else if relocation._type == RelocationType::Branch26 {
-                    word = (word & !IMM26_MASK) | ((target >> 2u32) & IMM26_MASK);
+                    word = (word & !IMM26_MASK) | (((target - pc) >> 2u32) & IMM26_MASK);
                 } else if relocation._type == RelocationType::Absolute32 {
                     word = target;
                 } else {

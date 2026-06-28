@@ -447,6 +447,7 @@ class Assembler {
             else if mnemonic == "b" { opcode = Opcode::B; }
             else if mnemonic == "br" { opcode = Opcode::BR; }
             else if mnemonic == "bl" { opcode = Opcode::BL; }
+            else if mnemonic == "blr" { opcode = Opcode::BLR; }
             else if mnemonic == "beq" { opcode = Opcode::BEQ; }
             else if mnemonic == "bne" { opcode = Opcode::BNE; }
             else if mnemonic == "blt" { opcode = Opcode::BLT; }
@@ -506,51 +507,52 @@ class Assembler {
             if relocatable_branch {
                 if opcode == Opcode::BL {
                     word |= (this.AssembleExpression(operands[0u64]->expression) << REG0_SHIFT);
-                } else if opcode != Opcode::B {
+                } else if opcode >= Opcode::BEQ && opcode <= Opcode::BGEU {
                     word |= (this.AssembleExpression(operands[0u64]->expression) << REG0_SHIFT);
                     word |= (this.AssembleExpression(operands[1u64]->expression) << REG1_SHIFT);
                 }
 
                 this.relocations.PushBack(Relocation(this.section, offset, relocation_type, branch_label));
-            } else {
-                if opcode >= Opcode::LB && opcode <= Opcode::SW {
-                    word |= (this.AssembleExpression(operands[0u64]->expression) << REG0_SHIFT);
+            } else if opcode >= Opcode::LB && opcode <= Opcode::SW {
+                word |= (this.AssembleExpression(operands[0u64]->expression) << REG0_SHIFT);
 
-                    if opcode == Opcode::LUI || opcode == Opcode::AUIPC {
-                        word |= (this.AssembleExpression(operands[1u64]->expression) & IMM21_MASK);
-                    } else {
-                        word |= (this.AssembleExpression(operands[1u64]->expression) << REG1_SHIFT);
-                        word |= (this.AssembleExpression(operands[1u64]->offset) & IMM16_MASK);
-                    }
-                } else if opcode == Opcode::B {
-                    word |= ((this.AssembleExpression(operands[0u64]->expression) >> 2u32) & IMM26_MASK);
-                } else if opcode == Opcode::BL {
-                    word |= (this.AssembleExpression(operands[0u64]->expression) << REG0_SHIFT);
-                    word |= (((this.AssembleExpression(operands[1u64]->expression) - offset) >> 2u32) & IMM21_MASK);
-                } else if opcode == Opcode::BR {
-                    word |= (this.AssembleExpression(operands[0u64]->expression) << REG0_SHIFT);
-                } else if opcode >= Opcode::BEQ && opcode <= Opcode::BGEU {
-                    word |= (this.AssembleExpression(operands[0u64]->expression) << REG0_SHIFT);
+                if opcode == Opcode::LUI || opcode == Opcode::AUIPC {
+                    word |= (this.AssembleExpression(operands[1u64]->expression) & IMM21_MASK);
+                } else {
                     word |= (this.AssembleExpression(operands[1u64]->expression) << REG1_SHIFT);
-                    word |= (((this.AssembleExpression(operands[2u64]->expression) - offset) >> 2u32) & IMM16_MASK);
-                } if opcode >= Opcode::SLT && opcode <= Opcode::SLTIU {
-                    word |= (this.AssembleExpression(operands[0u64]->expression) << REG0_SHIFT);
-                    word |= (this.AssembleExpression(operands[1u64]->expression) << REG1_SHIFT);
+                    word |= (this.AssembleExpression(operands[1u64]->offset) & IMM16_MASK);
+                }
+            } else if opcode == Opcode::B {
+                word |= (((this.AssembleExpression(operands[0u64]->expression) - offset) >> 2u32) & IMM26_MASK);
+            } else if opcode == Opcode::BL {
+                word |= (this.AssembleExpression(operands[0u64]->expression) << REG0_SHIFT);
+                word |= (((this.AssembleExpression(operands[1u64]->expression) - offset) >> 2u32) & IMM21_MASK);
+            } else if opcode == Opcode::BR {
+                word |= (this.AssembleExpression(operands[0u64]->expression) << REG0_SHIFT);
+            } else if opcode == Opcode::BLR {
+                word |= (this.AssembleExpression(operands[0u64]->expression) << REG0_SHIFT);
+                word |= (this.AssembleExpression(operands[1u64]->expression) << REG1_SHIFT);
+            } else if opcode >= Opcode::BEQ && opcode <= Opcode::BGEU {
+                word |= (this.AssembleExpression(operands[0u64]->expression) << REG0_SHIFT);
+                word |= (this.AssembleExpression(operands[1u64]->expression) << REG1_SHIFT);
+                word |= (((this.AssembleExpression(operands[2u64]->expression) - offset) >> 2u32) & IMM16_MASK);
+            } else if opcode >= Opcode::SLT && opcode <= Opcode::SLTIU {
+                word |= (this.AssembleExpression(operands[0u64]->expression) << REG0_SHIFT);
+                word |= (this.AssembleExpression(operands[1u64]->expression) << REG1_SHIFT);
 
-                    if opcode == Opcode::SLT || opcode == Opcode::SLTU {
-                        word |= (this.AssembleExpression(operands[2u64]->expression) << REG2_SHIFT);
-                    } else {
-                        word |= (this.AssembleExpression(operands[2u64]->expression) & IMM16_MASK);
-                    }
-                } else if opcode >= Opcode::ADD && opcode <= Opcode::SRAI {
-                    word |= (this.AssembleExpression(operands[0u64]->expression) << REG0_SHIFT);
-                    word |= (this.AssembleExpression(operands[1u64]->expression) << REG1_SHIFT);
+                if opcode == Opcode::SLT || opcode == Opcode::SLTU {
+                    word |= (this.AssembleExpression(operands[2u64]->expression) << REG2_SHIFT);
+                } else {
+                    word |= (this.AssembleExpression(operands[2u64]->expression) & IMM16_MASK);
+                }
+            } else if opcode >= Opcode::ADD && opcode <= Opcode::SRAI {
+                word |= (this.AssembleExpression(operands[0u64]->expression) << REG0_SHIFT);
+                word |= (this.AssembleExpression(operands[1u64]->expression) << REG1_SHIFT);
 
-                    if (Opcode::ADD % 2u32 == opcode % 2u32) || (opcode >= Opcode::MUL && opcode <= Opcode::REMU) {
-                        word |= (this.AssembleExpression(operands[2u64]->expression) << REG2_SHIFT);
-                    } else {
-                        word |= (this.AssembleExpression(operands[2u64]->expression) & IMM16_MASK);
-                    }
+                if (Opcode::ADD % 2u32 == opcode % 2u32) || (opcode >= Opcode::MUL && opcode <= Opcode::REMU) {
+                    word |= (this.AssembleExpression(operands[2u64]->expression) << REG2_SHIFT);
+                } else {
+                    word |= (this.AssembleExpression(operands[2u64]->expression) & IMM16_MASK);
                 }
             }
 

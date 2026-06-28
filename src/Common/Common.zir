@@ -19,7 +19,7 @@
 enum Opcode: u32 {
     NOP,
     LB, LBU, LH, LHU, LW, LUI, AUIPC, SB, SH, SW,
-    B, BR, BL, BEQ, BNE, BLT, BLTU, BGE, BGEU,
+    B, BR, BL, BLR, BEQ, BNE, BLT, BLTU, BGE, BGEU,
     SLT, SLTU, SLTI, SLTIU,
     ADD, ADDI, SUB, SUBI,
     MUL, MULH, MULHSU, MULHU, DIV, DIVU, REM, REMU,

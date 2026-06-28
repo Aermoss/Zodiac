@@ -33,6 +33,7 @@ module cpu(
         OP_B,
         OP_BR,
         OP_BL,
+        OP_BLR,
         OP_BEQ,
         OP_BNE,
         OP_BLT,
@@ -228,7 +229,7 @@ module cpu(
             OP_MUL, OP_MULH, OP_MULHSU, OP_MULHU, OP_DIV, OP_DIVU, OP_REM, OP_REMU,
             OP_AND, OP_ANDI, OP_OR, OP_ORI, OP_XOR, OP_XORI,
             OP_SLL, OP_SLLI, OP_SRL, OP_SRLI, OP_SRA, OP_SRAI,
-            OP_BL: mem_writes_reg = 1;
+            OP_BL, OP_BLR: mem_writes_reg = 1;
             default: mem_writes_reg = 0;
         endcase
     end
@@ -344,7 +345,7 @@ module cpu(
             OP_SLTIU: ex_result = (ex_reg1_fwd < {{16{1'b0}}, ex_imm16});
 
             OP_B: begin
-                branch_target = ex_imm26 << 2;
+                branch_target = ex_pc + (ex_imm26 << 2);
                 should_take_branch = 1;
             end
 
@@ -356,6 +357,12 @@ module cpu(
             OP_BL: begin
                 ex_result = ex_pc + 4;
                 branch_target = ex_pc + (ex_simm21 << 2);
+                should_take_branch = 1;
+            end
+
+            OP_BLR: begin
+                ex_result = ex_pc + 4;
+                branch_target = ex_reg0_fwd;
                 should_take_branch = 1;
             end
 
@@ -424,7 +431,7 @@ module cpu(
             OP_DIV, OP_DIVU, OP_REM, OP_REMU,
             OP_AND, OP_ANDI, OP_OR, OP_ORI, OP_XOR, OP_XORI,
             OP_SLL, OP_SLLI, OP_SRL, OP_SRLI, OP_SRA, OP_SRAI,
-            OP_BL: reg_write = wb_result;
+            OP_BL, OP_BLR: reg_write = wb_result;
             OP_LB: reg_write = {{24{ram_read_byte[7]}}, ram_read_byte};
             OP_LBU: reg_write = ram_read_byte;
             OP_LH: reg_write = {{16{ram_read_half[15]}}, ram_read_half};
