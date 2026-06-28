@@ -470,8 +470,7 @@ class Assembler {
                 let mut target = 0u32;
 
                 if this.IsRelocatable(operands[_index]->expression) {
-                    let label = (operands[_index]->expression as *const IdentifierNode)->value;
-                    this.relocations.PushBack(Relocation(this.section, offset, RelocationType::Branch16, label));
+                    this.relocations.PushBack(Relocation(this.section, offset, RelocationType::Branch16, (operands[_index]->expression as *const IdentifierNode)->value));
                 } else {
                     target = this.AssembleExpression(operands[_index]->expression);
                 }
@@ -538,32 +537,9 @@ class Assembler {
                 continue;
             }
 
-            let mut relocatable_branch = false;
-            let mut relocation_type = RelocationType::None;
-            let mut branch_label: String;
-
-            if opcode == Opcode::B || opcode == Opcode::BL || (opcode >= Opcode::BEQ && opcode <= Opcode::BGEU) {
-                let operand_index = (opcode == Opcode::B) ? 0u64 : ((opcode == Opcode::BL) ? 1u64 : 2u64);
-
-                if this.IsRelocatable(operands[operand_index]->expression) {
-                    branch_label = (operands[operand_index]->expression as *const IdentifierNode)->value;
-                    relocation_type = (opcode == Opcode::B) ? RelocationType::Branch26 : ((opcode == Opcode::BL) ? RelocationType::Branch21 : RelocationType::Branch16);
-                    relocatable_branch = true;
-                }
-            }
-
             let mut word = (opcode << OPCODE_SHIFT);
 
-            if relocatable_branch {
-                if opcode == Opcode::BL {
-                    word |= (this.AssembleExpression(operands[0u64]->expression) << REG0_SHIFT);
-                } else if opcode >= Opcode::BEQ && opcode <= Opcode::BGEU {
-                    word |= (this.AssembleExpression(operands[0u64]->expression) << REG0_SHIFT);
-                    word |= (this.AssembleExpression(operands[1u64]->expression) << REG1_SHIFT);
-                }
-
-                this.relocations.PushBack(Relocation(this.section, offset, relocation_type, branch_label));
-            } else if opcode >= Opcode::LB && opcode <= Opcode::SW {
+            if opcode >= Opcode::LB && opcode <= Opcode::SW {
                 word |= (this.AssembleExpression(operands[0u64]->expression) << REG0_SHIFT);
 
                 if opcode == Opcode::LUI || opcode == Opcode::AUIPC {
@@ -573,10 +549,19 @@ class Assembler {
                     word |= (this.AssembleExpression(operands[1u64]->offset) & IMM16_MASK);
                 }
             } else if opcode == Opcode::B {
-                word |= (((this.AssembleExpression(operands[0u64]->expression) - offset) >> 2u32) & IMM26_MASK);
+                if this.IsRelocatable(operands[0u64]->expression) {
+                    this.relocations.PushBack(Relocation(this.section, offset, RelocationType::Branch26, (operands[0u64]->expression as *const IdentifierNode)->value));
+                } else {
+                    word |= (((this.AssembleExpression(operands[0u64]->expression) - offset) >> 2u32) & IMM26_MASK);
+                }
             } else if opcode == Opcode::BL {
                 word |= (this.AssembleExpression(operands[0u64]->expression) << REG0_SHIFT);
-                word |= (((this.AssembleExpression(operands[1u64]->expression) - offset) >> 2u32) & IMM21_MASK);
+
+                if this.IsRelocatable(operands[1u64]->expression) {
+                    this.relocations.PushBack(Relocation(this.section, offset, RelocationType::Branch21, (operands[1u64]->expression as *const IdentifierNode)->value));
+                } else {
+                    word |= (((this.AssembleExpression(operands[1u64]->expression) - offset) >> 2u32) & IMM21_MASK);
+                }
             } else if opcode == Opcode::BR {
                 word |= (this.AssembleExpression(operands[0u64]->expression) << REG0_SHIFT);
             } else if opcode == Opcode::BLR {
@@ -585,7 +570,12 @@ class Assembler {
             } else if opcode >= Opcode::BEQ && opcode <= Opcode::BGEU {
                 word |= (this.AssembleExpression(operands[0u64]->expression) << REG0_SHIFT);
                 word |= (this.AssembleExpression(operands[1u64]->expression) << REG1_SHIFT);
-                word |= (((this.AssembleExpression(operands[2u64]->expression) - offset) >> 2u32) & IMM16_MASK);
+
+                if this.IsRelocatable(operands[2u64]->expression) {
+                    this.relocations.PushBack(Relocation(this.section, offset, RelocationType::Branch16, (operands[2u64]->expression as *const IdentifierNode)->value));
+                } else {
+                    word |= (((this.AssembleExpression(operands[2u64]->expression) - offset) >> 2u32) & IMM16_MASK);
+                }
             } else if opcode >= Opcode::SLT && opcode <= Opcode::SLTIU {
                 word |= (this.AssembleExpression(operands[0u64]->expression) << REG0_SHIFT);
                 word |= (this.AssembleExpression(operands[1u64]->expression) << REG1_SHIFT);
