@@ -1,0 +1,58 @@
+@nomangle
+func putchar(character: i8) {
+    volatile asm : x1(character) -> {
+        li x21, 0xFFFF
+        sb x1, 0(x21)
+    };
+}
+
+@nomangle
+func print(mut string: *const i8) {
+    while *string != '\0' {
+        putchar(*string);
+        string = string + 1u64;
+    }
+}
+
+@nomangle
+func print_int(value: i32) {
+    if value < 0i32 {
+        putchar('-');
+        print_int(-value);
+    } else if value >= 10i32 {
+        print_int(value / 10i32);
+        putchar(48i8 + (value % 10i32) as i8);
+    } else {
+        putchar(48i8 + value as i8);
+    }
+}
+
+@nomangle
+func factorial(n: i32) -> i32 {
+    if n <= 1i32 {
+        ret 1i32;
+    }
+
+    ret n * factorial(n - 1i32);
+}
+
+@nomangle
+func fibonacci(n: i32) -> i32 {
+    if n <= 1i32 {
+        ret n;
+    }
+
+    ret fibonacci(n - 1i32) + fibonacci(n - 2i32);
+}
+
+@nomangle
+func main() -> i32 {
+    print("Hello, World!\n");
+    print("factorial(5) = ");
+    print_int(factorial(5i32));
+    print("\n");
+    print("fibonacci(8) = ");
+    print_int(fibonacci(8i32));
+    print("\n");
+    ret 0i32;
+}

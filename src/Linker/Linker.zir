@@ -125,11 +125,11 @@ class Linker {
         let mut offset = 0u32;
 
         for i in 0u64..this.sections.Size() {
-            this.section_bases[i] = offset;
+            this.section_bases[i] = offset * 4u32;
 
             if offset != 0u32 {
                 for object in this.objects {
-                    object.section_bases[i] += offset;
+                    object.section_bases[i] += offset * 4u32;
                 }
             }
 
