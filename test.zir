@@ -90,7 +90,7 @@ func SetBaudRate(baud: i32) {
 
 @nomangle
 func Main() -> i32 {
-    SetBaudRate(921600i32);
+    SetBaudRate(115200i32);
 
     WriteLine("Zodiac interactive terminal initialized!");
     WriteLine("Type anything to echo, press 1-6 to toggle LEDs, or +/- to change RGB brightness.");

@@ -299,7 +299,8 @@ __z11SetBaudRatei:
 Main:
     addi x31, x31, -48
     sw x30, 44(x31)
-    lui x1, 450
+    lui x1, 56
+    ori x1, x1, 512
     bl x30, __z11SetBaudRatei
     la x1, .L__unnamed_1
     bl x30, __z9WriteLinePc
