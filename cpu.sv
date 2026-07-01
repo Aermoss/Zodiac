@@ -181,6 +181,69 @@ module cpu #(
         .result(alu_result)
     );
 
+    logic [31:0] div_dividend;
+    logic [31:0] div_divisor;
+    logic [31:0] raw_quotient;
+    logic [31:0] raw_remainder;
+    logic div_ready, div_start;
+
+    divider divider0(
+        .clk(clk),
+        .rst(rst),
+        .start(div_start),
+        .dividend(div_dividend),
+        .divisor(div_divisor),
+        .quotient(raw_quotient),
+        .remainder(raw_remainder),
+        .ready(div_ready)
+    );
+
+    logic is_div_op, div_active, div_stall;
+
+    assign div_dividend = (ex_opcode == OP_DIV || ex_opcode == OP_REM) && alu_left[31] ? -alu_left : alu_left;
+    assign div_divisor = (ex_opcode == OP_DIV || ex_opcode == OP_REM) && alu_right[31] ? -alu_right : alu_right;
+    assign is_div_op = (ex_opcode == OP_DIV) || (ex_opcode == OP_DIVU) || (ex_opcode == OP_REM) || (ex_opcode == OP_REMU);
+    assign div_start = is_div_op && !div_active;
+    assign div_stall = is_div_op && !div_ready;
+
+    always_ff @(posedge clk or posedge rst) begin
+        if (rst) begin
+            div_active <= 1'b0;
+        end else begin
+            if (div_start) begin
+                div_active <= 1'b1;
+            end else if (div_ready) begin
+                div_active <= 1'b0;
+            end
+        end
+    end
+
+    logic [31:0] div_orig_dividend;
+    logic [31:0] div_orig_divisor;
+    logic div_sign_q, div_sign_r;
+
+    always_ff @(posedge clk or posedge rst) begin
+        if (rst) begin
+            div_orig_dividend <= 32'b0;
+            div_orig_divisor <= 32'b0;
+            div_sign_q <= 1'b0;
+            div_sign_r <= 1'b0;
+        end else if (div_start) begin
+            div_orig_dividend <= alu_left;
+            div_orig_divisor <= alu_right;
+            div_sign_q <= (ex_opcode == OP_DIV) && (alu_left[31] ^ alu_right[31]) && (alu_right != 0);
+            div_sign_r <= (ex_opcode == OP_REM) && alu_left[31] && (alu_right != 0);
+        end
+    end
+
+    logic [31:0] final_quotient;
+    logic [31:0] final_remainder;
+    logic [31:0] div_result;
+
+    assign final_quotient = (div_orig_divisor == 32'b0) ? 32'hFFFFFFFF : (div_sign_q ? -raw_quotient : raw_quotient);
+    assign final_remainder = (div_orig_divisor == 32'b0) ? div_orig_dividend : (div_sign_r ? -raw_remainder : raw_remainder);
+    assign div_result = (ex_opcode == OP_DIV || ex_opcode == OP_DIVU) ? final_quotient : final_remainder;
+
     function automatic logic is_load_op(opcode_t opcode);
         case (opcode)
             OP_LB, OP_LBU, OP_LH, OP_LHU, OP_LW: return 1;
@@ -295,10 +358,6 @@ module cpu #(
             OP_MULH: alu_op = ALU_OP_MULH;
             OP_MULHSU: alu_op = ALU_OP_MULHSU;
             OP_MULHU: alu_op = ALU_OP_MULHU;
-            OP_DIV: alu_op = ALU_OP_DIV;
-            OP_DIVU: alu_op = ALU_OP_DIVU;
-            OP_REM: alu_op = ALU_OP_REM;
-            OP_REMU: alu_op = ALU_OP_REMU;
             OP_AND, OP_ANDI: alu_op = ALU_OP_AND;
             OP_OR, OP_ORI: alu_op = ALU_OP_OR;
             OP_XOR, OP_XORI: alu_op = ALU_OP_XOR;
@@ -444,7 +503,7 @@ module cpu #(
         should_take_branch = 0;
         branch_target = ex_pc + (ex_simm16 << 2);
         should_halt = 0;
-        ex_result = alu_result;
+        ex_result = is_div_op ? div_result : alu_result;
         ex_addr = 0;
 
         case (ex_opcode)
@@ -628,7 +687,7 @@ module cpu #(
             end else if (should_take_branch) begin
                 if_pc <= branch_target;
                 if_pc_current <= branch_target;
-            end else if (hazard_stall || mem_op_in_mem) begin
+            end else if (hazard_stall || mem_op_in_mem || div_stall) begin
                 if_pc <= if_pc_current;
                 if_pc_current <= if_pc_current;
             end else begin
@@ -639,7 +698,7 @@ module cpu #(
             if (should_take_branch || branch_taken || halted) begin
                 id_pc <= 0;
                 id_instr <= 0;
-            end else if (hazard_stall) begin
+            end else if (hazard_stall || div_stall) begin
                 id_pc <= id_pc;
                 id_instr <= id_instr;
             end else if (mem_op_in_mem || mem_op_in_wb) begin
@@ -650,32 +709,34 @@ module cpu #(
                 id_instr <= if_instr;
             end
 
-            if (should_take_branch || hazard_stall || halted) begin
-                ex_pc <= 0;
-                ex_instr <= 0;
-                ex_opcode <= OP_NOP;
-                ex_reg_addr <= 0;
-                ex_reg0 <= 0;
-                ex_reg1 <= 0;
-                ex_reg2 <= 0;
-                ex_imm16 <= 0;
-                ex_imm21 <= 0;
-                ex_imm26 <= 0;
-                ex_simm16 <= 0;
-                ex_simm21 <= 0;
-            end else begin
-                ex_pc <= id_pc;
-                ex_instr <= id_instr;
-                ex_opcode <= id_opcode;
-                ex_reg_addr <= id_reg_addr;
-                ex_reg0 <= id_reg0;
-                ex_reg1 <= id_reg1;
-                ex_reg2 <= id_reg2;
-                ex_imm16 <= id_imm16;
-                ex_imm21 <= id_imm21;
-                ex_imm26 <= id_imm26;
-                ex_simm16 <= id_simm16;
-                ex_simm21 <= id_simm21;
+            if (!div_stall) begin
+                if (should_take_branch || hazard_stall || halted) begin
+                    ex_pc <= 0;
+                    ex_instr <= 0;
+                    ex_opcode <= OP_NOP;
+                    ex_reg_addr <= 0;
+                    ex_reg0 <= 0;
+                    ex_reg1 <= 0;
+                    ex_reg2 <= 0;
+                    ex_imm16 <= 0;
+                    ex_imm21 <= 0;
+                    ex_imm26 <= 0;
+                    ex_simm16 <= 0;
+                    ex_simm21 <= 0;
+                end else begin
+                    ex_pc <= id_pc;
+                    ex_instr <= id_instr;
+                    ex_opcode <= id_opcode;
+                    ex_reg_addr <= id_reg_addr;
+                    ex_reg0 <= id_reg0;
+                    ex_reg1 <= id_reg1;
+                    ex_reg2 <= id_reg2;
+                    ex_imm16 <= id_imm16;
+                    ex_imm21 <= id_imm21;
+                    ex_imm26 <= id_imm26;
+                    ex_simm16 <= id_simm16;
+                    ex_simm21 <= id_simm21;
+                end
             end
 
             if (should_halt)
@@ -683,15 +744,26 @@ module cpu #(
 
             branch_taken <= should_take_branch;
 
-            mem_pc <= ex_pc;
-            mem_instr <= ex_instr;
-            mem_result <= ex_result;
-            mem_addr <= ex_addr;
-            mem_opcode <= ex_opcode;
-            mem_reg_addr <= ex_reg_addr;
-            mem_reg0 <= ex_reg0_fwd;
+            if (div_stall) begin
+                mem_pc <= 0;
+                mem_instr <= 0;
+                mem_result <= 0;
+                mem_addr <= 0;
+                mem_opcode <= OP_NOP;
+                mem_reg_addr <= 0;
+                mem_reg0 <= 0;
+                mem_op_in_mem <= 0;
+            end else begin
+                mem_pc <= ex_pc;
+                mem_instr <= ex_instr;
+                mem_result <= ex_result;
+                mem_addr <= ex_addr;
+                mem_opcode <= ex_opcode;
+                mem_reg_addr <= ex_reg_addr;
+                mem_reg0 <= ex_reg0_fwd;
+                mem_op_in_mem <= is_mem_op(ex_opcode);
+            end
 
-            mem_op_in_mem <= is_mem_op(ex_opcode);
             mem_op_in_wb <= mem_op_in_mem;
 
             wb_pc <= mem_pc;

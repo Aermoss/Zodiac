@@ -21,10 +21,6 @@ typedef enum logic [3:0] {
     ALU_OP_MULH,
     ALU_OP_MULHSU,
     ALU_OP_MULHU,
-    ALU_OP_DIV,
-    ALU_OP_DIVU,
-    ALU_OP_REM,
-    ALU_OP_REMU,
     ALU_OP_AND,
     ALU_OP_OR,
     ALU_OP_XOR,
@@ -57,10 +53,6 @@ module alu(
             ALU_OP_MULH: result = ss_prod[63:32];
             ALU_OP_MULHSU: result = su_prod[63:32];
             ALU_OP_MULHU: result = uu_prod[63:32];
-            ALU_OP_DIV: result = (right == 0) ? 32'hFFFFFFFF : ($signed(left) / $signed(right));
-            ALU_OP_DIVU: result = (right == 0) ? 32'hFFFFFFFF : (left / right);
-            ALU_OP_REM: result = (right == 0) ? left : ($signed(left) % $signed(right));
-            ALU_OP_REMU: result = (right == 0) ? left : (left % right);
             ALU_OP_AND: result = left & right;
             ALU_OP_OR: result = left | right;
             ALU_OP_XOR: result = left ^ right;

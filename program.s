@@ -61,42 +61,51 @@ __z9WriteLinePc:
 
 	.global	__z12WriteIntegeri
 __z12WriteIntegeri:
-    addi x31, x31, -24
-    sw x30, 20(x31)
+    addi x31, x31, -8
+    sw x30, 4(x31)
     add x2, x1, x0
-    sw x2, 4(x31)
+    sw x2, 0(x31)
     addi x1, x0, -1
     blt x1, x2, __LBB3_2
     b __LBB3_1
 __LBB3_1:
-    lw x2, 4(x31)
-    add x1, x0, x0
-    sub x1, x1, x2
-    sw x1, 4(x31)
     addi x1, x0, 45
     bl x30, __z14WriteCharacterc
+    lw x2, 0(x31)
+    add x1, x0, x0
+    sub x1, x1, x2
+    sw x1, 0(x31)
     b __LBB3_2
 __LBB3_2:
-    lw x2, 4(x31)
-    addi x1, x31, 8
-    addi x3, x0, 10
-    bl x30, __z14SoftwareDivide14DivisionResultii
-    lw x1, 8(x31)
-    add x2, x0, x0
-    beq x1, x2, __LBB3_4
+    lw x1, 0(x31)
+    addi x2, x0, 10
+    blt x1, x2, __LBB3_4
     b __LBB3_3
 __LBB3_3:
-    lw x1, 8(x31)
+    lw x1, 0(x31)
+    lui x2, 838860
+    ori x2, x2, 1639
+    mulh x1, x1, x2
+    srli x2, x1, 31
+    srai x1, x1, 2
+    add x1, x1, x2
     bl x30, __z12WriteIntegeri
     b __LBB3_4
 __LBB3_4:
-    addi x1, x31, 8
-    ori x1, x1, 4
-    lbu x1, 0(x1)
+    lw x1, 0(x31)
+    lui x2, 838860
+    ori x2, x2, 1639
+    mulh x2, x1, x2
+    srli x3, x2, 31
+    srai x2, x2, 2
+    add x2, x2, x3
+    addi x3, x0, 10
+    mul x2, x2, x3
+    sub x1, x1, x2
     addi x1, x1, 48
     bl x30, __z14WriteCharacterc
-    lw x30, 20(x31)
-    addi x31, x31, 24
+    lw x30, 4(x31)
+    addi x31, x31, 8
     br x30
 
 	.global	__z7SetLEDsc
@@ -200,6 +209,20 @@ __LBB10_3:
     addi x31, x31, 16
     br x30
 
+	.global	__z11SetBaudRatei
+__z11SetBaudRatei:
+    addi x31, x31, -8
+    add x2, x1, x0
+    sw x2, 4(x31)
+    lui x1, 13183
+    ori x1, x1, 1216
+    div x1, x1, x2
+    lui x2, 31
+    ori x2, x2, 2040
+    sw x1, 0(x2)
+    addi x31, x31, 8
+    br x30
+
 	.global	__zN14DivisionResult14DivisionResultEMR14DivisionResult14DivisionResultii
 __zN14DivisionResult14DivisionResultEMR14DivisionResult14DivisionResultii:
     addi x31, x31, -16
@@ -222,9 +245,9 @@ __z14SoftwareDivide14DivisionResultii:
     sw x2, 16(x31)
     sw x3, 20(x31)
     add x1, x0, x0
-    blt x1, x3, __LBB12_2
-    b __LBB12_1
-__LBB12_1:
+    blt x1, x3, __LBB13_2
+    b __LBB13_1
+__LBB13_1:
     addi x1, x31, 24
     sw x1, 4(x31)
     add x3, x0, x0
@@ -241,16 +264,16 @@ __LBB12_1:
     lw x30, 52(x31)
     addi x31, x31, 56
     br x30
-__LBB12_2:
+__LBB13_2:
     add x1, x0, x0
     sw x1, 36(x31)
-    b __LBB12_3
-__LBB12_3:
+    b __LBB13_3
+__LBB13_3:
     lw x1, 16(x31)
     lw x2, 20(x31)
-    blt x1, x2, __LBB12_5
-    b __LBB12_4
-__LBB12_4:
+    blt x1, x2, __LBB13_5
+    b __LBB13_4
+__LBB13_4:
     lw x2, 20(x31)
     lw x1, 16(x31)
     sub x1, x1, x2
@@ -258,8 +281,8 @@ __LBB12_4:
     lw x1, 36(x31)
     addi x1, x1, 1
     sw x1, 36(x31)
-    b __LBB12_3
-__LBB12_5:
+    b __LBB13_3
+__LBB13_5:
     lw x2, 36(x31)
     lw x3, 16(x31)
     addi x1, x31, 40
@@ -275,24 +298,6 @@ __LBB12_5:
     sw x2, 4(x3)
     lw x30, 52(x31)
     addi x31, x31, 56
-    br x30
-
-	.global	__z11SetBaudRatei
-__z11SetBaudRatei:
-    addi x31, x31, -24
-    sw x30, 20(x31)
-    add x3, x1, x0
-    sw x3, 4(x31)
-    lui x1, 13183
-    ori x2, x1, 1216
-    addi x1, x31, 8
-    bl x30, __z14SoftwareDivide14DivisionResultii
-    lw x1, 8(x31)
-    lui x2, 31
-    ori x2, x2, 2040
-    sw x1, 0(x2)
-    lw x30, 20(x31)
-    addi x31, x31, 24
     br x30
 
 	.global	Main
