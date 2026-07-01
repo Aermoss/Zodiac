@@ -14,40 +14,37 @@
  * limitations under the License.
  */
 
-`timescale 1ns / 1ps
+module top (
+    input logic clk,
+    input logic rst,
+    input logic uart_rx,
+    output logic uart_tx,
+    input logic button,
+    output logic [5:0] leds,
+    output logic ws2812
+);
+    logic rst_reg;
+    logic [7:0] counter = 0;
 
-module tb;
-    logic rst;
-    logic clk = 0;
-    integer i;
+    always_ff @(posedge clk) begin
+        if (counter < 8'hFF) begin
+            counter <= counter + 8'd1;
+            rst_reg <= 1'b1;
+        end else begin
+            rst_reg <= rst;
+        end
+    end
 
     cpu #(
-        .SIMULATION(1'b1),
+        .SIMULATION(1'b0),
         .CLK_FREQ(27000000)
     ) cpu0 (
         .clk(clk),
-        .rst(rst),
-        .uart_rx(),
-        .uart_tx(),
-        .button(),
-        .leds(),
-        .ws2812()
+        .rst(rst_reg),
+        .uart_rx(uart_rx),
+        .uart_tx(uart_tx),
+        .button(button),
+        .leds(leds),
+        .ws2812(ws2812)
     );
-
-    always #3 clk = ~clk;
-
-    initial begin
-        $dumpfile("dump.vcd");
-        $dumpvars(0, tb);
-
-        for (i = 0; i < 32; i++)
-            $dumpvars(0, cpu0.regs[i]);
-
-        rst = 1;
-        @(negedge clk);
-        rst = 0;
-
-        #100000;
-        $finish;
-    end
 endmodule

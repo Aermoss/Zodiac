@@ -1,8 +1,8 @@
 .text
 .global _start
-.extern main
+.extern Main
 
 _start:
     li x31, 0x4000
-    bl x30, main
+    bl x30, Main
     hlt

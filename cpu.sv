@@ -14,9 +14,17 @@
  * limitations under the License.
  */
 
-module cpu(
+module cpu #(
+    parameter bit SIMULATION = 1'b1,
+    parameter int CLK_FREQ = 27000000
+) (
     input logic clk,
-    input logic reset
+    input logic rst,
+    input logic uart_rx,
+    output logic uart_tx,
+    input logic button,
+    output logic [5:0] leds,
+    output logic ws2812
 );
     typedef enum logic [5:0] {
         OP_NOP,
@@ -301,11 +309,117 @@ module cpu(
     end
 
     logic [3:0] uart_we;
+    logic [15:0] uart_clks_per_bit;
 
-    uart uart0(
+    logic uart_tx_busy;
+    logic uart_tx_started;
+    logic uart_tx_write;
+
+    assign uart_tx_write = (ram_addr == 32'hFFFF) && (ram_we != 0) && !uart_tx_busy && !uart_tx_started;
+
+    always_ff @(posedge clk or posedge rst) begin
+        if (rst)
+            uart_tx_started <= 0;
+        else if (uart_tx_write)
+            uart_tx_started <= 1;
+        else
+            uart_tx_started <= 0;
+    end
+
+    generate
+        if (SIMULATION) begin : sim_uart
+            always_ff @(posedge clk) begin
+                if (uart_we[0]) $write("%c", ram_write[7:0]);
+                if (uart_we[1]) $write("%c", ram_write[15:8]);
+                if (uart_we[2]) $write("%c", ram_write[23:16]);
+                if (uart_we[3]) $write("%c", ram_write[31:24]);
+            end
+
+            assign uart_tx_busy = 1'b0;
+            assign uart_tx = 1'b1;
+        end else begin : hw_uart
+            logic [7:0] uart_tx_data;
+
+            always_comb begin
+                if (uart_we[3]) uart_tx_data = ram_write[31:24];
+                else if (uart_we[2]) uart_tx_data = ram_write[23:16];
+                else if (uart_we[1]) uart_tx_data = ram_write[15:8];
+                else uart_tx_data = ram_write[7:0];
+            end
+
+            uart_tx uart_tx0 (
+                .clk(clk),
+                .rst(rst),
+                .clks_per_bit(uart_clks_per_bit),
+                .tx_data(uart_tx_data),
+                .tx_write(uart_tx_write),
+                .tx_busy(uart_tx_busy),
+                .tx_pin(uart_tx)
+            );
+        end
+    endgenerate
+
+    logic [7:0] uart_rx_byte;
+    logic uart_rx_ready;
+
+    uart_rx uart_rx0 (
         .clk(clk),
-        .we(uart_we),
-        .write(ram_write)
+        .rst(rst),
+        .clks_per_bit(uart_clks_per_bit),
+        .rx_pin(uart_rx),
+        .read_ack(ram_addr == 32'hFFFF && ram_we == 0 && mem_access),
+        .rx_byte(uart_rx_byte),
+        .rx_ready(uart_rx_ready)
+    );
+
+    always_ff @(posedge clk or posedge rst) begin
+        if (rst)
+            uart_clks_per_bit <= 16'd234;
+        else if (ram_addr == 32'hFFF8 && ram_we != 0)
+            uart_clks_per_bit <= ram_write[15:0];
+    end
+
+    logic [31:0] ms_counter;
+    logic [14:0] tick_divider;
+
+    always_ff @(posedge clk or posedge rst) begin
+        if (rst) begin
+            ms_counter <= 0;
+            tick_divider <= 0;
+        end else if (tick_divider >= 15'd26999) begin
+            tick_divider <= 0;
+            ms_counter <= ms_counter + 32'd1;
+        end else begin
+            tick_divider <= tick_divider + 15'd1;
+        end
+    end
+
+    logic button_sync0, button_sync1;
+
+    always_ff @(posedge clk or posedge rst) begin
+        if (rst) begin
+            button_sync0 <= 1'b1;
+            button_sync1 <= 1'b1;
+        end else begin
+            button_sync0 <= button;
+            button_sync1 <= button_sync0;
+        end
+    end
+
+    always_ff @(posedge clk or posedge rst) begin
+        if (rst)
+            leds <= 6'h3F;
+        else if (ram_addr == 32'hFFF0 && ram_we != 0)
+            leds <= ram_write[5:0];
+    end
+
+    ws2812_tx ws2812_tx0 (
+        .clk(clk),
+        .rst(rst),
+        .strobe(ram_addr == 32'hFFE0 && ram_we != 0),
+        .write(ram_write[23:0]),
+        .busy(),
+        .out(ws2812)
     );
 
     always_comb begin
@@ -314,7 +428,7 @@ module cpu(
 
         if (ram_addr == 32'hFFFF)
             uart_we = ram_we;
-        else
+        else if (ram_addr != 32'hFFF0 && ram_addr != 32'hFFE0 && ram_addr != 32'hFFEC && ram_addr != 32'hFFF4 && ram_addr != 32'hFFF8)
             _ram_we = ram_we;
     end
 
@@ -412,11 +526,28 @@ module cpu(
         endcase
     end
 
+    logic [31:0] wb_read_data;
+
+    always_comb begin
+        if (wb_addr == 32'hFFFF)
+            wb_read_data = {4{uart_rx_byte}};
+        else if (wb_addr == 32'hFFFC)
+            wb_read_data = {30'b0, uart_tx_busy, uart_rx_ready};
+        else if (wb_addr == 32'hFFF8)
+            wb_read_data = {16'b0, uart_clks_per_bit};
+        else if (wb_addr == 32'hFFEC)
+            wb_read_data = ms_counter;
+        else if (wb_addr == 32'hFFF4)
+            wb_read_data = {31'b0, button_sync1};
+        else
+            wb_read_data = ram_read;
+    end
+
     logic [7:0] ram_read_byte;
     logic [15:0] ram_read_half;
 
-    assign ram_read_byte = ram_read[8 * wb_addr[1:0]+:8];
-    assign ram_read_half = ram_read[16 * wb_addr[1]+:16];
+    assign ram_read_byte = wb_read_data[8 * wb_addr[1:0]+:8];
+    assign ram_read_half = wb_read_data[16 * wb_addr[1]+:16];
 
     always_comb begin
         reg_addr = wb_reg_addr;
@@ -436,15 +567,15 @@ module cpu(
             OP_LBU: reg_write = ram_read_byte;
             OP_LH: reg_write = {{16{ram_read_half[15]}}, ram_read_half};
             OP_LHU: reg_write = ram_read_half;
-            OP_LW: reg_write = ram_read;
+            OP_LW: reg_write = wb_read_data;
             default: reg_we = 0;
         endcase
     end
 
     integer i;
 
-    always_ff @(posedge clk or posedge reset) begin
-        if (reset) begin
+    always_ff @(posedge clk or posedge rst) begin
+        if (rst) begin
             for (i = 0; i < 32; i++)
                 regs[i] <= 0;
 

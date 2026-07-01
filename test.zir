@@ -1,58 +1,181 @@
-@nomangle
-func putchar(character: i8) {
-    volatile asm : x1(character) -> {
-        li x21, 0xFFFF
-        sb x1, 0(x21)
-    };
+func WriteCharacter(character: i8) {
+    while (*(0xFFFCi32 as *const i32) & 2i32) != 0i32 {}
+    *(0xFFFFi32 as *mut i8) = character;
 }
 
-@nomangle
-func print(mut string: *const i8) {
+func Write(mut string: *const i8) {
     while *string != '\0' {
-        putchar(*string);
+        WriteCharacter(*string);
         string = string + 1u64;
     }
 }
 
-@nomangle
-func print_int(value: i32) {
+func WriteLine(string: *const i8) {
+    Write(string);
+    WriteCharacter('\n');
+}
+
+func WriteInteger(mut value: i32) {
     if value < 0i32 {
-        putchar('-');
-        print_int(-value);
-    } else if value >= 10i32 {
-        print_int(value / 10i32);
-        putchar(48i8 + (value % 10i32) as i8);
-    } else {
-        putchar(48i8 + value as i8);
+        value = -value;
+        WriteCharacter('-');
+    }
+
+    let result = SoftwareDivide(value, 10i32);
+
+    if result.quotient != 0i32 {
+        WriteInteger(result.quotient);
+    }
+
+    WriteCharacter(48i8 + result.remainder as i8);
+}
+
+func SetLEDs(leds: i8) {
+    *(0xFFF0i32 as *mut i8) = leds;
+}
+
+func SetWS2812(r: u8, g: u8, b: u8) {
+    *(0xFFE0i32 as *mut i32) = (g as i32 << 16i32) | (r as i32 << 8i32) | b as i32;
+}
+
+func HasCharacter() -> bool {
+    ret (*(0xFFFCi32 as *const i32) & 1i32) != 0i32;
+}
+
+func ReadCharacter() -> i8 {
+    ret *(0xFFFFi32 as *const i32) as i8;
+}
+
+func ButtonPressed() -> bool {
+    ret (*(0xFFF4i32 as *const i32) & 1i32) == 0i32;
+}
+
+func GetTime() -> i32 {
+    ret *(0xFFECi32 as *const i32);
+}
+
+func Sleep(ms: i32) {
+    let start = GetTime();
+    while GetTime() - start < ms {}
+}
+
+class DivisionResult {
+    pub quotient: i32,
+    pub remainder: i32;
+
+    DivisionResult(&mut this, quotient: i32, remainder: i32) {
+        (this.quotient, this.remainder) = (quotient, remainder);
     }
 }
 
-@nomangle
-func factorial(n: i32) -> i32 {
-    if n <= 1i32 {
-        ret 1i32;
+func SoftwareDivide(mut dividend: i32, divisor: i32) -> DivisionResult {
+    if divisor <= 0i32 {
+        ret DivisionResult(0i32, 0i32);
     }
 
-    ret n * factorial(n - 1i32);
+    let mut quotient = 0i32;
+
+    while dividend >= divisor {
+        dividend -= divisor;
+        quotient += 1i32;
+    }
+
+    ret DivisionResult(quotient, dividend);
+}
+
+func SetBaudRate(baud: i32) {
+    let result = SoftwareDivide(27000000i32, baud);
+    *(0xFFF8i32 as *mut i32) = result.quotient;
 }
 
 @nomangle
-func fibonacci(n: i32) -> i32 {
-    if n <= 1i32 {
-        ret n;
-    }
+func Main() -> i32 {
+    SetBaudRate(921600i32);
 
-    ret fibonacci(n - 1i32) + fibonacci(n - 2i32);
-}
+    WriteLine("Zodiac interactive terminal initialized!");
+    WriteLine("Type anything to echo, press 1-6 to toggle LEDs, or +/- to change RGB brightness.");
+    WriteLine("Press the button on the board to cycle WS2812 animation modes.");
 
-@nomangle
-func main() -> i32 {
-    print("Hello, World!\n");
-    print("factorial(5) = ");
-    print_int(factorial(5i32));
-    print("\n");
-    print("fibonacci(8) = ");
-    print_int(fibonacci(8i32));
-    print("\n");
-    ret 0i32;
+    let mut color_state = 0i32;
+    let (mut r, mut g, mut b) = (255u8, 0u8, 0u8);
+    let mut led_state = 0x3Fi8;
+    SetLEDs(led_state);
+
+    let mut mode = 0i32;
+    let mut key_state = !ButtonPressed();
+    let mut next_tick = GetTime() + 10i32;
+    let mut brightness = 64u8;
+
+    loop {
+        let now = GetTime();
+
+        if ButtonPressed() {
+            if key_state {
+                key_state = false;
+                mode = mode + 1i32;
+                if mode > 4i32 { mode = 0i32; }
+                Write("WS2812 Mode: ");
+                WriteInteger(mode);
+                Write("\n");
+            }
+        } else {
+            key_state = true;
+        }
+
+        if now >= next_tick {
+            next_tick = now + 10i32;
+
+            if mode == 0i32 {
+                if color_state == 0i32 {
+                    g = g + 5u8;
+                    if g >= 255u8 { g = 255u8; color_state = 1i32; }
+                } else if color_state == 1i32 {
+                    if r <= 5u8 { r = 0u8; color_state = 2i32; } else { r = r - 5u8; }
+                } else if color_state == 2i32 {
+                    b = b + 5u8;
+                    if b >= 255u8 { b = 255u8; color_state = 3i32; }
+                } else if color_state == 3i32 {
+                    if g <= 5u8 { g = 0u8; color_state = 4i32; } else { g = g - 5u8; }
+                } else if color_state == 4i32 {
+                    r = r + 5u8;
+                    if r >= 255u8 { r = 255u8; color_state = 5i32; }
+                } else {
+                    if b <= 5u8 { b = 0u8; color_state = 0i32; } else { b = b - 5u8; }
+                }
+
+                SetWS2812(((r as i32 * brightness as i32) >> 8i32) as u8, ((g as i32 * brightness as i32) >> 8i32) as u8, ((b as i32 * brightness as i32) >> 8i32) as u8);
+            } else if mode == 1i32 {
+                SetWS2812(brightness, 0u8, 0u8);
+            } else if mode == 2i32 {
+                SetWS2812(0u8, brightness, 0u8);
+            } else if mode == 3i32 {
+                SetWS2812(0u8, 0u8, brightness);
+            } else {
+                SetWS2812(0u8, 0u8, 0u8);
+            }
+        }
+
+        if HasCharacter() {
+            let c = ReadCharacter();
+
+            if c >= '1' && c <= '6' {
+                led_state ^= 1i8 << (c - '1');
+                SetLEDs(led_state);
+            } else if c == '+' {
+                if brightness >= 247u8 { brightness = 255u8; }
+                else { brightness += 8u8; }
+                Write("Brightness: ");
+                WriteInteger(brightness as i32);
+                Write("/255\n");
+            } else if c == '-' {
+                if brightness <= 8u8 { brightness = 0u8; }
+                else { brightness -= 8u8; }
+                Write("Brightness: ");
+                WriteInteger(brightness as i32);
+                Write("/255\n");
+            } else {
+                WriteCharacter(c);
+            }
+        }
+    } ret 0i32;
 }
