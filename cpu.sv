@@ -172,39 +172,25 @@ module cpu #(
     logic [31:0] alu_left;
     logic [31:0] alu_right;
     alu_op_t alu_op;
+    logic div_start;
     logic [31:0] alu_result;
+    logic alu_ready;
 
     alu alu0(
+        .clk(clk),
+        .rst(rst),
         .left(alu_left),
         .right(alu_right),
         .alu_op(alu_op),
-        .result(alu_result)
-    );
-
-    logic [31:0] div_dividend;
-    logic [31:0] div_divisor;
-    logic [31:0] raw_quotient;
-    logic [31:0] raw_remainder;
-    logic div_ready, div_start;
-
-    divider divider0(
-        .clk(clk),
-        .rst(rst),
         .start(div_start),
-        .dividend(div_dividend),
-        .divisor(div_divisor),
-        .quotient(raw_quotient),
-        .remainder(raw_remainder),
-        .ready(div_ready)
+        .result(alu_result),
+        .ready(alu_ready)
     );
 
     logic is_div_op, div_active, div_stall;
-
-    assign div_dividend = (ex_opcode == OP_DIV || ex_opcode == OP_REM) && alu_left[31] ? -alu_left : alu_left;
-    assign div_divisor = (ex_opcode == OP_DIV || ex_opcode == OP_REM) && alu_right[31] ? -alu_right : alu_right;
     assign is_div_op = (ex_opcode == OP_DIV) || (ex_opcode == OP_DIVU) || (ex_opcode == OP_REM) || (ex_opcode == OP_REMU);
     assign div_start = is_div_op && !div_active;
-    assign div_stall = is_div_op && !div_ready;
+    assign div_stall = is_div_op && !alu_ready;
 
     always_ff @(posedge clk or posedge rst) begin
         if (rst) begin
@@ -212,37 +198,11 @@ module cpu #(
         end else begin
             if (div_start) begin
                 div_active <= 1'b1;
-            end else if (div_ready) begin
+            end else if (alu_ready) begin
                 div_active <= 1'b0;
             end
         end
     end
-
-    logic [31:0] div_orig_dividend;
-    logic [31:0] div_orig_divisor;
-    logic div_sign_q, div_sign_r;
-
-    always_ff @(posedge clk or posedge rst) begin
-        if (rst) begin
-            div_orig_dividend <= 32'b0;
-            div_orig_divisor <= 32'b0;
-            div_sign_q <= 1'b0;
-            div_sign_r <= 1'b0;
-        end else if (div_start) begin
-            div_orig_dividend <= alu_left;
-            div_orig_divisor <= alu_right;
-            div_sign_q <= (ex_opcode == OP_DIV) && (alu_left[31] ^ alu_right[31]) && (alu_right != 0);
-            div_sign_r <= (ex_opcode == OP_REM) && alu_left[31] && (alu_right != 0);
-        end
-    end
-
-    logic [31:0] final_quotient;
-    logic [31:0] final_remainder;
-    logic [31:0] div_result;
-
-    assign final_quotient = (div_orig_divisor == 32'b0) ? 32'hFFFFFFFF : (div_sign_q ? -raw_quotient : raw_quotient);
-    assign final_remainder = (div_orig_divisor == 32'b0) ? div_orig_dividend : (div_sign_r ? -raw_remainder : raw_remainder);
-    assign div_result = (ex_opcode == OP_DIV || ex_opcode == OP_DIVU) ? final_quotient : final_remainder;
 
     function automatic logic is_load_op(opcode_t opcode);
         case (opcode)
@@ -358,6 +318,10 @@ module cpu #(
             OP_MULH: alu_op = ALU_OP_MULH;
             OP_MULHSU: alu_op = ALU_OP_MULHSU;
             OP_MULHU: alu_op = ALU_OP_MULHU;
+            OP_DIV: alu_op = ALU_OP_DIV;
+            OP_DIVU: alu_op = ALU_OP_DIVU;
+            OP_REM: alu_op = ALU_OP_REM;
+            OP_REMU: alu_op = ALU_OP_REMU;
             OP_AND, OP_ANDI: alu_op = ALU_OP_AND;
             OP_OR, OP_ORI: alu_op = ALU_OP_OR;
             OP_XOR, OP_XORI: alu_op = ALU_OP_XOR;
@@ -503,7 +467,7 @@ module cpu #(
         should_take_branch = 0;
         branch_target = ex_pc + (ex_simm16 << 2);
         should_halt = 0;
-        ex_result = is_div_op ? div_result : alu_result;
+        ex_result = alu_result;
         ex_addr = 0;
 
         case (ex_opcode)

@@ -32,8 +32,16 @@ func SetLEDs(leds: i8) {
     *(0xFFF0i32 as *mut i8) = leds;
 }
 
-func SetWS2812(r: u8, g: u8, b: u8) {
-    *(0xFFE0i32 as *mut i32) = (g as i32 << 16i32) | (r as i32 << 8i32) | b as i32;
+func SetWS2812(_r: u8, _g: u8, _b: u8, brightness: u8) {
+    let (mut r, mut g, mut b) = (_r as i32, _g as i32, _b as i32);
+
+    if brightness < 255u8 {
+        r = (r * brightness as i32) / 255i32;
+        g = (g * brightness as i32) / 255i32;
+        b = (b * brightness as i32) / 255i32;
+    }
+
+    *(0xFFE0i32 as *mut i32) = (g << 16i32) | (r << 8i32) | b;
 }
 
 func HasCharacter() -> bool {
@@ -116,15 +124,15 @@ func Main() -> i32 {
                     if b <= 5u8 { b = 0u8; color_state = 0i32; } else { b = b - 5u8; }
                 }
 
-                SetWS2812(((r as i32 * brightness as i32) >> 8i32) as u8, ((g as i32 * brightness as i32) >> 8i32) as u8, ((b as i32 * brightness as i32) >> 8i32) as u8);
+                SetWS2812(r, g, b, brightness);
             } else if mode == 1i32 {
-                SetWS2812(brightness, 0u8, 0u8);
+                SetWS2812(255u8, 0u8, 0u8, brightness);
             } else if mode == 2i32 {
-                SetWS2812(0u8, brightness, 0u8);
+                SetWS2812(0u8, 255u8, 0u8, brightness);
             } else if mode == 3i32 {
-                SetWS2812(0u8, 0u8, brightness);
+                SetWS2812(0u8, 0u8, 255u8, brightness);
             } else {
-                SetWS2812(0u8, 0u8, 0u8);
+                SetWS2812(0u8, 0u8, 0u8, brightness);
             }
         }
 
