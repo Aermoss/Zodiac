@@ -16,16 +16,27 @@
 
 module cpu #(
     parameter bit SIMULATION = 1'b1,
-    parameter int CLK_FREQ = 27000000
+    parameter int CLK_FREQ = 33000000
 ) (
     input logic clk,
     input logic rst,
+
     input logic uart_rx,
     output logic uart_tx,
+
     input logic button,
     output logic [5:0] leds,
-    output logic ws2812
+    output logic ws2812,
+
+    output logic mem_access,
+    output logic [3:0] actual_mem_we,
+    output logic [31:0] mem_addr,
+    output logic [31:0] mem_write,
+    input logic [31:0] mem_read,
+    input logic bus_stall
 );
+    logic [3:0] mem_we;
+
     typedef enum logic [5:0] {
         OP_NOP,
         OP_LB,
@@ -88,6 +99,8 @@ module cpu #(
     logic [31:0] if_pc_current;
     wire [31:0] if_instr;
 
+    assign if_instr = mem_read;
+
     logic [31:0] id_pc;
     logic [31:0] id_instr;
     opcode_t id_opcode;
@@ -137,12 +150,11 @@ module cpu #(
     logic [31:0] mem_pc;
     logic [31:0] mem_instr;
     logic [31:0] mem_result;
-    logic [31:0] mem_addr;
+    logic [31:0] stage_mem_addr;
     opcode_t mem_opcode;
     logic [4:0] mem_reg_addr;
     logic [31:0] mem_reg0;
 
-    logic mem_access;
     logic mem_op_in_mem;
     logic mem_op_in_wb;
 
@@ -152,22 +164,6 @@ module cpu #(
     logic [31:0] wb_addr;
     opcode_t wb_opcode;
     logic [4:0] wb_reg_addr;
-
-    logic [3:0] ram_we;
-    logic [3:0] _ram_we;
-    logic [31:0] ram_addr;
-    logic [31:0] ram_write;
-    logic [31:0] ram_read;
-
-    assign if_instr = ram_read;
-
-    ram ram0(
-        .clk(clk),
-        .we(_ram_we),
-        .addr(ram_addr),
-        .write(ram_write),
-        .read(ram_read)
-    );
 
     logic [31:0] alu_left;
     logic [31:0] alu_right;
@@ -338,7 +334,7 @@ module cpu #(
     logic uart_tx_started;
     logic uart_tx_write;
 
-    assign uart_tx_write = (ram_addr == 32'hFFFF) && (ram_we != 0) && !uart_tx_busy && !uart_tx_started;
+    assign uart_tx_write = (mem_addr == 32'hFFFF) && (mem_we != 0) && !uart_tx_busy && !uart_tx_started;
 
     always_ff @(posedge clk or posedge rst) begin
         if (rst)
@@ -352,10 +348,10 @@ module cpu #(
     generate
         if (SIMULATION) begin : sim_uart
             always_ff @(posedge clk) begin
-                if (uart_we[0]) $write("%c", ram_write[7:0]);
-                if (uart_we[1]) $write("%c", ram_write[15:8]);
-                if (uart_we[2]) $write("%c", ram_write[23:16]);
-                if (uart_we[3]) $write("%c", ram_write[31:24]);
+                if (uart_we[0]) $write("%c", mem_write[7:0]);
+                if (uart_we[1]) $write("%c", mem_write[15:8]);
+                if (uart_we[2]) $write("%c", mem_write[23:16]);
+                if (uart_we[3]) $write("%c", mem_write[31:24]);
             end
 
             assign uart_tx_busy = 1'b0;
@@ -364,10 +360,10 @@ module cpu #(
             logic [7:0] uart_tx_data;
 
             always_comb begin
-                if (uart_we[3]) uart_tx_data = ram_write[31:24];
-                else if (uart_we[2]) uart_tx_data = ram_write[23:16];
-                else if (uart_we[1]) uart_tx_data = ram_write[15:8];
-                else uart_tx_data = ram_write[7:0];
+                if (uart_we[3]) uart_tx_data = mem_write[31:24];
+                else if (uart_we[2]) uart_tx_data = mem_write[23:16];
+                else if (uart_we[1]) uart_tx_data = mem_write[15:8];
+                else uart_tx_data = mem_write[7:0];
             end
 
             uart_tx uart_tx0 (
@@ -390,30 +386,35 @@ module cpu #(
         .rst(rst),
         .clks_per_bit(uart_clks_per_bit),
         .rx_pin(uart_rx),
-        .read_ack(ram_addr == 32'hFFFF && ram_we == 0 && mem_access),
+        .read_ack(mem_addr == 32'hFFFF && mem_we == 0 && mem_access),
         .rx_byte(uart_rx_byte),
         .rx_ready(uart_rx_ready)
     );
 
+    localparam int UART_DEFAULT_BAUD_RATE = 115200;
+    localparam int UART_DEFAULT_CLKS_PER_BIT = CLK_FREQ / UART_DEFAULT_BAUD_RATE;
+
     always_ff @(posedge clk or posedge rst) begin
         if (rst)
-            uart_clks_per_bit <= 16'd234;
-        else if (ram_addr == 32'hFFF8 && ram_we != 0)
-            uart_clks_per_bit <= ram_write[15:0];
+            uart_clks_per_bit <= UART_DEFAULT_CLKS_PER_BIT;
+        else if (mem_addr == 32'hFFF8 && mem_we != 0)
+            uart_clks_per_bit <= mem_write[15:0];
     end
 
     logic [31:0] ms_counter;
-    logic [14:0] tick_divider;
+    logic [21:0] tick_divider;
+
+    localparam int TICK_MAX = (CLK_FREQ / 1000) - 1;
 
     always_ff @(posedge clk or posedge rst) begin
         if (rst) begin
             ms_counter <= 0;
             tick_divider <= 0;
-        end else if (tick_divider >= 15'd26999) begin
+        end else if (tick_divider >= TICK_MAX) begin
             tick_divider <= 0;
             ms_counter <= ms_counter + 32'd1;
         end else begin
-            tick_divider <= tick_divider + 15'd1;
+            tick_divider <= tick_divider + 31'd1;
         end
     end
 
@@ -432,27 +433,29 @@ module cpu #(
     always_ff @(posedge clk or posedge rst) begin
         if (rst)
             leds <= 6'h3F;
-        else if (ram_addr == 32'hFFF0 && ram_we != 0)
-            leds <= ram_write[5:0];
+        else if (mem_addr == 32'hFFF0 && mem_we != 0)
+            leds <= mem_write[5:0];
     end
 
-    ws2812_tx ws2812_tx0 (
+    ws2812_tx #(
+        .CLK_FREQ(CLK_FREQ)
+    ) ws2812_tx0 (
         .clk(clk),
         .rst(rst),
-        .strobe(ram_addr == 32'hFFE0 && ram_we != 0),
-        .write(ram_write[23:0]),
+        .strobe(mem_addr == 32'hFFE0 && mem_we != 0),
+        .write(mem_write[23:0]),
         .busy(),
         .out(ws2812)
     );
 
     always_comb begin
         uart_we = 0;
-        _ram_we = 0;
+        actual_mem_we = 0;
 
-        if (ram_addr == 32'hFFFF)
-            uart_we = ram_we;
-        else if (ram_addr != 32'hFFF0 && ram_addr != 32'hFFE0 && ram_addr != 32'hFFEC && ram_addr != 32'hFFF4 && ram_addr != 32'hFFF8)
-            _ram_we = ram_we;
+        if (mem_addr == 32'hFFFF)
+            uart_we = mem_we;
+        else if (mem_addr != 32'hFFF0 && mem_addr != 32'hFFE0 && mem_addr != 32'hFFEC && mem_addr != 32'hFFF4 && mem_addr != 32'hFFF8)
+            actual_mem_we = mem_we;
     end
 
     logic branch_eq;
@@ -515,62 +518,62 @@ module cpu #(
 
     always_comb begin
         if (mem_access)
-            ram_addr = mem_addr;
+            mem_addr = stage_mem_addr;
         else
-            ram_addr = if_pc;
+            mem_addr = if_pc;
     end
 
     always_comb begin
-        ram_write = 0;
+        mem_write = 0;
         mem_access = 0;
-        ram_we = 0;
+        mem_we = 0;
 
         case (mem_opcode)
             OP_LB, OP_LBU, OP_LH, OP_LHU, OP_LW:
                 mem_access = 1;
 
             OP_SB: begin
-                ram_we = 4'b0001 << ram_addr[1:0];
-                ram_write = {24'b0, mem_reg0[7:0]} << (8 * ram_addr[1:0]);
+                mem_we = 4'b0001 << mem_addr[1:0];
+                mem_write = {24'b0, mem_reg0[7:0]} << (8 * mem_addr[1:0]);
                 mem_access = 1;
             end
 
             OP_SH: begin
-                ram_we = 4'b0011 << (2 * ram_addr[1]);
-                ram_write = {16'b0, mem_reg0[15:0]} << (16 * ram_addr[1]);
+                mem_we = 4'b0011 << (2 * mem_addr[1]);
+                mem_write = {16'b0, mem_reg0[15:0]} << (16 * mem_addr[1]);
                 mem_access = 1;
             end
 
             OP_SW: begin
-                ram_we = 4'b1111;
-                ram_write = mem_reg0;
+                mem_we = 4'b1111;
+                mem_write = mem_reg0;
                 mem_access = 1;
             end
         endcase
     end
 
-    logic [31:0] wb_read_data;
+    logic [31:0] wb_read_word;
 
     always_comb begin
         if (wb_addr == 32'hFFFF)
-            wb_read_data = {4{uart_rx_byte}};
+            wb_read_word = {4{uart_rx_byte}};
         else if (wb_addr == 32'hFFFC)
-            wb_read_data = {30'b0, uart_tx_busy, uart_rx_ready};
+            wb_read_word = {30'b0, uart_tx_busy, uart_rx_ready};
         else if (wb_addr == 32'hFFF8)
-            wb_read_data = {16'b0, uart_clks_per_bit};
+            wb_read_word = {16'b0, uart_clks_per_bit};
         else if (wb_addr == 32'hFFEC)
-            wb_read_data = ms_counter;
+            wb_read_word = ms_counter;
         else if (wb_addr == 32'hFFF4)
-            wb_read_data = {31'b0, button_sync1};
+            wb_read_word = {31'b0, button_sync1};
         else
-            wb_read_data = ram_read;
+            wb_read_word = mem_read;
     end
 
-    logic [7:0] ram_read_byte;
-    logic [15:0] ram_read_half;
+    logic [15:0] wb_read_half;
+    logic [7:0] wb_read_byte;
 
-    assign ram_read_byte = wb_read_data[8 * wb_addr[1:0]+:8];
-    assign ram_read_half = wb_read_data[16 * wb_addr[1]+:16];
+    assign wb_read_half = wb_read_word[16 * wb_addr[1]+:16];
+    assign wb_read_byte = wb_read_word[8 * wb_addr[1:0]+:8];
 
     always_comb begin
         reg_addr = wb_reg_addr;
@@ -586,11 +589,11 @@ module cpu #(
             OP_AND, OP_ANDI, OP_OR, OP_ORI, OP_XOR, OP_XORI,
             OP_SLL, OP_SLLI, OP_SRL, OP_SRLI, OP_SRA, OP_SRAI,
             OP_BL, OP_BLR: reg_write = wb_result;
-            OP_LB: reg_write = {{24{ram_read_byte[7]}}, ram_read_byte};
-            OP_LBU: reg_write = ram_read_byte;
-            OP_LH: reg_write = {{16{ram_read_half[15]}}, ram_read_half};
-            OP_LHU: reg_write = ram_read_half;
-            OP_LW: reg_write = wb_read_data;
+            OP_LB: reg_write = {{24{wb_read_byte[7]}}, wb_read_byte};
+            OP_LBU: reg_write = wb_read_byte;
+            OP_LH: reg_write = {{16{wb_read_half[15]}}, wb_read_half};
+            OP_LHU: reg_write = wb_read_half;
+            OP_LW: reg_write = wb_read_word;
             default: reg_we = 0;
         endcase
     end
@@ -627,7 +630,7 @@ module cpu #(
             mem_pc <= 0;
             mem_instr <= 0;
             mem_result <= 0;
-            mem_addr <= 0;
+            stage_mem_addr <= 0;
             mem_opcode <= OP_NOP;
             mem_reg_addr <= 0;
             mem_reg0 <= 0;
@@ -651,7 +654,7 @@ module cpu #(
             end else if (should_take_branch) begin
                 if_pc <= branch_target;
                 if_pc_current <= branch_target;
-            end else if (hazard_stall || mem_op_in_mem || div_stall) begin
+            end else if (hazard_stall || mem_op_in_mem || div_stall || bus_stall) begin
                 if_pc <= if_pc_current;
                 if_pc_current <= if_pc_current;
             end else begin
@@ -662,7 +665,7 @@ module cpu #(
             if (should_take_branch || branch_taken || halted) begin
                 id_pc <= 0;
                 id_instr <= 0;
-            end else if (hazard_stall || div_stall) begin
+            end else if (hazard_stall || div_stall || bus_stall) begin
                 id_pc <= id_pc;
                 id_instr <= id_instr;
             end else if (mem_op_in_mem || mem_op_in_wb) begin
@@ -673,7 +676,7 @@ module cpu #(
                 id_instr <= if_instr;
             end
 
-            if (!div_stall) begin
+            if (!div_stall && !bus_stall) begin
                 if (should_take_branch || hazard_stall || halted) begin
                     ex_pc <= 0;
                     ex_instr <= 0;
@@ -708,34 +711,37 @@ module cpu #(
 
             branch_taken <= should_take_branch;
 
-            if (div_stall) begin
-                mem_pc <= 0;
-                mem_instr <= 0;
-                mem_result <= 0;
-                mem_addr <= 0;
-                mem_opcode <= OP_NOP;
-                mem_reg_addr <= 0;
-                mem_reg0 <= 0;
-                mem_op_in_mem <= 0;
-            end else begin
-                mem_pc <= ex_pc;
-                mem_instr <= ex_instr;
-                mem_result <= ex_result;
-                mem_addr <= ex_addr;
-                mem_opcode <= ex_opcode;
-                mem_reg_addr <= ex_reg_addr;
-                mem_reg0 <= ex_reg0_fwd;
-                mem_op_in_mem <= is_mem_op(ex_opcode);
+            if (!bus_stall) begin
+                if (div_stall) begin
+                    mem_pc <= 0;
+                    mem_instr <= 0;
+                    mem_result <= 0;
+                    stage_mem_addr <= 0;
+                    mem_opcode <= OP_NOP;
+                    mem_reg_addr <= 0;
+                    mem_reg0 <= 0;
+                    mem_op_in_mem <= 0;
+                end else begin
+                    mem_pc <= ex_pc;
+                    mem_instr <= ex_instr;
+                    mem_result <= ex_result;
+                    stage_mem_addr <= ex_addr;
+                    mem_opcode <= ex_opcode;
+                    mem_reg_addr <= ex_reg_addr;
+                    mem_reg0 <= ex_reg0_fwd;
+                    mem_op_in_mem <= is_mem_op(ex_opcode);
+                end
             end
 
-            mem_op_in_wb <= mem_op_in_mem;
-
-            wb_pc <= mem_pc;
-            wb_instr <= mem_instr;
-            wb_result <= mem_result;
-            wb_addr <= mem_addr;
-            wb_opcode <= mem_opcode;
-            wb_reg_addr <= mem_reg_addr;
+            if (!bus_stall) begin
+                mem_op_in_wb <= mem_op_in_mem;
+                wb_pc <= mem_pc;
+                wb_instr <= mem_instr;
+                wb_result <= mem_result;
+                wb_addr <= stage_mem_addr;
+                wb_opcode <= mem_opcode;
+                wb_reg_addr <= mem_reg_addr;
+            end
 
             if (halted && id_instr == 0 && ex_instr == 0 && mem_instr == 0 && wb_instr == 0)
                 $finish;

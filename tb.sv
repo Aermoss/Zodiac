@@ -21,17 +21,39 @@ module tb;
     logic clk = 0;
     integer i;
 
+    logic [3:0] mem_we;
+    logic [31:0] mem_addr;
+    logic [31:0] mem_write;
+    logic [31:0] mem_read;
+
     cpu #(
         .SIMULATION(1'b1),
-        .CLK_FREQ(27000000)
+        .CLK_FREQ(33000000)
     ) cpu0 (
         .clk(clk),
         .rst(rst),
+
         .uart_rx(),
         .uart_tx(),
+
         .button(),
         .leds(),
-        .ws2812()
+        .ws2812(),
+
+        .mem_access(),
+        .actual_mem_we(mem_we),
+        .mem_addr(mem_addr),
+        .mem_write(mem_write),
+        .mem_read(mem_read),
+        .bus_stall(1'b0)
+    );
+
+    bram bram0 (
+        .clk(clk),
+        .we(mem_we),
+        .addr(mem_addr),
+        .write(mem_write),
+        .read(mem_read)
     );
 
     always #3 clk = ~clk;

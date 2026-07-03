@@ -14,9 +14,9 @@
  * limitations under the License.
  */
 
-module ram #(
+module bram #(
     parameter BYTE_DEPTH = 16384
-)(
+) (
     input logic clk,
     input logic [3:0] we,
     input logic [31:0] addr,

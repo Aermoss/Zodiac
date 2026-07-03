@@ -1,6 +1,8 @@
+const CLK_FREQ: u32 = 33000000u32;
+
 func WriteCharacter(character: i8) {
-    while (*(0xFFFCi32 as *const i32) & 2i32) != 0i32 {}
-    *(0xFFFFi32 as *mut i8) = character;
+    while (*(0xFFFCu32 as *const u32) & 2u32) != 0u32 {}
+    *(0xFFFFu32 as *mut i8) = character;
 }
 
 func Write(mut string: *const i8) {
@@ -28,54 +30,94 @@ func WriteInteger(mut value: i32) {
     WriteCharacter(48i8 + (value % 10i32) as i8);
 }
 
+func WriteInteger(value: u32) {
+    if value >= 10u32 {
+        WriteInteger(value / 10u32);
+    }
+
+    WriteCharacter(48i8 + (value % 10u32) as i8);
+}
+
+func WriteHexadecimal(value: u32) {
+    Write("0x");
+    let mut i = 7i32;
+
+    loop {
+        if i < 0i32 { break; }
+        let nibble = ((value >> (i as u32 * 4u32)) & 0xFu32) as i8;
+        
+        if nibble < 10i8 {
+            WriteCharacter(48i8 + nibble);
+        } else {
+            WriteCharacter(55i8 + nibble);
+        } i -= 1i32;
+    }
+}
+
 func SetLEDs(leds: i8) {
-    *(0xFFF0i32 as *mut i8) = leds;
+    *(0xFFF0u32 as *mut i8) = leds;
 }
 
 func SetWS2812(_r: u8, _g: u8, _b: u8, brightness: u8) {
-    let (mut r, mut g, mut b) = (_r as i32, _g as i32, _b as i32);
+    let (mut r, mut g, mut b) = (_r as u32, _g as u32, _b as u32);
 
     if brightness < 255u8 {
-        r = (r * brightness as i32) / 255i32;
-        g = (g * brightness as i32) / 255i32;
-        b = (b * brightness as i32) / 255i32;
+        r = (r * brightness as u32) / 255u32;
+        g = (g * brightness as u32) / 255u32;
+        b = (b * brightness as u32) / 255u32;
     }
 
-    *(0xFFE0i32 as *mut i32) = (g << 16i32) | (r << 8i32) | b;
+    *(0xFFE0u32 as *mut u32) = (g << 16u32) | (r << 8u32) | b;
 }
 
 func HasCharacter() -> bool {
-    ret (*(0xFFFCi32 as *const i32) & 1i32) != 0i32;
+    ret (*(0xFFFCu32 as *const u32) & 1u32) != 0u32;
 }
 
 func ReadCharacter() -> i8 {
-    ret *(0xFFFFi32 as *const i32) as i8;
+    ret *(0xFFFFu32 as *const u32) as i8;
 }
 
 func ButtonPressed() -> bool {
-    ret (*(0xFFF4i32 as *const i32) & 1i32) == 0i32;
+    ret (*(0xFFF4u32 as *const u32) & 1u32) == 0u32;
 }
 
-func GetTime() -> i32 {
-    ret *(0xFFECi32 as *const i32);
+func GetTime() -> u32 {
+    ret *(0xFFECu32 as *const u32);
 }
 
-func Sleep(ms: i32) {
+func Sleep(ms: u32) {
     let start = GetTime();
     while GetTime() - start < ms {}
 }
 
-func SetBaudRate(baud: i32) {
-    *(0xFFF8i32 as *mut i32) = 27000000i32 / baud;
+func SetBaudRate(baud: u32) {
+    *(0xFFF8u32 as *mut u32) = CLK_FREQ / baud;
 }
 
 @nomangle
 func Main() -> i32 {
-    SetBaudRate(115200i32);
+    SetBaudRate(115200u32);
+    Sleep(1u32);
 
     WriteLine("Zodiac interactive terminal initialized!");
     WriteLine("Type anything to echo, press 1-6 to toggle LEDs, or +/- to change RGB brightness.");
     WriteLine("Press the button on the board to cycle WS2812 animation modes.");
+
+    let address = 0x40000000u32 as *mut u32;
+    WriteLine("Running SDRAM test...");
+    *address = 0xDEADBEEFu32;
+    WriteLine("Written 0xDEADBEEF to 0x40000000.");
+    let value = *address;
+    Write("Read ");
+    WriteHexadecimal(value);
+    WriteLine(" from 0x40000000.");
+
+    if value == 0xDEADBEEFu32 {
+        WriteLine("SDRAM test successful!");
+    } else {
+        WriteLine("SDRAM test failed!");
+    }
 
     let mut color_state = 0i32;
     let (mut r, mut g, mut b) = (255u8, 0u8, 0u8);
@@ -84,7 +126,7 @@ func Main() -> i32 {
 
     let mut mode = 0i32;
     let mut key_state = !ButtonPressed();
-    let mut next_tick = GetTime() + 10i32;
+    let mut next_tick = GetTime() + 10u32;
     let mut brightness = 64u8;
 
     loop {
@@ -104,7 +146,7 @@ func Main() -> i32 {
         }
 
         if now >= next_tick {
-            next_tick = now + 10i32;
+            next_tick = now + 10u32;
 
             if mode == 0i32 {
                 if color_state == 0i32 {

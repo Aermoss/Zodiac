@@ -14,7 +14,9 @@
  * limitations under the License.
  */
 
-module ws2812_tx (
+module ws2812_tx #(
+    parameter int CLK_FREQ = 33000000
+) (
     input logic clk,
     input logic rst,
     input logic strobe,
@@ -32,6 +34,11 @@ module ws2812_tx (
     logic [4:0] bit_counter;
     logic [15:0] cycle_counter;
     logic [23:0] shift_reg;
+
+    localparam int CYCLES_TOTAL = int'(1250.0 * CLK_FREQ / 1000000000.0);
+    localparam int CYCLES_T1H = int'(800.0 * CLK_FREQ / 1000000000.0);
+    localparam int CYCLES_T0H = int'(400.0 * CLK_FREQ / 1000000000.0);
+    localparam int CYCLES_RESET = int'(250000.0 * CLK_FREQ / 1000000000.0);
 
     always_ff @(posedge clk or posedge rst) begin
         if (rst) begin
@@ -59,12 +66,12 @@ module ws2812_tx (
 
                 S_SEND: begin
                     if (shift_reg[23]) begin
-                        out <= (cycle_counter < 16'd19);
+                        out <= (cycle_counter < CYCLES_T1H);
                     end else begin
-                        out <= (cycle_counter < 16'd9);
+                        out <= (cycle_counter < CYCLES_T0H);
                     end
 
-                    if (cycle_counter < 16'd33) begin
+                    if (cycle_counter < CYCLES_TOTAL) begin
                         cycle_counter <= cycle_counter + 16'd1;
                     end else begin
                         cycle_counter <= 16'b0;
@@ -82,7 +89,7 @@ module ws2812_tx (
                 S_RESET: begin
                     out <= 1'b0;
 
-                    if (cycle_counter < 16'd8192) begin
+                    if (cycle_counter < CYCLES_RESET) begin
                         cycle_counter <= cycle_counter + 16'd1;
                     end else begin
                         cycle_counter <= 16'b0;
