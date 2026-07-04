@@ -136,7 +136,7 @@ module alu(
             ALU_OP_XOR: result = left ^ right;
             ALU_OP_SLL: result = left << right[4:0];
             ALU_OP_SRL: result = left >> right[4:0];
-            ALU_OP_SRA: result = $signed(left) >>> right[4:0]; 
+            ALU_OP_SRA: result = $signed(left) >>> right[4:0];
         endcase
     end
 endmodule

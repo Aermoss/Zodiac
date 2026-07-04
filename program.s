@@ -421,13 +421,11 @@ __LBB14_6:
     sb x1, 35(x31)
     b __LBB14_11
 __LBB14_7:
-    add x1, x0, x0
-    sb x1, 35(x31)
     lw x1, 28(x31)
     addi x2, x1, 1
     sw x2, 28(x31)
     addi x1, x0, 4
-    blt x1, x2, __LBB14_9
+    bltu x1, x2, __LBB14_9
     b __LBB14_10
 __LBB14_8:
     b __LBB14_11
@@ -436,10 +434,12 @@ __LBB14_9:
     sw x1, 28(x31)
     b __LBB14_10
 __LBB14_10:
+    add x1, x0, x0
+    sb x1, 35(x31)
     la x1, .L__unnamed_11
     bl x30, __z5WritePc
     lw x1, 28(x31)
-    bl x30, __z12WriteIntegeri
+    bl x30, __z12WriteIntegeri.1
     la x1, .L__unnamed_12
     bl x30, __z5WritePc
     b __LBB14_8
@@ -711,7 +711,7 @@ __LBB14_65:
     la x1, .L__unnamed_13
     bl x30, __z5WritePc
     lbu x1, 43(x31)
-    bl x30, __z12WriteIntegeri
+    bl x30, __z12WriteIntegeri.1
     la x1, .L__unnamed_14
     bl x30, __z5WritePc
     b __LBB14_66
@@ -739,7 +739,7 @@ __LBB14_71:
     la x1, .L__unnamed_15
     bl x30, __z5WritePc
     lbu x1, 43(x31)
-    bl x30, __z12WriteIntegeri
+    bl x30, __z12WriteIntegeri.1
     la x1, .L__unnamed_16
     bl x30, __z5WritePc
     b __LBB14_72

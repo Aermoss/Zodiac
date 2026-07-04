@@ -113,6 +113,7 @@ module cpu #(
     logic [25:0] id_imm26;
     logic signed [31:0] id_simm16;
     logic signed [31:0] id_simm21;
+    logic signed [31:0] id_simm26;
 
     assign id_opcode = opcode_t'(id_instr[31:26]);
     assign id_reg_addr = id_instr[25:21];
@@ -124,6 +125,7 @@ module cpu #(
     assign id_imm26 = id_instr[25:0];
     assign id_simm16 = {{16{id_imm16[15]}}, id_imm16};
     assign id_simm21 = {{11{id_imm21[20]}}, id_imm21};
+    assign id_simm26 = {{6{id_imm26[25]}}, id_imm26};
 
     logic [31:0] ex_pc;
     logic [31:0] ex_instr;
@@ -139,6 +141,7 @@ module cpu #(
     logic [25:0] ex_imm26;
     logic signed [31:0] ex_simm16;
     logic signed [31:0] ex_simm21;
+    logic signed [31:0] ex_simm26;
 
     logic should_take_branch;
     logic [31:0] branch_target;
@@ -477,7 +480,7 @@ module cpu #(
             OP_LB, OP_LBU, OP_LH, OP_LHU, OP_LW, OP_SB, OP_SH, OP_SW:
                 ex_addr = ex_reg1_fwd + ex_simm16;
 
-            OP_LUI: ex_result = ex_imm21 << 11;
+            OP_LUI: ex_result = (ex_imm21 << 11);
             OP_AUIPC: ex_result = ex_pc + (ex_imm21 << 11);
             OP_SLT: ex_result = ($signed(ex_reg1_fwd) < $signed(ex_reg2_fwd));
             OP_SLTU: ex_result = (ex_reg1_fwd < ex_reg2_fwd);
@@ -485,7 +488,7 @@ module cpu #(
             OP_SLTIU: ex_result = (ex_reg1_fwd < {{16{1'b0}}, ex_imm16});
 
             OP_B: begin
-                branch_target = ex_pc + (ex_imm26 << 2);
+                branch_target = ex_pc + (ex_simm26 << 2);
                 should_take_branch = 1;
             end
 
@@ -623,6 +626,7 @@ module cpu #(
             ex_imm26 <= 0;
             ex_simm16 <= 0;
             ex_simm21 <= 0;
+            ex_simm26 <= 0;
 
             halted <= 0;
             branch_taken <= 0;
@@ -690,6 +694,7 @@ module cpu #(
                     ex_imm26 <= 0;
                     ex_simm16 <= 0;
                     ex_simm21 <= 0;
+                    ex_simm26 <= 0;
                 end else begin
                     ex_pc <= id_pc;
                     ex_instr <= id_instr;
@@ -703,6 +708,7 @@ module cpu #(
                     ex_imm26 <= id_imm26;
                     ex_simm16 <= id_simm16;
                     ex_simm21 <= id_simm21;
+                    ex_simm26 <= id_simm26;
                 end
             end
 
