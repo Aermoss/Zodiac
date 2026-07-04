@@ -131,7 +131,7 @@ module top (
         .I_sdram_clk(sdram_clk),
         .I_sdrc_cmd_en(sdrc_cmd_en),
         .I_sdrc_cmd(sdrc_cmd),
-        .I_sdrc_precharge_ctrl(1'b0),
+        .I_sdrc_precharge_ctrl(1'b1),
         .I_sdram_power_down(1'b0),
         .I_sdram_selfrefresh(1'b0),
         .I_sdrc_addr(sdrc_addr),
