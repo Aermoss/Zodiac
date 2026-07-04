@@ -55,12 +55,6 @@ module bus (
     logic [2:0] read_delay_counter;
     logic [2:0] write_delay_counter;
     logic [31:0] sdram_read_reg;
-
-    // This flag is set in S_DONE for reads, and stays high for exactly one
-    // more cycle after the state returns to S_IDLE. During that extra cycle
-    // the CPU's WB stage samples mem_read, so we must still drive
-    // sdram_read_reg onto cpu_mem_read (cpu_mem_addr has already switched
-    // back to the instruction-fetch PC by then, so is_sdram_addr is false).
     logic sdram_read_active;
 
     logic [20:0] r_sdrc_addr;
@@ -86,7 +80,6 @@ module bus (
             read_delay_counter <= 3'b0;
             write_delay_counter <= 3'b0;
         end else begin
-            // Default: clear after one cycle so WB sees it for exactly one clock
             sdram_read_active <= 1'b0;
 
             case (state)
@@ -96,27 +89,29 @@ module bus (
                         r_sdrc_addr <= sdram_word_addr;
                         r_sdrc_data_w <= cpu_mem_write;
                         r_sdrc_dqm <= (cpu_mem_we != 4'b0000) ? ~cpu_mem_we : 4'b0000; 
-                        
-                        r_sdrc_cmd <= 3'b011; // Active command
+                        r_sdrc_cmd <= 3'b011;
                         state <= S_ACTIVATE_WAIT;
                     end
                 end
 
                 S_ACTIVATE_WAIT: begin
-                    sdrc_cmd_en <= 1'b0; // End the 1-cycle pulse
+                    sdrc_cmd_en <= 1'b0;
+
                     if (sdrc_cmd_ack) begin
-                        sdrc_cmd_en <= 1'b1; // Start pulse for Read/Write
-                        if (cpu_mem_we != 4'b0000) begin
-                            r_sdrc_cmd <= 3'b100; // Write
-                        end else begin
-                            r_sdrc_cmd <= 3'b101; // Read
-                        end
+                        sdrc_cmd_en <= 1'b1;
+
+                        if (cpu_mem_we != 4'b0000)
+                            r_sdrc_cmd <= 3'b100;
+                        else
+                            r_sdrc_cmd <= 3'b101;
+
                         state <= S_SDRAM_WAIT;
                     end
                 end
 
                 S_SDRAM_WAIT: begin
-                    sdrc_cmd_en <= 1'b0; // End the 1-cycle pulse
+                    sdrc_cmd_en <= 1'b0;
+
                     if (sdrc_cmd_ack) begin
                         if (r_sdrc_cmd == 3'b101) begin
                             read_delay_counter <= 3'd5;
@@ -138,19 +133,16 @@ module bus (
                 end
                 
                 S_WRITE_DELAY: begin
-                    if (write_delay_counter > 3'd1) begin
+                    if (write_delay_counter > 3'd1)
                         write_delay_counter <= write_delay_counter - 3'd1;
-                    end else begin
+                    else
                         state <= S_DONE;
-                    end
                 end
 
                 S_DONE: begin
-                    if (r_sdrc_cmd == 3'b101) begin
-                        // Read complete: assert flag so the MUX drives
-                        // sdram_read_reg for the next cycle (WB sampling).
+                    if (r_sdrc_cmd == 3'b101)
                         sdram_read_active <= 1'b1;
-                    end
+
                     state <= S_IDLE;
                 end
                 
@@ -164,25 +156,19 @@ module bus (
         bram_write = cpu_mem_write;
         bram_we = 4'b0000;
         
-        if (cpu_mem_access && !is_sdram_addr && state == S_IDLE) begin
+        if (cpu_mem_access && !is_sdram_addr && state == S_IDLE)
             bram_we = cpu_mem_we;
-        end
 
-        // Drive sdram_read_reg when:
-        //  - S_DONE cycle (stall just dropped, MEM stage still active), OR
-        //  - the cycle AFTER S_DONE (sdram_read_active=1, WB stage sampling)
-        if (state == S_DONE || sdram_read_active) begin
+        if (state == S_DONE || sdram_read_active)
             cpu_mem_read = sdram_read_reg;
-        end else begin
+        else
             cpu_mem_read = bram_read;
-        end
 
-        if (state == S_IDLE) begin
+        if (state == S_IDLE)
             cpu_stall = is_sdram_addr;
-        end else if (state == S_DONE) begin
+        else if (state == S_DONE)
             cpu_stall = 1'b0;
-        end else begin
+        else
             cpu_stall = 1'b1;
-        end
     end
 endmodule

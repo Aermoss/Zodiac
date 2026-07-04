@@ -69,7 +69,7 @@ module tb;
         @(negedge clk);
         rst = 0;
 
-        #2000000;
+        #1000000;
         $finish;
     end
 endmodule
