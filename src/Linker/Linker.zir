@@ -24,9 +24,10 @@ class Linker {
     priv sections: Vector<Vector<u32>>,
     priv section_bases: Vector<u32>;
  
-    pub Link(&mut this, path: &String) -> bool {
+    pub Link(&mut this) -> String {
         this.sections.Resize(SECTION_COUNT);
         this.section_bases.Resize(SECTION_COUNT);
+        let mut result = String();
 
         for object in this.objects {
             for i in 0u64..object.sections.Size() {
@@ -64,7 +65,7 @@ class Linker {
                 } else if symbol.binding == BindingType::Global {
                     if this.symbol_names.Contains(name) {
                         Logger::Log("Duplicate global symbol definition '" + name + "'.", LogSeverity::Error);
-                        ret false;
+                        ret result;
                     }
                 }
 
@@ -84,7 +85,7 @@ class Linker {
  
                 if symbol_index == -1i64 {
                     Logger::Log("Undefined symbol '" + relocation.symbol + "' referenced in " + object.path + ".", LogSeverity::Error);
-                    ret false;
+                    ret result;
                 }
  
                 let target: u32 = this.symbol_addresses[symbol_index as u64];
@@ -110,14 +111,12 @@ class Linker {
                     word = target;
                 } else {
                     Logger::Log("Unknown relocation type.", LogSeverity::Error);
-                    ret false;
+                    ret result;
                 }
 
                 this.sections[relocation.section as u64][index] = word;
             }
         }
-
-        let mut result = String();
 
         for section in this.sections {
             for word in section {
@@ -125,8 +124,6 @@ class Linker {
                 while hex.Length() < 8u64 { hex = "0" + hex; }
                 result += hex + "\n";
             }
-        }
-
-        ret _WriteFile(path, result);
+        } ret result;
     }
 }

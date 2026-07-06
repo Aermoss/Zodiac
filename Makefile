@@ -8,6 +8,10 @@ bin/zld.exe: export PATH := C:\Program Files\LLVM\bin;$(PATH)
 bin/zld.exe: $(wildcard src/Linker/*.zir) $(wildcard src/Common/*.zir)
 	../Zircon/bin/zirconc.exe src/Linker/Main.zir -o $@ -I ../Zircon/include -lDbgHelp -lucrt -O0 -DLINKER
 
+bin/zar.exe: export PATH := C:\Program Files\LLVM\bin;$(PATH)
+bin/zar.exe: $(wildcard src/Archiver/*.zir) $(wildcard src/Common/*.zir)
+	../Zircon/bin/zirconc.exe src/Archiver/Main.zir -o $@ -I ../Zircon/include -lDbgHelp -lucrt -O0 -DARCHIVER
+
 boot.o: bin/zas.exe boot.s
 	$^ -o $@
 

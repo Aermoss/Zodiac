@@ -1,0 +1,60 @@
+/*
+ * Copyright 2026 Yusuf Rençber
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+#[include "std/file", "src/Common/Common.zir" : *]
+
+const OBJECT_MAGIC: u32 = 0x4A424F5Au32;
+const ARCHIVE_MAGIC: u32 = 0x4352415Au32;
+
+extern "C" {
+    func fopen(pathname: *const i8, mode: *const i8) -> *mut void;
+    func fread(ptr: *mut void, size: u64, nmemb: u64, stream: *mut void) -> u64;
+    func fwrite(ptr: *const void, size: u64, nmemb: u64, stream: *mut void) -> u64;
+    func fclose(stream: *mut void) -> i32;
+}
+
+enum FileType: u32 {
+    Assembly, Object, Archive, Binary, Hexadecimal, Other
+}
+
+func ResolveFileType(path: &String) -> FileType {
+    let extension = SplitExtension(path).right;
+
+    if extension == ".s" {
+        ret FileType::Assembly;
+    } else if extension == ".bin" {
+        ret FileType::Binary;
+    } else if extension == ".hex" {
+        ret FileType::Hexadecimal;
+    } else {
+        let file = fopen(path.Data(), "rb");
+        let mut magic = 0u32;
+
+        if file != null {
+            if fread(&mut magic, 4u64, 1u64, file) != 1u64 {
+                magic = 0u32;
+            } fclose(file);
+        }
+
+        if magic == OBJECT_MAGIC {
+            ret FileType::Object;
+        } else if magic == ARCHIVE_MAGIC {
+            ret FileType::Archive;
+        } else {
+            ret FileType::Other;
+        }
+    }
+}

@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#[include "std/io", "std/file", "src/Linker/Linker.zir",
+#[include "std/io", "std/file", "src/Archiver/Archiver.zir",
     "src/Common/Archive.zir", "src/Common/Object.zir", "src/Common/Logger.zir" : *]
 
 func PrintVersion(executable: String) {
@@ -25,11 +25,11 @@ func PrintVersion(executable: String) {
 }
 
 func PrintUsage(executable: String) {
-    WriteLine("OVERVIEW: Zodiac linker");
+    WriteLine("OVERVIEW: Zodiac archiver");
     WriteLine("USAGE: " + executable + " [options] <inputs...>");
     WriteLine("OPTIONS:");
     WriteLine("  -o <file>                Write linked output to <file> (default: program.hex)");
-    WriteLine("  --version                Display linker version");
+    WriteLine("  --version                Display archiver version");
     WriteLine("  -h, --help               Display this help message");
 }
 
@@ -79,7 +79,7 @@ func main(args: &mut Vector<String>) -> i32 {
         ret 1i32;
     }
 
-    let mut linker = Linker();
+    let mut archiver = Archiver();
 
     for input in inputs {
         let file_type = ResolveFileType(input);
@@ -92,31 +92,21 @@ func main(args: &mut Vector<String>) -> i32 {
                 ret 1i32;
             }
 
-            linker.objects.PushBack(object);
-        } else if file_type == FileType::Archive {
-            let mut archive = Archive();
-
-            if !archive.Read(input) {
-                Logger::Log("Failed to read archive file '" + input + "'.", LogSeverity::Error);
-                ret 1i32;
-            }
-
-            linker.objects += archive.objects;
+            archiver.objects.PushBack(object);
         } else {
             Logger::Log("Invalid input '" + input + "'.", LogSeverity::Error);
             ret 1i32;
         }
     }
 
-    let result = linker.Link();
-    if result.Empty() { ret 1i32; }
+    let archive = archiver.Archive();
 
     if output.Empty() {
-        output = SplitExtension(inputs[0u64]).left + ".o";
+        output = SplitExtension(inputs[0u64]).left + ".a";
     }
 
-    if !_WriteFile(output, result) {
-        Logger::Log("Failed to write result file '" + output + "'.", LogSeverity::Error);
+    if !archive.Write(output) {
+        Logger::Log("Failed to write archive file '" + output + "'.", LogSeverity::Error);
         ret 1i32;
     } ret 0i32;
 }
