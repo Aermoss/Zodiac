@@ -14,101 +14,17 @@
  * limitations under the License.
  */
 
-#[include "std/str", "std/vec", "std/map", "std/file", "src/Common/Common.zir" : *]
-
-extern "C" {
-    func fopen(pathname: *const i8, mode: *const i8) -> *mut void;
-    func fread(ptr: *mut void, size: u64, nmemb: u64, stream: *mut void) -> u64;
-    func fclose(stream: *mut void) -> i32;
-}
-
-class ObjectFile {
-    pub file_name: String,
-    pub sections: Vector<Vector<u32>>,
-    pub section_bases: Vector<u32>,
-    pub symbols: Vector<Symbol>,
-    pub relocations: Vector<Relocation>;
-
-    pub Load(&mut this, file_name: &String) -> bool {
-        this.file_name = file_name;
-        this.sections.Resize(SECTION_COUNT);
-        this.section_bases.Resize(SECTION_COUNT);
-        let file = fopen(file_name.Data(), "rb");
-        if file == null { ret false; }
-
-        let mut magic = 0u32;
-        fread(&mut magic, 4u64, 1u64, file);
-
-        if magic != 0x4A424F5Au32 {
-            fclose(file);
-            ret false;
-        }
-
-        let mut word_counts: Vector<u32>;
-        word_counts.Resize(SECTION_COUNT);
-
-        for i in 0u64..word_counts.Size() {
-            fread(word_counts[i], 4u64, 1u64, file);
-        }
-
-        let mut symbol_count = 0u32;
-        fread(&mut symbol_count, 4u64, 1u64, file);
-
-        let mut relocation_count = 0u32;
-        fread(&mut relocation_count, 4u64, 1u64, file);
-
-        for i in 0u64..word_counts.Size() {
-            let count = word_counts[i] as u64;
-            let section = this.sections[i];
-            section.Resize(count);
-            fread(section.Data(), 4u64, count, file);
-        }
-
-        for i in 0u32..symbol_count {
-            let mut length = 0u32;
-            fread(&mut length, 4u64, 1u64, file);
-            let buffer = new i8[length as u64 + 1u64];
-            fread(buffer, 1u64, length as u64, file);
-            buffer[length as u64] = 0i8;
-            let symbol = Symbol(String(buffer));
-            del[] buffer;
-
-            fread(&mut symbol.section, 4u64, 1u64, file);
-            fread(&mut symbol.offset, 4u64, 1u64, file);
-            fread(&mut symbol.binding, 4u64, 1u64, file);
-            this.symbols.PushBack(symbol);
-        }
-
-        for i in 0u32..relocation_count {
-            let relocation = Relocation();
-            fread(&mut relocation.section, 4u64, 1u64, file);
-            fread(&mut relocation.offset, 4u64, 1u64, file);
-            fread(&mut relocation._type, 4u64, 1u64, file);
-
-            let mut length = 0u32;
-            fread(&mut length, 4u64, 1u64, file);
-            let buffer = new i8[length as u64 + 1u64];
-            fread(buffer, 1u64, length as u64, file);
-            buffer[length as u64] = 0i8;
-            relocation.symbol = buffer;
-            del[] buffer;
-
-            this.relocations.PushBack(relocation);
-        }
-
-        fclose(file);
-        ret true;
-    }
-}
+#[include "std/str", "std/vec", "src/Common/Common.zir",
+    "src/Common/Object.zir", "src/Common/Logger.zir" : *]
 
 class Linker {
-    pub objects: Vector<ObjectFile>,
+    pub objects: Vector<Object>,
     priv symbol_names: Vector<String>,
     priv symbol_addresses: Vector<u32>,
     priv sections: Vector<Vector<u32>>,
     priv section_bases: Vector<u32>;
  
-    pub Link(&mut this, file_name: &String) -> bool {
+    pub Link(&mut this, path: &String) -> bool {
         this.sections.Resize(SECTION_COUNT);
         this.section_bases.Resize(SECTION_COUNT);
 
@@ -147,7 +63,7 @@ class Linker {
                     name = String(i as i64) + ":" + name;
                 } else if symbol.binding == BindingType::Global {
                     if this.symbol_names.Contains(name) {
-                        WriteLine("Duplicate global symbol definition '" + name + "'.");
+                        Logger::Log("Duplicate global symbol definition '" + name + "'.", LogSeverity::Error);
                         ret false;
                     }
                 }
@@ -167,7 +83,7 @@ class Linker {
                 }
  
                 if symbol_index == -1i64 {
-                    WriteLine("Undefined symbol '" + relocation.symbol + "' referenced in " + object.file_name + ".");
+                    Logger::Log("Undefined symbol '" + relocation.symbol + "' referenced in " + object.path + ".", LogSeverity::Error);
                     ret false;
                 }
  
@@ -193,7 +109,7 @@ class Linker {
                 } else if relocation._type == RelocationType::Absolute32 {
                     word = target;
                 } else {
-                    WriteLine("Unknown relocation type.");
+                    Logger::Log("Unknown relocation type.", LogSeverity::Error);
                     ret false;
                 }
 
@@ -211,6 +127,6 @@ class Linker {
             }
         }
 
-        ret _WriteFile(file_name, result);
+        ret _WriteFile(path, result);
     }
 }

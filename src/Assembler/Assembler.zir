@@ -14,14 +14,8 @@
  * limitations under the License.
  */
 
-#[include "std/str", "std/vec", "std/map", "src/Assembler/Nodes.zir",
-    "src/Common/Common.zir", "src/Common/Logger.zir" : *]
-
-extern "C" {
-    func fopen(pathname: *const i8, mode: *const i8) -> *mut void;
-    func fwrite(ptr: *const void, size: u64, nmemb: u64, stream: *mut void) -> u64;
-    func fclose(stream: *mut void) -> i32;
-}
+#[include "std/str", "std/vec", "src/Assembler/Nodes.zir",
+    "src/Common/Common.zir", "src/Common/Object.zir", "src/Common/Logger.zir" : *]
 
 class Assembler {
     priv section: SectionType,
@@ -78,59 +72,6 @@ class Assembler {
         } else {
             ret false;
         }
-    }
-
-    pub WriteObjectFile(&mut this, file_name: &String) -> bool {
-        let file = fopen(file_name.Data(), "wb");
-
-        if file == null {
-            ret false;
-        }
-
-        let mut magic = 0x4A424F5Au32;
-        fwrite(&mut magic, 4u64, 1u64, file);
-
-        for section in this.sections {
-            let mut word_count = (section.Size() / 4u64) as u32;
-            fwrite(&mut word_count, 4u64, 1u64, file);
-        }
-
-        let mut symbol_count = this.symbols.Size() as u32;
-        fwrite(&mut symbol_count, 4u64, 1u64, file);
-
-        let mut relocation_count = this.relocations.Size() as u32;
-        fwrite(&mut relocation_count, 4u64, 1u64, file);
-
-        for section in this.sections {
-            for i in 0u64..(section.Size() / 4u64) {
-                let mut word = section[i * 4u64] as u32;
-                word |= (section[i * 4u64 + 1u64] as u32) << 8u32;
-                word |= (section[i * 4u64 + 2u64] as u32) << 16u32;
-                word |= (section[i * 4u64 + 3u64] as u32) << 24u32;
-                fwrite(&mut word, 4u64, 1u64, file);
-            }
-        }
-
-        for symbol in this.symbols {
-            let mut length = symbol.name.Length() as u32;
-            fwrite(&mut length, 4u64, 1u64, file);
-            fwrite(symbol.name.Data(), 1u64, length as u64, file);
-            fwrite(&mut symbol.section, 4u64, 1u64, file);
-            fwrite(&mut symbol.offset, 4u64, 1u64, file);
-            fwrite(&mut symbol.binding, 4u64, 1u64, file);
-        }
- 
-        for relocation in this.relocations {
-            fwrite(&mut relocation.section, 4u64, 1u64, file);
-            fwrite(&mut relocation.offset, 4u64, 1u64, file);
-            fwrite(&mut relocation._type, 4u64, 1u64, file);
-            let mut length = relocation.symbol.Length() as u32;
-            fwrite(&mut length, 4u64, 1u64, file);
-            fwrite(relocation.symbol.Data(), 1u64, length as u64, file);
-        }
-
-        fclose(file);
-        ret true;
     }
 
     priv AssembleExpression(&mut this, node: *const Node) -> u32 {
@@ -190,14 +131,9 @@ class Assembler {
         }
     }
 
-    pub Assemble(&mut this, root: *const RootNode) -> bool {
+    pub Assemble(&mut this, root: *const RootNode) -> Object {
         this.section = SectionType::Text;
-        this.sections.Clear();
         this.sections.Resize(SECTION_COUNT);
-        this.symbols.Clear();
-        this.relocations.Clear();
-        this.globals.Clear();
-        this.externs.Clear();
 
         let mut section_sizes: Vector<u32>;
         section_sizes.Resize(SECTION_COUNT);
@@ -596,6 +532,28 @@ class Assembler {
                     section.PushBack(0u8);
                 }
             }
-        } ret true;
+        }
+
+        let object = Object();
+        object.sections.Resize(this.sections.Size());
+
+        for i in 0u64..this.sections.Size() {
+            let section = this.sections[i];
+
+            for j in 0u64..(section.Size() / 4u64) {
+                let mut word = section[j * 4u64] as u32;
+                word |= (section[j * 4u64 + 1u64] as u32) << 8u32;
+                word |= (section[j * 4u64 + 2u64] as u32) << 16u32;
+                word |= (section[j * 4u64 + 3u64] as u32) << 24u32;
+                object.sections[i].PushBack(word);
+            }
+        }
+
+        this.sections.Clear();
+        object.symbols.Swap(this.symbols);
+        object.relocations.Swap(this.relocations);
+        this.globals.Clear();
+        this.externs.Clear();
+        ret object;
     }
 }

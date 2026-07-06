@@ -121,10 +121,11 @@ class Log {
 
 class Logger {
     pub logs: Vector<Log>,
-    pub has_error: bool = false;
+    pub has_error: bool = false,
+    pub executable: String;
 
-    Logger(&mut this) {
-        logger = this;
+    Logger(&mut this, executable: &String) {
+        (logger, this.executable) = (this, executable);
     }
 
     ~Logger(&mut this) {
@@ -173,36 +174,12 @@ class Logger {
         }
     }
 
-    pub Log(file: &String, row: u64, column: u64, message: &String, severity: LogSeverity) {
-        Logger::Log(file.Data(), row, column, -1i64 as u64, -1i64 as u64, message.Data(), severity);
+    pub Log(message: &String, severity: LogSeverity) {
+        Logger::Log(logger->executable.Data(), -1i64 as u64, -1i64 as u64, -1i64 as u64, -1i64 as u64, message.Data(), severity);
     }
 
-    pub Log(file: &String, row: u64, column: u64, message: *const i8, severity: LogSeverity) {
-        Logger::Log(file.Data(), row, column, -1i64 as u64, -1i64 as u64, message, severity);
-    }
-
-    pub Log(file: *const i8, row: u64, column: u64, message: &String, severity: LogSeverity) {
-        Logger::Log(file, row, column, -1i64 as u64, -1i64 as u64, message.Data(), severity);
-    }
-
-    pub Log(file: *const i8, row: u64, column: u64, message: *const i8, severity: LogSeverity) {
-        Logger::Log(file, row, column, -1i64 as u64, -1i64 as u64, message, severity);
-    }
-
-    pub Log(file: &String, message: &String, severity: LogSeverity) {
-        Logger::Log(file.Data(), -1i64 as u64, -1i64 as u64, -1i64 as u64, -1i64 as u64, message.Data(), severity);
-    }
-
-    pub Log(file: &String, message: *const i8, severity: LogSeverity) {
-        Logger::Log(file.Data(), -1i64 as u64, -1i64 as u64, -1i64 as u64, -1i64 as u64, message, severity);
-    }
-
-    pub Log(file: *const i8, message: &String, severity: LogSeverity) {
-        Logger::Log(file, -1i64 as u64, -1i64 as u64, -1i64 as u64, -1i64 as u64, message.Data(), severity);
-    }
-
-    pub Log(file: *const i8, message: *const i8, severity: LogSeverity) {
-        Logger::Log(file, -1i64 as u64, -1i64 as u64, -1i64 as u64, -1i64 as u64, message, severity);
+    pub Log(message: *const i8, severity: LogSeverity) {
+        Logger::Log(logger->executable.Data(), -1i64 as u64, -1i64 as u64, -1i64 as u64, -1i64 as u64, message, severity);
     }
 
 #[if ASSEMBLER]

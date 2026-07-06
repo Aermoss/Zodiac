@@ -34,16 +34,16 @@ func PrintUsage(executable: String) {
 }
 
 func main(args: &mut Vector<String>) -> i32 {
-    let mut logger: Logger;
     let executable = SplitPath(args[0u64]).right;
+    let mut logger = Logger(executable);
 
     if args.Size() < 2u64 {
         PrintUsage(executable);
         ret 1i32;
     }
 
-    let mut input_file: String;
-    let mut output_file: String;
+    let mut input: String;
+    let mut output: String;
     let mut i = 1u64;
 
     while i < args.Size() {
@@ -59,52 +59,49 @@ func main(args: &mut Vector<String>) -> i32 {
             i += 1u64;
 
             if i < args.Size() {
-                output_file = args[i];
+                output = args[i];
             } else {
-                Logger::Log(executable, "Missing argument to '-o'.", LogSeverity::Error);
+                Logger::Log("Missing argument to '-o'.", LogSeverity::Error);
                 ret 1i32;
             }
         } else {
             if FileExists(arg) {
-                if input_file.Empty() {
-                    input_file = arg;
+                if input.Empty() {
+                    input = arg;
                 } else {
-                    Logger::Log(executable, "Already specified an input file.", LogSeverity::Error);
+                    Logger::Log("Already specified an input file.", LogSeverity::Error);
                     ret 1i32;
                 }
             } else {
-                Logger::Log(executable, "Cannot find '" + arg + "'.", LogSeverity::Error);
+                Logger::Log("Cannot find '" + arg + "'.", LogSeverity::Error);
                 ret 1i32;
             }
         } i += 1u64;
     }
 
-    if input_file.Empty() {
-        Logger::Log(executable, "No input file.", LogSeverity::Error);
+    if input.Empty() {
+        Logger::Log("No input file.", LogSeverity::Error);
         ret 1i32;
     }
 
     let mut lexer = Lexer();
-    let content = _ReadFile(input_file);
-    let tokens = lexer.Lex(content, input_file);
+    let content = _ReadFile(input);
+    let tokens = lexer.Lex(content, input);
 
     let mut parser = Parser();
     let root = parser.Parse(tokens);
     if root == null { ret 1i32; }
 
     let mut assembler = Assembler();
+    let object = assembler.Assemble(root);
+    if Logger::HasError() { ret 1i32; }
 
-    if !assembler.Assemble(root) {
+    if output.Empty() {
+        output = SplitExtension(input).left + ".o";
+    }
+
+    if !object.Write(output) {
+        Logger::Log("Failed to write object file '" + output + "'.", LogSeverity::Error);
         ret 1i32;
-    }
-
-    if output_file.Empty() {
-        output_file = SplitExtension(input_file).left + ".o";
-    }
-
-    if !assembler.WriteObjectFile(output_file) {
-        ret 1i32;
-    }
-
-    ret Logger::HasError() ? 1i32 : 0i32;
+    } ret 0i32;
 }
