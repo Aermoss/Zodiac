@@ -37,11 +37,11 @@ class Object {
         }
 
         for i in 0u32..file.ReadWord() {
-            this.symbols.PushBack(Symbol(file.ReadString(), file.ReadWord(), file.ReadWord(), file.ReadWord()));
+            this.symbols.PushBack(Symbol::Read(file));
         }
 
         for i in 0u32..file.ReadWord() {
-            this.relocations.PushBack(Relocation(file.ReadWord(), file.ReadWord(), file.ReadWord(), file.ReadString()));
+            this.relocations.PushBack(Relocation::Read(file));
         }
     }
 
@@ -60,19 +60,13 @@ class Object {
         file.WriteWord(this.symbols.Size() as u32);
 
         for symbol in this.symbols {
-            file.WriteString(symbol.name);
-            file.WriteWord(symbol.section);
-            file.WriteWord(symbol.offset);
-            file.WriteWord(symbol.binding);
+            symbol.Write(file);
         }
  
         file.WriteWord(this.relocations.Size() as u32);
 
         for relocation in this.relocations {
-            file.WriteWord(relocation.section);
-            file.WriteWord(relocation.offset);
-            file.WriteWord(relocation._type);
-            file.WriteString(relocation.symbol);
+            relocation.Write(file);
         }
     }
 }

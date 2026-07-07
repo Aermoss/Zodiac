@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#[include "std/str", "src/Common/Section.zir" : *]
+#[include "std/str", "src/Common/File.zir", "src/Common/Section.zir" : *]
 
 enum BindingType: u32 {
     Local, Global
@@ -26,11 +26,27 @@ class Symbol {
     pub offset: u32,
     pub binding: BindingType;
 
-    Symbol(&mut this, name: &String) {
-        this.name = name;
-    }
-
     Symbol(&mut this, name: &String, section: SectionType, offset: u32, binding: BindingType) {
         (this.name, this.section, this.offset, this.binding) = (name, section, offset, binding);
+    }
+
+    pub Read(&mut this, file: &File) {
+        this.name = file.ReadString();
+        this.section = file.ReadWord();
+        this.offset = file.ReadWord();
+        this.binding = file.ReadWord();
+    }
+
+    pub Read(file: &File) -> Symbol {
+        let symbol = Symbol();
+        symbol.Read(file);
+        ret symbol;
+    }
+
+    pub Write(&mut this, file: &File) {
+        file.WriteString(this.name);
+        file.WriteWord(this.section);
+        file.WriteWord(this.offset);
+        file.WriteWord(this.binding);
     }
 }

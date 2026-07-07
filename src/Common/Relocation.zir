@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#[include "std/str", "src/Common/Section.zir" : *]
+#[include "std/str", "src/Common/File.zir", "src/Common/Section.zir" : *]
 
 enum RelocationType: u32 {
     None,
@@ -34,9 +34,27 @@ class Relocation {
     pub _type: RelocationType,
     pub symbol: String;
 
-    Relocation(&mut this) {}
-
     Relocation(&mut this, section: SectionType, offset: u32, _type: RelocationType, symbol: &String) {
         (this.section, this.offset, this._type, this.symbol) = (section, offset, _type, symbol);
+    }
+
+    pub Read(&mut this, file: &File) {
+        this.section = file.ReadWord();
+        this.offset = file.ReadWord();
+        this._type = file.ReadWord();
+        this.symbol = file.ReadString();
+    }
+
+    pub Read(file: &File) -> Relocation {
+        let relocation = Relocation();
+        relocation.Read(file);
+        ret relocation;
+    }
+
+    pub Write(&mut this, file: &File) {
+        file.WriteWord(this.section);
+        file.WriteWord(this.offset);
+        file.WriteWord(this._type);
+        file.WriteString(this.symbol);
     }
 }
