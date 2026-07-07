@@ -94,7 +94,7 @@ func main(args: &mut Vector<String>) -> i32 {
         if magic == OBJECT_MAGIC {
             linker.objects.PushBack(Object::Read(file));
         } else if magic == ARCHIVE_MAGIC {
-            linker.objects += Archive::Read(file).objects;
+            linker.archives.PushBack(Archive::Read(file));
         } else {
             Logger::Log("Invalid input file '" + input + "'.", LogSeverity::Error);
             ret 1i32;

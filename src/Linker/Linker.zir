@@ -19,12 +19,83 @@
 
 class Linker {
     pub objects: Vector<Object>,
+    pub archives: Vector<Archive>,
     priv symbol_names: Vector<String>,
     priv symbol_addresses: Vector<u32>,
     priv sections: Vector<Vector<u32>>,
     priv section_bases: Vector<u32>;
  
     pub Link(&mut this) -> String {
+        loop {
+            let mut defined_symbols: Vector<String>;
+
+            for object in this.objects {
+                for symbol in object.symbols {
+                    if symbol.binding == BindingType::Global {
+                        defined_symbols.PushBack(symbol.name);
+                    }
+                }
+            }
+
+            let mut required_symbols: Vector<String>;
+
+            for object in this.objects {
+                for relocation in object.relocations {
+                    let mut local = false;
+
+                    for symbol in object.symbols {
+                        if symbol.name == relocation.symbol {
+                            local = true;
+                            break;
+                        }
+                    }
+
+                    if !local && !defined_symbols.Contains(relocation.symbol) {
+                        if !required_symbols.Contains(relocation.symbol) {
+                            required_symbols.PushBack(relocation.symbol);
+                        }
+                    }
+                }
+            }
+
+            let mut changed = false;
+
+            for archive in this.archives {
+                let mut objects: Vector<Object>;
+
+                for object in archive.objects {
+                    let mut included = false;
+
+                    for other in this.objects {
+
+                    }
+
+                    if included { continue; }
+                    let mut provides = false;
+
+                    for symbol in object.symbols {
+                        if symbol.binding == BindingType::Global && required_symbols.Contains(symbol.name) {
+                            provides = true;
+                            break;
+                        }
+                    }
+
+                    if !provides {
+                        objects.PushBack(object);
+                    } else {
+                        this.objects.PushBack(object);
+                        changed = true;
+                    }
+                }
+
+                archive.objects.Swap(objects);
+            }
+
+            if !changed {
+                break;
+            }
+        }
+
         this.sections.Resize(SECTION_COUNT);
         this.section_bases.Resize(SECTION_COUNT);
         let mut result = String();
@@ -120,12 +191,19 @@ class Linker {
             }
         }
 
+        this.symbol_names.Clear();
+        this.symbol_addresses.Clear();
+        this.section_bases.Clear();
+
         for section in this.sections {
             for word in section {
                 let mut hex = String(word as u64, 16u64);
                 while hex.Length() < 8u64 { hex = "0" + hex; }
                 result += hex + "\n";
             }
-        } ret result;
+        }
+        
+        this.sections.Clear();
+        ret result;
     }
 }
