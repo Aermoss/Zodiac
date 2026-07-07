@@ -64,13 +64,6 @@ class Linker {
                 let mut objects: Vector<Object>;
 
                 for object in archive.objects {
-                    let mut included = false;
-
-                    for other in this.objects {
-
-                    }
-
-                    if included { continue; }
                     let mut provides = false;
 
                     for symbol in object.symbols {
