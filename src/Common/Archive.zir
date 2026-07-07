@@ -16,50 +16,32 @@
 
 #[include "std/str", "std/vec", "src/Common/Common.zir", "src/Common/Object.zir", "src/Common/File.zir" : *]
 
+const ARCHIVE_MAGIC: u32 = 0x4352415Au32;
+
 class Archive {
     pub path: String,
     pub objects: Vector<Object>;
 
-    pub Read(&mut this, path: &String) -> bool {
-        this.path = path;
-        let file = fopen(path.Data(), "rb");
-        if file == null { ret false; }
-
-        let mut magic = 0u32;
-        fread(&mut magic, 4u64, 1u64, file);
-
-        if magic != ARCHIVE_MAGIC {
-            fclose(file);
-            ret false;
-        }
-
-        let mut count = 0u32;
-        fread(&mut count, 4u64, 1u64, file);
-        this.objects.Resize(count as u64);
+    pub Read(&mut this, file: &File) {
+        this.path = file.path;
+        this.objects.Resize(file.ReadWord() as u64);
 
         for object in this.objects {
             object.Read(file);
         }
-
-        fclose(file);
-        ret true;
     }
 
-    pub Write(&mut this, path: &String) -> bool {
-        let file = fopen(path.Data(), "wb");
-        if file == null { ret false; }
+    pub Read(file: &File) -> Archive {
+        let archive = Archive();
+        archive.Read(file);
+        ret archive;
+    }
 
-        let mut magic = ARCHIVE_MAGIC;
-        fwrite(&mut magic, 4u64, 1u64, file);
-
-        let mut count = this.objects.Size() as u32;
-        fwrite(&mut count, 4u64, 1u64, file);
+    pub Write(&mut this, file: &File) {
+        file.WriteWord(this.objects.Size() as u32);
 
         for object in this.objects {
             object.Write(file);
         }
-
-        fclose(file);
-        ret true;
     }
 }

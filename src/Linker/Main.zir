@@ -82,28 +82,21 @@ func main(args: &mut Vector<String>) -> i32 {
     let mut linker = Linker();
 
     for input in inputs {
-        let file_type = ResolveFileType(input);
+        let file = File(input);
 
-        if file_type == FileType::Object {
-            let mut object = Object();
+        if !file.Open(FileMode::ReadBinary) {
+            Logger::Log("Failed to open file '" + input + "'.", LogSeverity::Error);
+            ret 1i32;
+        }
 
-            if !object.Read(input) {
-                Logger::Log("Failed to read object file '" + input + "'.", LogSeverity::Error);
-                ret 1i32;
-            }
+        let magic = file.ReadWord();
 
-            linker.objects.PushBack(object);
-        } else if file_type == FileType::Archive {
-            let mut archive = Archive();
-
-            if !archive.Read(input) {
-                Logger::Log("Failed to read archive file '" + input + "'.", LogSeverity::Error);
-                ret 1i32;
-            }
-
-            linker.objects += archive.objects;
+        if magic == OBJECT_MAGIC {
+            linker.objects.PushBack(Object::Read(file));
+        } else if magic == ARCHIVE_MAGIC {
+            linker.objects += Archive::Read(file).objects;
         } else {
-            Logger::Log("Invalid input '" + input + "'.", LogSeverity::Error);
+            Logger::Log("Invalid input file '" + input + "'.", LogSeverity::Error);
             ret 1i32;
         }
     }

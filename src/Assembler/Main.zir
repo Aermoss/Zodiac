@@ -84,8 +84,10 @@ func main(args: &mut Vector<String>) -> i32 {
         ret 1i32;
     }
 
-    let mut lexer = Lexer();
     let content = _ReadFile(input);
+    if content.Empty() { ret 1i32; }
+
+    let mut lexer = Lexer();
     let tokens = lexer.Lex(content, input);
 
     let mut parser = Parser();
@@ -100,8 +102,14 @@ func main(args: &mut Vector<String>) -> i32 {
         output = SplitExtension(input).left + ".o";
     }
 
-    if !object.Write(output) {
+    let file = File(output);
+
+    if !file.Open(FileMode::WriteBinary) {
         Logger::Log("Failed to write object file '" + output + "'.", LogSeverity::Error);
         ret 1i32;
-    } ret 0i32;
+    }
+
+    file.WriteWord(OBJECT_MAGIC);
+    object.Write(file);
+    ret 0i32;
 }

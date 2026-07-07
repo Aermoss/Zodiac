@@ -30,6 +30,8 @@ class Linker {
         let mut result = String();
 
         for object in this.objects {
+            object.section_bases.Resize(SECTION_COUNT);
+
             for i in 0u64..object.sections.Size() {
                 object.section_bases[i] = (this.sections[i].Size() as u32) * 4u32;
 

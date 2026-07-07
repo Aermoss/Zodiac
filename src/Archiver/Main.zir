@@ -82,19 +82,19 @@ func main(args: &mut Vector<String>) -> i32 {
     let mut archiver = Archiver();
 
     for input in inputs {
-        let file_type = ResolveFileType(input);
+        let file = File(input);
 
-        if file_type == FileType::Object {
-            let mut object = Object();
+        if !file.Open(FileMode::ReadBinary) {
+            Logger::Log("Failed to open file '" + input + "'.", LogSeverity::Error);
+            ret 1i32;
+        }
 
-            if !object.Read(input) {
-                Logger::Log("Failed to read object file '" + input + "'.", LogSeverity::Error);
-                ret 1i32;
-            }
+        let magic = file.ReadWord();
 
-            archiver.objects.PushBack(object);
+        if magic == OBJECT_MAGIC {
+            archiver.objects.PushBack(Object::Read(file));
         } else {
-            Logger::Log("Invalid input '" + input + "'.", LogSeverity::Error);
+            Logger::Log("Invalid input file '" + input + "'.", LogSeverity::Error);
             ret 1i32;
         }
     }
@@ -105,8 +105,14 @@ func main(args: &mut Vector<String>) -> i32 {
         output = SplitExtension(inputs[0u64]).left + ".a";
     }
 
-    if !archive.Write(output) {
+    let file = File(output);
+
+    if !file.Open(FileMode::WriteBinary) {
         Logger::Log("Failed to write archive file '" + output + "'.", LogSeverity::Error);
         ret 1i32;
-    } ret 0i32;
+    }
+
+    file.WriteWord(ARCHIVE_MAGIC);
+    archive.Write(file);
+    ret 0i32;
 }
