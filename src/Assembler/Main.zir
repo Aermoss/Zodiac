@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#[include "std/io", "std/file", "src/Assembler/Lexer.zir", "src/Assembler/Parser.zir",
-    "src/Assembler/Assembler.zir", "src/Common/Logger.zir" : *]
+#[include "std/io", "std/str", "std/vec", "std/pair", "std/file", "src/Common/Logger.zir",
+    "src/Assembler/Lexer.zir", "src/Assembler/Parser.zir", "src/Assembler/Assembler.zir" : *]
 
 func PrintVersion(executable: String) {
     WriteLine("Unversioned build of " + executable + ".");

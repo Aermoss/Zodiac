@@ -14,14 +14,23 @@
  * limitations under the License.
  */
 
-#[include "std/vec", "src/Common/Object.zir", "src/Common/Archive.zir" : *]
+#[include "std/str", "src/Common/Section.zir" : *]
 
-class Archiver {
-    pub objects: Vector<Object>;
+enum BindingType: u32 {
+    Local, Global
+}
 
-    pub Archive(&mut this) -> Archive {
-        let mut archive = Archive();
-        archive.objects.Swap(this.objects);
-        ret archive;
+class Symbol {
+    pub name: String,
+    pub section: SectionType,
+    pub offset: u32,
+    pub binding: BindingType;
+
+    Symbol(&mut this, name: &String) {
+        this.name = name;
+    }
+
+    Symbol(&mut this, name: &String, section: SectionType, offset: u32, binding: BindingType) {
+        (this.name, this.section, this.offset, this.binding) = (name, section, offset, binding);
     }
 }

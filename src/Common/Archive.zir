@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#[include "std/str", "std/vec", "src/Common/Common.zir", "src/Common/Object.zir", "src/Common/File.zir" : *]
+#[include "std/str", "std/vec", "src/Common/File.zir", "src/Common/Object.zir" : *]
 
 const ARCHIVE_MAGIC: u32 = 0x4352415Au32;
 

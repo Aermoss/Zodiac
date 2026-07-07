@@ -14,14 +14,8 @@
  * limitations under the License.
  */
 
-#[include "std/vec", "src/Common/Object.zir", "src/Common/Archive.zir" : *]
-
-class Archiver {
-    pub objects: Vector<Object>;
-
-    pub Archive(&mut this) -> Archive {
-        let mut archive = Archive();
-        archive.objects.Swap(this.objects);
-        ret archive;
-    }
+enum SectionType: u32 {
+    Text, Data
 }
+
+const SECTION_COUNT: u64 = 2u64;

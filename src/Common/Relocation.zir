@@ -14,14 +14,29 @@
  * limitations under the License.
  */
 
-#[include "std/vec", "src/Common/Object.zir", "src/Common/Archive.zir" : *]
+#[include "std/str", "src/Common/Section.zir" : *]
 
-class Archiver {
-    pub objects: Vector<Object>;
+enum RelocationType: u32 {
+    None,
+    AbsoluteUpper21,
+    AbsoluteLower11,
+    PcRelativeUpper21,
+    PcRelativeLower11,
+    Branch16,
+    Branch21,
+    Branch26,
+    Absolute32
+}
 
-    pub Archive(&mut this) -> Archive {
-        let mut archive = Archive();
-        archive.objects.Swap(this.objects);
-        ret archive;
+class Relocation {
+    pub section: SectionType,
+    pub offset: u32,
+    pub _type: RelocationType,
+    pub symbol: String;
+
+    Relocation(&mut this) {}
+
+    Relocation(&mut this, section: SectionType, offset: u32, _type: RelocationType, symbol: &String) {
+        (this.section, this.offset, this._type, this.symbol) = (section, offset, _type, symbol);
     }
 }

@@ -14,7 +14,8 @@
  * limitations under the License.
  */
 
-#[include "std/str", "std/vec", "src/Common/Common.zir", "src/Common/File.zir" : *]
+#[include "std/str", "std/vec", "src/Common/File.zir", "src/Common/Section.zir",
+    "src/Common/Symbol.zir", "src/Common/Relocation.zir" : *]
 
 const OBJECT_MAGIC: u32 = 0x4A424F5Au32;
 

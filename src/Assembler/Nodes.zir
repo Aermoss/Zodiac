@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#[include "std/str", "std/vec", "std/map", "std/pair", "src/Assembler/Tokens.zir" : *]
+#[include "std/str", "std/vec", "src/Assembler/Tokens.zir" : *]
 
 enum NodeType: i32 {
     ROOT,
@@ -68,7 +68,9 @@ class AddressNode : Node {
 }
 
 class BinaryOperationNode : Node {
-    pub left: *const Node, pub right: *const Node, pub operator: TokenType;
+    pub left: *const Node,
+    pub right: *const Node,
+    pub operator: TokenType;
 
     BinaryOperationNode(&mut this, left: *const Node, right: *const Node, operator: TokenType, start: Token) : Node(NodeType::BINARY_OPERATION, start) {
         (this.left, this.right, this.operator) = (left, right, operator);
@@ -76,7 +78,8 @@ class BinaryOperationNode : Node {
 }
 
 class UnaryOperationNode : Node {
-    pub operand: *const Node, pub operator: TokenType;
+    pub operand: *const Node,
+    pub operator: TokenType;
 
     UnaryOperationNode(&mut this, operand: *const Node, operator: TokenType, start: Token) : Node(NodeType::UNARY_OPERATION, start) {
         (this.operand, this.operator) = (operand, operator);
@@ -84,7 +87,8 @@ class UnaryOperationNode : Node {
 }
 
 class OperandNode : Node {
-    pub expression: *const Node, pub offset: *const Node;
+    pub expression: *const Node,
+    pub offset: *const Node;
 
     OperandNode(&mut this, expression: *const Node, offset: *const Node, start: Token) : Node(NodeType::OPERAND, start) {
         (this.expression, this.offset) = (expression, offset);
@@ -92,7 +96,8 @@ class OperandNode : Node {
 }
 
 class InstructionNode : Node {
-    pub mnemonic: String, pub operands: Vector<*const OperandNode>;
+    pub mnemonic: String,
+    pub operands: Vector<*const OperandNode>;
 
     InstructionNode(&mut this, mnemonic: String, start: Token) : Node(NodeType::INSTRUCTION, start) {
         this.mnemonic = mnemonic;
