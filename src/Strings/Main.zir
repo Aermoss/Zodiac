@@ -1,0 +1,108 @@
+/*
+ * Copyright 2026 Yusuf Rençber
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+#[include "std/io", "std/str", "std/vec", "std/pair", "std/file",
+    "src/Common/File.zir", "src/Common/Logger.zir" : *]
+
+func PrintVersion(executable: String) {
+    WriteLine("Unversioned build of " + executable + ".");
+    WriteLine("Copyright (c) 2026 Yusuf Rençber.");
+    WriteLine("Licensed under the Apache License, Version 2.0.");
+    WriteLine("See the LICENSE file for details.");
+}
+
+func PrintUsage(executable: String) {
+    WriteLine("OVERVIEW: Zodiac string dumper");
+    WriteLine("USAGE: " + executable + " [options] <inputs...>");
+    WriteLine("OPTIONS:");
+    WriteLine("  --version                Display string dumper version");
+    WriteLine("  -h, --help               Display this help message");
+}
+
+func main(args: &mut Vector<String>) -> i32 {
+    let executable = SplitPath(args[0u64]).right;
+    let mut logger = Logger(executable);
+
+    if args.Size() < 2u64 {
+        PrintUsage(executable);
+        ret 1i32;
+    }
+
+    let mut inputs: Vector<String>;
+
+    for i in 1u64..args.Size() {
+        if args[i] == "--help" || args[i] == "-h" {
+            PrintUsage(executable);
+            ret 0i32;
+        } else if args[i] == "--version" {
+            PrintVersion(executable);
+            ret 0i32;
+        } else if FileExists(args[i]) {
+            inputs.PushBack(args[i]);
+        } else {
+            Logger::Log("Cannot find '" + args[i] + "'.", LogSeverity::Error);
+            ret 1i32;
+        }
+    }
+
+    if inputs.Empty() {
+        Logger::Log("No input files.", LogSeverity::Error);
+        ret 1i32;
+    }
+
+    let mut first = true;
+
+    for input in inputs {
+        if first {
+            first = false;
+        } else {
+            Write("\n");
+        }
+
+        if inputs.Size() > 1u64 {
+            WriteLine(input + ':');
+        }
+
+        let file = File(input);
+
+        if !file.Open(FileMode::ReadBinary) {
+            Logger::Log("Failed to open file '" + input + "'.", LogSeverity::Error);
+            continue;
+        }
+
+        let mut result = String();
+
+        loop {
+            let mut byte = 0u8;
+
+            if !file.ReadBytes(&mut byte, 1u64) {
+                break;
+            }
+
+            if byte >= 32u8 && byte <= 126u8 {
+                result += byte as i8;
+            } else {
+                if result.Length() >= 4u64 {
+                    WriteLine(result);
+                } result = "";
+            }
+        }
+
+        if result.Length() >= 4u64 {
+            WriteLine(result);
+        }
+    } ret 0i32;
+}

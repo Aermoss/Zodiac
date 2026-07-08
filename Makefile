@@ -16,6 +16,14 @@ bin/zda.exe: export PATH := C:\Program Files\LLVM\bin;$(PATH)
 bin/zda.exe: $(wildcard src/Disassembler/*.zir) $(wildcard src/Common/*.zir)
 	../Zircon/bin/zirconc.exe src/Disassembler/Main.zir -o $@ -I ../Zircon/include -lDbgHelp -lucrt -O0 -DDISASSEMBLER
 
+bin/znm.exe: export PATH := C:\Program Files\LLVM\bin;$(PATH)
+bin/znm.exe: $(wildcard src/Names/*.zir) $(wildcard src/Common/*.zir)
+	../Zircon/bin/zirconc.exe src/Names/Main.zir -o $@ -I ../Zircon/include -lDbgHelp -lucrt -O0 -DNAMES
+
+bin/zstrings.exe: export PATH := C:\Program Files\LLVM\bin;$(PATH)
+bin/zstrings.exe: $(wildcard src/Strings/*.zir) $(wildcard src/Common/*.zir)
+	../Zircon/bin/zirconc.exe src/Strings/Main.zir -o $@ -I ../Zircon/include -lDbgHelp -lucrt -O0 -DSTRINGS
+
 boot.o: bin/zas.exe boot.s
 	$^ -o $@
 
