@@ -1,20 +1,24 @@
-default: run
+default: simulate
 
 bin/zas.exe: export PATH := C:\Program Files\LLVM\bin;$(PATH)
 bin/zas.exe: $(wildcard src/Assembler/*.zir) $(wildcard src/Common/*.zir)
 	../Zircon/bin/zirconc.exe src/Assembler/Main.zir -o $@ -I ../Zircon/include -lDbgHelp -lucrt -O0 -DASSEMBLER
 
-bin/zld.exe: export PATH := C:\Program Files\LLVM\bin;$(PATH)
-bin/zld.exe: $(wildcard src/Linker/*.zir) $(wildcard src/Common/*.zir)
-	../Zircon/bin/zirconc.exe src/Linker/Main.zir -o $@ -I ../Zircon/include -lDbgHelp -lucrt -O0 -DLINKER
+bin/zda.exe: export PATH := C:\Program Files\LLVM\bin;$(PATH)
+bin/zda.exe: $(wildcard src/Disassembler/*.zir) $(wildcard src/Common/*.zir)
+	../Zircon/bin/zirconc.exe src/Disassembler/Main.zir -o $@ -I ../Zircon/include -lDbgHelp -lucrt -O0 -DDISASSEMBLER
 
 bin/zar.exe: export PATH := C:\Program Files\LLVM\bin;$(PATH)
 bin/zar.exe: $(wildcard src/Archiver/*.zir) $(wildcard src/Common/*.zir)
 	../Zircon/bin/zirconc.exe src/Archiver/Main.zir -o $@ -I ../Zircon/include -lDbgHelp -lucrt -O0 -DARCHIVER
 
-bin/zda.exe: export PATH := C:\Program Files\LLVM\bin;$(PATH)
-bin/zda.exe: $(wildcard src/Disassembler/*.zir) $(wildcard src/Common/*.zir)
-	../Zircon/bin/zirconc.exe src/Disassembler/Main.zir -o $@ -I ../Zircon/include -lDbgHelp -lucrt -O0 -DDISASSEMBLER
+bin/zld.exe: export PATH := C:\Program Files\LLVM\bin;$(PATH)
+bin/zld.exe: $(wildcard src/Linker/*.zir) $(wildcard src/Common/*.zir)
+	../Zircon/bin/zirconc.exe src/Linker/Main.zir -o $@ -I ../Zircon/include -lDbgHelp -lucrt -O0 -DLINKER
+
+bin/zemu.exe: export PATH := C:\Program Files\LLVM\bin;$(PATH)
+bin/zemu.exe: $(wildcard src/Emulator/*.zir) $(wildcard src/Common/*.zir)
+	../Zircon/bin/zirconc.exe src/Emulator/Main.zir -o $@ -I ../Zircon/include -lDbgHelp -lucrt -O0 -DEMULATOR
 
 bin/znm.exe: export PATH := C:\Program Files\LLVM\bin;$(PATH)
 bin/znm.exe: $(wildcard src/Names/*.zir) $(wildcard src/Common/*.zir)
@@ -43,10 +47,13 @@ sim.out: $(filter-out top.sv, $(wildcard *.sv))
 dump.vcd: sim.out program.hex
 	vvp $<
 
-run: dump.vcd
+build: program.hex
+
+simulate: dump.vcd
 	gtkwave -S $< cpu.gtkw
 
-build: program.hex
+emulate: bin/zemu.exe program.hex
+	$^
 
 clean:
 	rm -f dump.vcd sim.out program.hex bin/zld.exe boot.o program.o bin/zas.exe

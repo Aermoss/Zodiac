@@ -1,7 +1,9 @@
 	.text
 	.global	__z14WriteCharacterc
 __z14WriteCharacterc:
-    add x3, x1, x0
+    addi x31, x31, -8
+    sb x1, 7(x31)
+    b __LBB0_1
 __LBB0_1:
     lui x1, 31
     ori x1, x1, 2044
@@ -13,22 +15,32 @@ __LBB0_1:
 __LBB0_2:
     b __LBB0_1
 __LBB0_3:
+    lbu x1, 7(x31)
     lui x2, 31
     ori x2, x2, 2047
-    sb x3, 0(x2)
+    sb x1, 0(x2)
+    addi x31, x31, 8
     br x30
 
 	.global	__z5WritePc
 __z5WritePc:
     addi x31, x31, -8
     sw x30, 4(x31)
-    add x4, x1, x0
+    sw x1, 0(x31)
+    b __LBB1_1
 __LBB1_1:
-    lbu x1, 0(x4)
+    lw x1, 0(x31)
+    lbu x1, 0(x1)
     add x2, x0, x0
     beq x1, x2, __LBB1_3
+    b __LBB1_2
+__LBB1_2:
+    lw x1, 0(x31)
+    lbu x1, 0(x1)
     bl x30, __z14WriteCharacterc
-    addi x4, x4, 1
+    lw x1, 0(x31)
+    addi x1, x1, 1
+    sw x1, 0(x31)
     b __LBB1_1
 __LBB1_3:
     lw x30, 4(x31)
@@ -286,19 +298,24 @@ __z7GetTime:
 
 	.global	__z5Sleepi
 __z5Sleepi:
-    add x6, x1, x0
-    addi x31, x31, -8
-    sw x30, 4(x31)
+    addi x31, x31, -16
+    sw x30, 12(x31)
+    sw x1, 4(x31)
     bl x30, __z7GetTime
-    add x7, x1, x0
+    sw x1, 8(x31)
+    b __LBB12_1
 __LBB12_1:
     bl x30, __z7GetTime
-    sub x1, x1, x7
-    bgeu x1, x6, __LBB12_3
+    lw x2, 8(x31)
+    sub x1, x1, x2
+    lw x2, 4(x31)
+    bgeu x1, x2, __LBB12_3
+    b __LBB12_2
+__LBB12_2:
     b __LBB12_1
 __LBB12_3:
-    lw x30, 4(x31)
-    addi x31, x31, 8
+    lw x30, 12(x31)
+    addi x31, x31, 16
     br x30
 
 	.global	__z11SetBaudRatei
@@ -319,19 +336,11 @@ __z11SetBaudRatei:
 Main:
     addi x31, x31, -56
     sw x30, 52(x31)
-
-    lui x10, 31
-    ori x10, x10, 2032
-    addi x11, x0, 8
-    sb x11, 0(x10)
-
     lui x1, 56
     ori x1, x1, 512
     bl x30, __z11SetBaudRatei
-
     addi x1, x0, 1
     bl x30, __z5Sleepi
-
     la x1, .L__unnamed_2
     bl x30, __z9WriteLinePc
     la x1, .L__unnamed_3
@@ -339,7 +348,7 @@ Main:
     la x1, .L__unnamed_4
     bl x30, __z9WriteLinePc
     lui x1, 524288
-    ori x1, x1, 2000
+    ori x1, x1, 0
     sw x1, 12(x31)
     la x1, .L__unnamed_5
     bl x30, __z9WriteLinePc

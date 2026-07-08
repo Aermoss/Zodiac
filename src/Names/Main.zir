@@ -43,17 +43,17 @@ func main(args: &mut Vector<String>) -> i32 {
 
     let mut inputs: Vector<String>;
 
-    for i in 1u64..args.Size() {
-        if args[i] == "--help" || args[i] == "-h" {
+    for arg in args {
+        if arg == "--help" || arg == "-h" {
             PrintUsage(executable);
             ret 0i32;
-        } else if args[i] == "--version" {
+        } else if arg == "--version" {
             PrintVersion(executable);
             ret 0i32;
-        } else if FileExists(args[i]) {
-            inputs.PushBack(args[i]);
+        } else if FileExists(arg) {
+            inputs.PushBack(arg);
         } else {
-            Logger::Log("Cannot find '" + args[i] + "'.", LogSeverity::Error);
+            Logger::Log("Cannot find '" + arg + "'.", LogSeverity::Error);
             ret 1i32;
         }
     }
