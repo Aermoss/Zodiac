@@ -1,0 +1,227 @@
+/*
+ * Copyright 2026 Yusuf Rençber
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+#[include "std/str", "std/vec", "src/Common/Object.zir", "src/Common/Logger.zir",
+    "src/Common/Instruction.zir", "src/Common/Section.zir", "src/Common/Symbol.zir", "src/Common/Relocation.zir" : *]
+
+class Disassembler {
+    pub objects: Vector<Object>;
+
+    priv GetRelocationSymbol(&this, object: &Object, section: SectionType, offset: u32) -> String {
+        for relocation in object.relocations {
+            if relocation.section == section && relocation.offset == offset {
+                ret relocation.symbol;
+            }
+        } ret "".ToString();
+    }
+
+    priv DisassembleRegister(&this, register: u32) -> String {
+        ret "x" + String(register as u64);
+    }
+
+    priv DisassembleInstruction(&this, word: u32, offset: u32, section: SectionType, object: &Object) -> String {
+        let opcode = (word >> OPCODE_SHIFT);
+        let (reg0, reg1, reg2) = ((word >> REG0_SHIFT) & 0x1Fu32, (word >> REG1_SHIFT) & 0x1Fu32, (word >> REG2_SHIFT) & 0x1Fu32);
+        let (imm11, imm16, imm21, imm26) = (word & IMM11_MASK, word & IMM16_MASK, word & IMM21_MASK, word & IMM26_MASK);
+        let simm11 = (((imm11 as i32) ^ (1i32 << 10i32)) - (1i32 << 10i32)) as i64;
+        let simm16 = (((imm16 as i32) ^ (1i32 << 15i32)) - (1i32 << 15i32)) as i64;
+        let simm21 = (((imm21 as i32) ^ (1i32 << 20i32)) - (1i32 << 20i32)) as i64;
+        let simm26 = (((imm26 as i32) ^ (1i32 << 25i32)) - (1i32 << 25i32)) as i64;
+        let mut mnemonic: String;
+
+        if opcode == Opcode::NOP { mnemonic = "nop"; }
+        else if opcode == Opcode::LB { mnemonic = "lb"; }
+        else if opcode == Opcode::LBU { mnemonic = "lbu"; }
+        else if opcode == Opcode::LH { mnemonic = "lh"; }
+        else if opcode == Opcode::LHU { mnemonic = "lhu"; }
+        else if opcode == Opcode::LW { mnemonic = "lw"; }
+        else if opcode == Opcode::LUI { mnemonic = "lui"; }
+        else if opcode == Opcode::AUIPC { mnemonic = "auipc"; }
+        else if opcode == Opcode::SB { mnemonic = "sb"; }
+        else if opcode == Opcode::SH { mnemonic = "sh"; }
+        else if opcode == Opcode::SW { mnemonic = "sw"; }
+        else if opcode == Opcode::B { mnemonic = "b"; }
+        else if opcode == Opcode::BR { mnemonic = "br"; }
+        else if opcode == Opcode::BL { mnemonic = "bl"; }
+        else if opcode == Opcode::BLR { mnemonic = "blr"; }
+        else if opcode == Opcode::BEQ { mnemonic = "beq"; }
+        else if opcode == Opcode::BNE { mnemonic = "bne"; }
+        else if opcode == Opcode::BLT { mnemonic = "blt"; }
+        else if opcode == Opcode::BLTU { mnemonic = "bltu"; }
+        else if opcode == Opcode::BGE { mnemonic = "bge"; }
+        else if opcode == Opcode::BGEU { mnemonic = "bgeu"; }
+        else if opcode == Opcode::SLT { mnemonic = "slt"; }
+        else if opcode == Opcode::SLTU { mnemonic = "sltu"; }
+        else if opcode == Opcode::SLTI { mnemonic = "slti"; }
+        else if opcode == Opcode::SLTIU { mnemonic = "sltiu"; }
+        else if opcode == Opcode::ADD { mnemonic = "add"; }
+        else if opcode == Opcode::ADDI { mnemonic = "addi"; }
+        else if opcode == Opcode::SUB { mnemonic = "sub"; }
+        else if opcode == Opcode::SUBI { mnemonic = "subi"; }
+        else if opcode == Opcode::MUL { mnemonic = "mul"; }
+        else if opcode == Opcode::MULH { mnemonic = "mulh"; }
+        else if opcode == Opcode::MULHSU { mnemonic = "mulhsu"; }
+        else if opcode == Opcode::MULHU { mnemonic = "mulhu"; }
+        else if opcode == Opcode::DIV { mnemonic = "div"; }
+        else if opcode == Opcode::DIVU { mnemonic = "divu"; }
+        else if opcode == Opcode::REM { mnemonic = "rem"; }
+        else if opcode == Opcode::REMU { mnemonic = "remu"; }
+        else if opcode == Opcode::AND { mnemonic = "and"; }
+        else if opcode == Opcode::ANDI { mnemonic = "andi"; }
+        else if opcode == Opcode::OR { mnemonic = "or"; }
+        else if opcode == Opcode::ORI { mnemonic = "ori"; }
+        else if opcode == Opcode::XOR { mnemonic = "xor"; }
+        else if opcode == Opcode::XORI { mnemonic = "xori"; }
+        else if opcode == Opcode::SLL { mnemonic = "sll"; }
+        else if opcode == Opcode::SLLI { mnemonic = "slli"; }
+        else if opcode == Opcode::SRL { mnemonic = "srl"; }
+        else if opcode == Opcode::SRLI { mnemonic = "srli"; }
+        else if opcode == Opcode::SRA { mnemonic = "sra"; }
+        else if opcode == Opcode::SRAI { mnemonic = "srai"; }
+        else if opcode == Opcode::HLT { mnemonic = "hlt"; }
+        else {
+            ret ".word 0x" + String(word as u64, 16u64);
+        }
+
+        if opcode >= Opcode::LB && opcode <= Opcode::SW {
+            if opcode == Opcode::LUI || opcode == Opcode::AUIPC {
+                let relocation = this.GetRelocationSymbol(object, section, offset);
+                if !relocation.Empty() { ret mnemonic + " " + this.DisassembleRegister(reg0) + ", " + relocation; }
+                ret mnemonic + " " + this.DisassembleRegister(reg0) + ", " + String(simm21);
+            } else {
+                ret mnemonic + " " + this.DisassembleRegister(reg0) + ", " + String(simm16) + "(" + this.DisassembleRegister(reg1) + ")";
+            }
+        } else if opcode == Opcode::B {
+            let relocation = this.GetRelocationSymbol(object, section, offset);
+            if !relocation.Empty() { ret mnemonic + " " + relocation; }
+            ret mnemonic + " " + String(simm26);
+        } else if opcode == Opcode::BL {
+            let relocation = this.GetRelocationSymbol(object, section, offset);
+            if !relocation.Empty() { ret mnemonic + " " + this.DisassembleRegister(reg0) + ", " + relocation; }
+            ret mnemonic + " " + this.DisassembleRegister(reg0) + ", " + String(simm21);
+        } else if opcode == Opcode::BR {
+            ret mnemonic + " " + this.DisassembleRegister(reg0);
+        } else if opcode == Opcode::BLR {
+            ret mnemonic + " " + this.DisassembleRegister(reg0) + ", " + this.DisassembleRegister(reg1);
+        } else if opcode >= Opcode::BEQ && opcode <= Opcode::BGEU {
+            let relocation = this.GetRelocationSymbol(object, section, offset);
+            if !relocation.Empty() { ret mnemonic + " " + this.DisassembleRegister(reg0) + ", " + this.DisassembleRegister(reg1) + ", " + relocation; }
+            ret mnemonic + " " + this.DisassembleRegister(reg0) + ", " + this.DisassembleRegister(reg1) + ", " + String(simm16);
+        } else if opcode >= Opcode::SLT && opcode <= Opcode::SLTIU {
+            if opcode == Opcode::SLT || opcode == Opcode::SLTU {
+                ret mnemonic + " " + this.DisassembleRegister(reg0) + ", " + this.DisassembleRegister(reg1) + ", " + this.DisassembleRegister(reg2);
+            } else {
+                ret mnemonic + " " + this.DisassembleRegister(reg0) + ", " + this.DisassembleRegister(reg1) + ", " + String(simm16);
+            }
+        } else if opcode >= Opcode::ADD && opcode <= Opcode::SRAI {
+            if (Opcode::ADD % 2u32 == opcode % 2u32) {
+                ret mnemonic + " " + this.DisassembleRegister(reg0) + ", " + this.DisassembleRegister(reg1) + ", " + this.DisassembleRegister(reg2);
+            } else {
+                ret mnemonic + " " + this.DisassembleRegister(reg0) + ", " + this.DisassembleRegister(reg1) + ", " + String(simm16);
+            }
+        } else {
+            ret mnemonic;
+        }
+    }
+
+    priv FormatHexWord(&this, word: u32) -> String {
+        let mut hex = String(word as u64, 16u64);
+        while hex.Length() < 8u64 { hex = "0" + hex; }
+        ret hex.SubString(0u64, 2u64) + " " + hex.SubString(2u64, 2u64) + " "
+            + hex.SubString(4u64, 2u64) + " " + hex.SubString(6u64, 2u64);
+    }
+
+    priv FormatHexAddress(&this, address: u32) -> String {
+        let mut hex = String(address as u64, 16u64);
+        while hex.Length() < 8u64 { hex = "0" + hex; }
+        ret hex;
+    }
+
+    priv FormatRelocation(&this, _type: RelocationType) -> String {
+        if _type == RelocationType::AbsoluteUpper21 { ret "R_ABS_HI21".ToString(); }
+        else if _type == RelocationType::AbsoluteLower11 { ret "R_ABS_LO11".ToString(); }
+        else if _type == RelocationType::PcRelativeUpper21 { ret "R_PCREL_HI21".ToString(); }
+        else if _type == RelocationType::PcRelativeLower11 { ret "R_PCREL_LO11".ToString(); }
+        else if _type == RelocationType::Branch16 { ret "R_BR16".ToString(); }
+        else if _type == RelocationType::Branch21 { ret "R_BR21".ToString(); }
+        else if _type == RelocationType::Branch26 { ret "R_BR26".ToString(); }
+        else if _type == RelocationType::Absolute32 { ret "R_ABS32".ToString(); }
+        else { ret "R_UNKNOWN".ToString(); }
+    }
+
+    pub Disassemble(&mut this, format: bool) -> String {
+        let mut result = String();
+
+        for object in this.objects {
+            if !object.path.Empty() {
+                if format {
+                    result += "\nDisassembly of object: " + object.path + '\n';
+                } else {
+                    result += "; Disassembly of object: " + object.path + '\n';
+                }
+            }
+
+            for index in 0u64..object.sections.Size() {
+                let section_type = index as SectionType;
+                let section_name = section_type == SectionType::Text ? ".text" : ".data";
+                let section = object.sections[index];
+                if section.Empty() { continue; }
+
+                if format {
+                    result += "Disassembly of section " + section_name.ToString() + ":\n";
+                } else {
+                    result += section_name.ToString() + '\n';
+                }
+
+                let mut offset = 0u32;
+
+                for word in section {
+                    for symbol in object.symbols {
+                        if symbol.section == section_type && symbol.offset == offset {
+                            if format {
+                                result += '\n' + this.FormatHexAddress(offset) + " <" + symbol.name + ">:\n";
+                            } else {
+                                result += symbol.name + ":\n";
+                            }
+                        }
+                    }
+
+                    if format {
+                        result += this.FormatHexAddress(offset) + ":   " + this.FormatHexWord(word);
+
+                        if section_type == SectionType::Text {
+                            result += "     " + this.DisassembleInstruction(word, offset, section_type, object) + '\n';
+
+                            for relocation in object.relocations {
+                                if relocation.section == section_type && relocation.offset == offset {
+                                    result += "                        " + this.FormatHexAddress(offset) + ": " + this.FormatRelocation(relocation._type) + "   <" + relocation.symbol + ">\n";
+                                }
+                            }
+                        } else {
+                            result += '\n';
+                        }
+                    } else {
+                        if section_type == SectionType::Text {
+                            result += "    " + this.DisassembleInstruction(word, offset, section_type, object) + '\n';
+                        } else {
+                            result += "    .word " + String(word as i64) + '\n';
+                        }
+                    } offset += 4u32;
+                } result += '\n';
+            }
+        } ret result;
+    }
+}

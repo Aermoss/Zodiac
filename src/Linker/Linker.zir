@@ -15,7 +15,7 @@
  */
 
 #[include "std/str", "std/vec", "src/Common/Object.zir", "src/Common/Logger.zir",
-    "src/Common/Instruction.zir", "src/Common/Section.zir" : *]
+    "src/Common/Instruction.zir", "src/Common/Section.zir", "src/Common/Symbol.zir", "src/Common/Relocation.zir" : *]
 
 class Linker {
     pub objects: Vector<Object>,

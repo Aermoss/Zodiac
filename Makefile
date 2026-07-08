@@ -12,6 +12,10 @@ bin/zar.exe: export PATH := C:\Program Files\LLVM\bin;$(PATH)
 bin/zar.exe: $(wildcard src/Archiver/*.zir) $(wildcard src/Common/*.zir)
 	../Zircon/bin/zirconc.exe src/Archiver/Main.zir -o $@ -I ../Zircon/include -lDbgHelp -lucrt -O0 -DARCHIVER
 
+bin/zda.exe: export PATH := C:\Program Files\LLVM\bin;$(PATH)
+bin/zda.exe: $(wildcard src/Disassembler/*.zir) $(wildcard src/Common/*.zir)
+	../Zircon/bin/zirconc.exe src/Disassembler/Main.zir -o $@ -I ../Zircon/include -lDbgHelp -lucrt -O0 -DDISASSEMBLER
+
 boot.o: bin/zas.exe boot.s
 	$^ -o $@
 

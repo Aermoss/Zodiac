@@ -1,0 +1,171 @@
+/*
+ * Copyright 2026 Yusuf Rençber
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+#[include "std/io", "std/str", "std/vec", "std/pair", "std/file", "src/Disassembler/Disassembler.zir",
+    "src/Common/File.zir", "src/Common/Object.zir", "src/Common/Archive.zir", "src/Common/Logger.zir" : *]
+
+func PrintVersion(executable: String) {
+    WriteLine("Unversioned build of " + executable + ".");
+    WriteLine("Copyright (c) 2026 Yusuf Rençber.");
+    WriteLine("Licensed under the Apache License, Version 2.0.");
+    WriteLine("See the LICENSE file for details.");
+}
+
+func PrintUsage(executable: String) {
+    WriteLine("OVERVIEW: Zodiac disassembler");
+    WriteLine("USAGE: " + executable + " [options] <inputs...>");
+    WriteLine("OPTIONS:");
+    WriteLine("  -o <file>                Write output to <file> (default: stdout)");
+    WriteLine("  --version                Display disassembler version");
+    WriteLine("  -h, --help               Display this help message");
+}
+
+func main(args: &mut Vector<String>) -> i32 {
+    let executable = SplitPath(args[0u64]).right;
+    let mut logger = Logger(executable);
+
+    if args.Size() < 2u64 {
+        PrintUsage(executable);
+        ret 1i32;
+    }
+
+    let mut output: String;
+    let mut inputs: Vector<String>;
+    let mut i = 1u64;
+
+    while i < args.Size() {
+        let arg = args[i];
+
+        if arg == "--help" || arg == "-h" {
+            PrintUsage(executable);
+            ret 0i32;
+        } else if arg == "--version" {
+            PrintVersion(executable);
+            ret 0i32;
+        } else if arg == "-o" {
+            i += 1u64;
+
+            if i < args.Size() {
+                output = args[i];
+            } else {
+                Logger::Log("Missing argument to '-o'.", LogSeverity::Error);
+                ret 1i32;
+            }
+        } else {
+            if FileExists(arg) {
+                inputs.PushBack(arg);
+            } else {
+                Logger::Log("Cannot find '" + arg + "'.", LogSeverity::Error);
+                ret 1i32;
+            }
+        } i += 1u64;
+    }
+
+    if inputs.Empty() {
+        Logger::Log("No input files.", LogSeverity::Error);
+        ret 1i32;
+    }
+
+    let mut disassembler = Disassembler();
+
+    for input in inputs {
+        let extension = SplitExtension(input).right;
+
+        if extension == ".a" {
+            let file = File(input);
+
+            if !file.Open(FileMode::ReadBinary) {
+                Logger::Log("Failed to open file '" + input + "'.", LogSeverity::Error);
+                ret 1i32;
+            }
+
+            let magic = file.ReadWord();
+
+            if magic == ARCHIVE_MAGIC {
+                disassembler.objects += Archive::Read(file).objects;
+            } else {
+                Logger::Log("Invalid archive format '" + input + "'.", LogSeverity::Error);
+                ret 1i32;
+            }
+        } else if extension == ".o" {
+            let file = File(input);
+
+            if !file.Open(FileMode::ReadBinary) {
+                Logger::Log("Failed to open file '" + input + "'.", LogSeverity::Error);
+                ret 1i32;
+            }
+
+            let magic = file.ReadWord();
+
+            if magic == OBJECT_MAGIC {
+                disassembler.objects.PushBack(Object::Read(file));
+            } else {
+                Logger::Log("Invalid object format '" + input + "'.", LogSeverity::Error);
+                ret 1i32;
+            }
+        } else if extension == ".bin" {
+            let file = File(input);
+
+            if !file.Open(FileMode::ReadBinary) {
+                Logger::Log("Failed to open file '" + input + "'.", LogSeverity::Error);
+                ret 1i32;
+            }
+
+            let mut object = Object();
+            object.sections.Resize(SECTION_COUNT);
+            object.path = input;
+
+            loop {
+                let mut word = 0u32;
+                if !file.ReadWords(&mut word, 1u64) { break; }
+                object.sections[0u64].PushBack(word);
+            }
+
+            disassembler.objects.PushBack(object);
+        } else if extension == ".hex" {
+            let content = _ReadFile(input);
+
+            if content.Empty() {
+                Logger::Log("Failed to read file '" + input + "'.", LogSeverity::Error);
+                ret 1i32;
+            }
+
+            let mut object = Object();
+            object.sections.Resize(SECTION_COUNT);
+            object.path = input;
+
+            for line in content.Split('\n') {
+                if line.Empty() { continue; }
+                let word = line.ToInteger(16i64) as u32;
+                object.sections[0u64].PushBack(word);
+            }
+
+            disassembler.objects.PushBack(object);
+        } else {
+            Logger::Log("Unsupported file extension '" + extension + "'.", LogSeverity::Error);
+            ret 1i32;
+        }
+    }
+
+    let result = disassembler.Disassemble(output.Empty());
+
+    if output.Empty() {
+        WriteLine(result);
+    } else if !_WriteFile(output, result) {
+        Logger::Log("Failed to write result file '" + output + "'.", LogSeverity::Error);
+        ret 1i32;
+    } ret 0i32;
+}
