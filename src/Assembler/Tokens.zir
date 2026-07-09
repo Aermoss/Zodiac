@@ -59,7 +59,7 @@ func ToString(_type: TokenType) -> String {
 class Token {
     pub _type: TokenType,
     pub value: String,
-    pub row: u64,
-    pub column: u64,
+    pub row: u32,
+    pub column: u32,
     pub file: String
 }

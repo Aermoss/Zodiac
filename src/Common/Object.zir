@@ -31,7 +31,7 @@ class Object {
         this.sections.Resize(SECTION_COUNT);
 
         for section in this.sections {
-            let size = file.ReadWord() as u64;
+            let size = file.ReadWord() as usize;
             section.Resize(size);
             file.ReadWords(section.Data(), size);
         }

@@ -33,10 +33,10 @@ func PrintUsage(executable: String) {
 }
 
 func main(args: &mut Vector<String>) -> i32 {
-    let executable = SplitPath(args[0u64]).right;
+    let executable = SplitPath(args[0usize]).right;
     let mut logger = Logger(executable);
 
-    if args.Size() < 2u64 {
+    if args.Size() < 2usize {
         PrintUsage(executable);
         ret 1i32;
     }
@@ -72,7 +72,7 @@ func main(args: &mut Vector<String>) -> i32 {
             Write("\n");
         }
 
-        if inputs.Size() > 1u64 {
+        if inputs.Size() > 1usize {
             WriteLine(input + ':');
         }
 
@@ -88,20 +88,20 @@ func main(args: &mut Vector<String>) -> i32 {
         loop {
             let mut byte = 0u8;
 
-            if !file.ReadBytes(&mut byte, 1u64) {
+            if !file.ReadBytes(&mut byte, 1usize) {
                 break;
             }
 
             if byte >= 32u8 && byte <= 126u8 {
                 result += byte as i8;
             } else {
-                if result.Length() >= 4u64 {
+                if result.Length() >= 4usize {
                     WriteLine(result);
                 } result = "";
             }
         }
 
-        if result.Length() >= 4u64 {
+        if result.Length() >= 4usize {
             WriteLine(result);
         }
     } ret 0i32;

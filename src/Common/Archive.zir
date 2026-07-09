@@ -24,7 +24,7 @@ class Archive {
 
     pub Read(&mut this, file: &File) {
         this.path = file.path;
-        this.objects.Resize(file.ReadWord() as u64);
+        this.objects.Resize(file.ReadWord() as usize);
 
         for object in this.objects {
             object.Read(file);

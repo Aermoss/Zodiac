@@ -139,14 +139,14 @@ class Disassembler {
 
     priv FormatHexWord(&this, word: u32) -> String {
         let mut hex = String(word as u64, 16u64);
-        while hex.Length() < 8u64 { hex = "0" + hex; }
-        ret hex.SubString(0u64, 2u64) + " " + hex.SubString(2u64, 2u64) + " "
-            + hex.SubString(4u64, 2u64) + " " + hex.SubString(6u64, 2u64);
+        while hex.Length() < 8usize { hex = "0" + hex; }
+        ret hex.SubString(0usize, 2usize) + " " + hex.SubString(2usize, 2usize) + " "
+            + hex.SubString(4usize, 2usize) + " " + hex.SubString(6usize, 2usize);
     }
 
     priv FormatHexAddress(&this, address: u32) -> String {
         let mut hex = String(address as u64, 16u64);
-        while hex.Length() < 8u64 { hex = "0" + hex; }
+        while hex.Length() < 8usize { hex = "0" + hex; }
         ret hex;
     }
 
@@ -174,7 +174,7 @@ class Disassembler {
                 }
             }
 
-            for index in 0u64..object.sections.Size() {
+            for index in 0usize..object.sections.Size() {
                 let section_type = index as SectionType;
                 let section_name = section_type == SectionType::Text ? ".text" : ".data";
                 let section = object.sections[index];

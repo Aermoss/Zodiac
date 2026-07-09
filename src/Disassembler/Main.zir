@@ -34,17 +34,17 @@ func PrintUsage(executable: String) {
 }
 
 func main(args: &mut Vector<String>) -> i32 {
-    let executable = SplitPath(args[0u64]).right;
+    let executable = SplitPath(args[0usize]).right;
     let mut logger = Logger(executable);
 
-    if args.Size() < 2u64 {
+    if args.Size() < 2usize {
         PrintUsage(executable);
         ret 1i32;
     }
 
     let mut output: String;
     let mut inputs: Vector<String>;
-    let mut i = 1u64;
+    let mut i = 1usize;
 
     while i < args.Size() {
         let arg = args[i];
@@ -56,7 +56,7 @@ func main(args: &mut Vector<String>) -> i32 {
             PrintVersion(executable);
             ret 0i32;
         } else if arg == "-o" {
-            i += 1u64;
+            i += 1usize;
 
             if i < args.Size() {
                 output = args[i];
@@ -71,7 +71,7 @@ func main(args: &mut Vector<String>) -> i32 {
                 Logger::Log("Cannot find '" + arg + "'.", LogSeverity::Error);
                 ret 1i32;
             }
-        } i += 1u64;
+        } i += 1usize;
     }
 
     if inputs.Empty() {
@@ -130,8 +130,8 @@ func main(args: &mut Vector<String>) -> i32 {
 
             loop {
                 let mut word = 0u32;
-                if !file.ReadWords(&mut word, 1u64) { break; }
-                object.sections[0u64].PushBack(word);
+                if !file.ReadWords(&mut word, 1usize) { break; }
+                object.sections[0usize].PushBack(word);
             }
 
             disassembler.objects.PushBack(object);
@@ -150,7 +150,7 @@ func main(args: &mut Vector<String>) -> i32 {
             for line in content.Split('\n') {
                 if line.Empty() { continue; }
                 let word = line.ToInteger(16i64) as u32;
-                object.sections[0u64].PushBack(word);
+                object.sections[0usize].PushBack(word);
             }
 
             disassembler.objects.PushBack(object);

@@ -36,9 +36,9 @@ class Emulator {
     pub uart_mutex: Mutex;
 
     Emulator(&mut this) {
-        this.registers = new u32[32u64];
-        this.bram = new u8[16384u64];
-        this.sdram = new u8[8388608u64];
+        this.registers = new u32[32usize];
+        this.bram = new u8[16384usize];
+        this.sdram = new u8[8388608usize];
         this.Reset();
     }
 
@@ -68,7 +68,7 @@ class Emulator {
 
         loop {
             let mut word = 0u32;
-            if !file.ReadWords(&mut word, 1u64) { break; }
+            if !file.ReadWords(&mut word, 1usize) { break; }
             this.WriteWord(offset, word);
             offset += 4u32;
         } ret true;
@@ -77,16 +77,16 @@ class Emulator {
     pub Reset(&mut this) {
         (this.pc, this.halted) = (0u32, false);
         (this.ms_counter, this.tick_counter) = (0u32, 0u32);
-        for i in 0u64..32u64 { this.registers[i] = 0u32; }
+        for i in 0usize..32usize { this.registers[i] = 0u32; }
     }
 
     pub GetRegister(&this, index: u32) -> u32 {
-        ret this.registers[index as u64];
+        ret this.registers[index as usize];
     }
 
     pub SetRegister(&mut this, index: u32, value: u32) {
         if index != 0u32 {
-            this.registers[index as u64] = value;
+            this.registers[index as usize] = value;
         }
     }
 
@@ -105,9 +105,9 @@ class Emulator {
         } else if address == 0xFFF4u32 {
             ret 1u8;
         } else if (address & 0xC0000000u32) == 0x40000000u32 {
-            ret this.sdram[address & 0x7FFFFFu32];
+            ret this.sdram[(address & 0x7FFFFFu32) as usize];
         } else if address < 16384u32 {
-            ret this.bram[address];
+            ret this.bram[address as usize];
         } else {
             ret 0u8;
         }
@@ -137,9 +137,9 @@ class Emulator {
         } else if address == 0xFFF0u32 {
             WriteLine("[LEDs: 0x" + String(value as u64, 16u64) + ']');
         } else if (address & 0xC0000000u32) == 0x40000000u32 {
-            this.sdram[address & 0x7FFFFFu32] = value;
+            this.sdram[(address & 0x7FFFFFu32) as usize] = value;
         } else if address < 16384u32 {
-            this.bram[address] = value;
+            this.bram[address as usize] = value;
         }
     }
 

@@ -32,10 +32,10 @@ func PrintUsage(executable: String) {
 }
 
 func main(args: &mut Vector<String>) -> i32 {
-    let executable = SplitPath(args[0u64]).right;
+    let executable = SplitPath(args[0usize]).right;
     let mut logger = Logger(executable);
 
-    if args.Size() < 2u64 {
+    if args.Size() < 2usize {
         PrintUsage(executable);
         ret 1i32;
     }

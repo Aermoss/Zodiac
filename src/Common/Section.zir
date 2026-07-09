@@ -18,4 +18,4 @@ enum SectionType: u32 {
     Text, Data
 }
 
-const SECTION_COUNT: u64 = 2u64;
+const SECTION_COUNT: usize = 2usize;

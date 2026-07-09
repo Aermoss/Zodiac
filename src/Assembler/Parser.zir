@@ -20,20 +20,20 @@
 class Parser {
     priv arena: Arena,
     priv tokens: Vector<Token>,
-    priv index: u64;
+    priv index: usize;
 
     priv Current(&this) -> Token {
         if this.index >= this.tokens.Size() {
-            ret this.tokens[this.tokens.Size() - 1u64];
+            ret this.tokens[this.tokens.Size() - 1usize];
         } else {
             ret this.tokens[this.index];
         }
     }
 
-    priv Peek(&this, offset: u64) -> Token {
+    priv Peek(&this, offset: usize) -> Token {
         let index = this.index + offset;
         if index >= this.tokens.Size() {
-            ret this.tokens[this.tokens.Size() - 1u64];
+            ret this.tokens[this.tokens.Size() - 1usize];
         } else {
             ret this.tokens[index];
         }
@@ -42,7 +42,7 @@ class Parser {
     priv Advance(&mut this) -> Token {
         let token = this.Current();
         if this.index < this.tokens.Size() {
-            this.index += 1u64;
+            this.index += 1usize;
         } ret token;
     }
 
@@ -182,13 +182,13 @@ class Parser {
         let instruction = this.arena.New<InstructionNode>(mnemonic, token);
 
         if this.Current()._type != TokenType::NEWLINE && this.Current()._type != TokenType::EOF {
-            let mut index = 0u64;
+            let mut index = 0usize;
 
             loop {
                 let operand = this.ParseOperand();
 
                 if operand != null {
-                    let state = (mnemonic == "lb" || mnemonic == "lbu" || mnemonic == "lh" || mnemonic == "lhu" || mnemonic == "lw" || mnemonic == "sb" || mnemonic == "sh" || mnemonic == "sw") && index == 1u64;
+                    let state = (mnemonic == "lb" || mnemonic == "lbu" || mnemonic == "lh" || mnemonic == "lhu" || mnemonic == "lw" || mnemonic == "sb" || mnemonic == "sh" || mnemonic == "sw") && index == 1usize;
                     let mut is_reloc = false;
 
                     if operand->offset != null {
@@ -208,7 +208,7 @@ class Parser {
                 }
 
                 if this.Match(TokenType::COMMA) {
-                    index += 1u64;
+                    index += 1usize;
                 } else {
                     break;
                 }
@@ -223,7 +223,7 @@ class Parser {
     }
 
     pub Parse(&mut this, tokens: &Vector<Token>) -> *const RootNode {
-        (this.tokens, this.index) = (tokens, 0u64);
+        (this.tokens, this.index) = (tokens, 0usize);
         this.arena.Clear();
         let root = this.arena.New<RootNode>();
 
@@ -232,7 +232,7 @@ class Parser {
             let token = this.Current();
 
             if token._type == TokenType::IDENTIFIER {
-                if this.Peek(1u64)._type == TokenType::COLON {
+                if this.Peek(1usize)._type == TokenType::COLON {
                     root->declarations.PushBack(this.ParseLabel());
                 } else {
                     root->declarations.PushBack(this.ParseInstruction());

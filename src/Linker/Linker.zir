@@ -96,7 +96,7 @@ class Linker {
         for object in this.objects {
             object.section_bases.Resize(SECTION_COUNT);
 
-            for i in 0u64..object.sections.Size() {
+            for i in 0usize..object.sections.Size() {
                 object.section_bases[i] = (this.sections[i].Size() as u32) * 4u32;
 
                 for word in object.sections[i] {
@@ -107,7 +107,7 @@ class Linker {
 
         let mut offset = 0u32;
 
-        for i in 0u64..this.sections.Size() {
+        for i in 0usize..this.sections.Size() {
             this.section_bases[i] = offset * 4u32;
 
             if offset != 0u32 {
@@ -119,11 +119,11 @@ class Linker {
             offset += this.sections[i].Size() as u32;
         }
 
-        for i in 0u64..this.objects.Size() {
+        for i in 0usize..this.objects.Size() {
             let object = this.objects[i];
 
             for symbol in object.symbols {
-                this.symbol_addresses.PushBack(object.section_bases[symbol.section as u64] + symbol.offset);
+                this.symbol_addresses.PushBack(object.section_bases[symbol.section as usize] + symbol.offset);
                 let mut name = symbol.name;
 
                 if symbol.binding == BindingType::Local {
@@ -139,7 +139,7 @@ class Linker {
             }
         }
 
-        for i in 0u64..this.objects.Size() {
+        for i in 0usize..this.objects.Size() {
             let object = this.objects[i];
 
             for relocation in object.relocations {
@@ -154,10 +154,10 @@ class Linker {
                     ret result;
                 }
  
-                let target: u32 = this.symbol_addresses[symbol_index as u64];
-                let pc = object.section_bases[relocation.section as u64] + relocation.offset;
-                let index = ((pc - this.section_bases[relocation.section as u64]) / 4u32) as u64;
-                let mut word: u32 = this.sections[relocation.section as u64][index];
+                let target: u32 = this.symbol_addresses[symbol_index as usize];
+                let pc = object.section_bases[relocation.section as usize] + relocation.offset;
+                let index = ((pc - this.section_bases[relocation.section as usize]) / 4u32) as usize;
+                let mut word: u32 = this.sections[relocation.section as usize][index];
 
                 if relocation._type == RelocationType::AbsoluteUpper21 {
                     word = (word & !IMM21_MASK) | ((target >> 11u32) & IMM21_MASK);
@@ -180,7 +180,7 @@ class Linker {
                     ret result;
                 }
 
-                this.sections[relocation.section as u64][index] = word;
+                this.sections[relocation.section as usize][index] = word;
             }
         }
 
@@ -191,7 +191,7 @@ class Linker {
         for section in this.sections {
             for word in section {
                 let mut hex = String(word as u64, 16u64);
-                while hex.Length() < 8u64 { hex = "0" + hex; }
+                while hex.Length() < 8usize { hex = "0" + hex; }
                 result += hex + "\n";
             }
         }
