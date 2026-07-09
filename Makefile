@@ -18,7 +18,7 @@ bin/zld.exe: $(wildcard src/Linker/*.zir) $(wildcard src/Common/*.zir)
 
 bin/zemu.exe: export PATH := C:\Program Files\LLVM\bin;$(PATH)
 bin/zemu.exe: $(wildcard src/Emulator/*.zir) $(wildcard src/Common/*.zir)
-	../Zircon/bin/zirconc.exe src/Emulator/Main.zir -o $@ -I ../Zircon/include -lDbgHelp -lucrt -O0 -DEMULATOR
+	../Zircon/bin/zirconc.exe src/Emulator/Main.zir -o $@ -I ../Zircon/include -lDbgHelp -lucrt -lvcruntime -O0 -DEMULATOR
 
 bin/znm.exe: export PATH := C:\Program Files\LLVM\bin;$(PATH)
 bin/znm.exe: $(wildcard src/Names/*.zir) $(wildcard src/Common/*.zir)

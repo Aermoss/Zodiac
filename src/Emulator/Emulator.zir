@@ -14,8 +14,12 @@
  * limitations under the License.
  */
 
-#[include "std/io", "std/str", "std/vec", "std/file",
+#[include "std/io", "std/str", "std/vec", "std/file", "std/thrd",
     "src/Common/File.zir", "src/Common/Instruction.zir" : *]
+
+extern "C" {
+    func _getch() -> i32;
+}
 
 const CLK_FREQ: u32 = 33000000u32;
 
@@ -26,7 +30,10 @@ class Emulator {
     pub bram: *mut u8,
     pub sdram: *mut u8,
     pub ms_counter: u32,
-    pub tick_counter: u32;
+    pub tick_counter: u32,
+    pub uart_rx: u8,
+    pub uart_rx_ready: bool,
+    pub uart_mutex: Mutex;
 
     Emulator(&mut this) {
         this.registers = new u32[32u64];
@@ -83,15 +90,44 @@ class Emulator {
         }
     }
 
-    priv ReadByte(&this, address: u32) -> u8 {
-        if address == 0xFFFFu32 {
-            ret 0u8;
+    priv ReadByte(&mut this, address: u32) -> u8 {
+        if address == 0xFFFCu32 {
+            this.uart_mutex.Lock();
+            let ready = this.uart_rx_ready;
+            this.uart_mutex.Unlock();
+            ret ready ? 1u8 : 0u8;
+        } else if address == 0xFFFFu32 {
+            this.uart_mutex.Lock();
+            let result = this.uart_rx_ready ? this.uart_rx : 0u8;
+            this.uart_rx_ready = false;
+            this.uart_mutex.Unlock();
+            ret result;
+        } else if address == 0xFFF4u32 {
+            ret 1u8;
         } else if (address & 0xC0000000u32) == 0x40000000u32 {
             ret this.sdram[address & 0x7FFFFFu32];
         } else if address < 16384u32 {
             ret this.bram[address];
         } else {
             ret 0u8;
+        }
+    }
+
+    priv ReadHalf(&mut this, address: u32) -> u16 {
+        let mut result = this.ReadByte(address) as u32;
+        result |= (this.ReadByte(address + 1u32) as u32 << 8u32);
+        ret result as u16;
+    }
+
+    priv ReadWord(&mut this, address: u32) -> u32 {
+        if address == 0xFFECu32 {
+            ret this.ms_counter;
+        } else {
+            let mut result = this.ReadByte(address) as u32;
+            result |= (this.ReadByte(address + 1u32) as u32 << 8u32);
+            result |= (this.ReadByte(address + 2u32) as u32 << 16u32);
+            result |= (this.ReadByte(address + 3u32) as u32 << 24u32);
+            ret result;
         }
     }
 
@@ -107,45 +143,17 @@ class Emulator {
         }
     }
 
-    priv ReadHalf(&this, address: u32) -> u16 {
-        let mut result = this.ReadByte(address) as u32;
-        result |= (this.ReadByte(address + 1u32) as u32 << 8u32);
-        ret result as u16;
-    }
-
-    priv ReadWord(&this, address: u32) -> u32 {
-        if address == 0xFFFCu32 {
-            ret 0u32;
-        } else if address == 0xFFECu32 {
-            ret this.ms_counter;
-        } else if address == 0xFFF4u32 {
-            ret 1u32;
-        } else if address == 0xFFF8u32 {
-            ret 0u32;
-        } else if address == 0xFFFFu32 {
-            ret 0u32;
-        } else {
-            let mut result = this.ReadByte(address) as u32;
-            result |= (this.ReadByte(address + 1u32) as u32 << 8u32);
-            result |= (this.ReadByte(address + 2u32) as u32 << 16u32);
-            result |= (this.ReadByte(address + 3u32) as u32 << 24u32);
-            ret result;
-        }
-    }
-
     priv WriteHalf(&mut this, address: u32, value: u16) {
         this.WriteByte(address, (value as u32 & 0xFFu32) as u8);
         this.WriteByte(address + 1u32, ((value as u32 >> 8u32) & 0xFFu32) as u8);
     }
 
     priv WriteWord(&mut this, address: u32, value: u32) {
-        if address == 0xFFFFu32 {
-            Write(((value & 0xFFu32) as i8).ToString());
-        } else if address == 0xFFF0u32 {
-            WriteLine("[LEDs: 0x" + String(value as u64, 16u64) + ']');
-        } else if address == 0xFFE0u32 {
+        if address == 0xFFE0u32 {
             WriteLine("[WS2812: RGB(0x" + String(value as u64, 16u64) + ")]");
-        } else if address == 0xFFF8u32 {} else {
+        } else if address == 0xFFF8u32 {
+            WriteLine("[UART Baud Rate: ~" + String((CLK_FREQ / value) as u64, 10u64) + ']');
+        } else {
             this.WriteByte(address, (value & 0xFFu32) as u8);
             this.WriteByte(address + 1u32, ((value >> 8u32) & 0xFFu32) as u8);
             this.WriteByte(address + 2u32, ((value >> 16u32) & 0xFFu32) as u8);
@@ -301,7 +309,24 @@ class Emulator {
         }
     }
 
+    func UartThread(&mut this) {
+        loop {
+            let character = _getch();
+            this.uart_mutex.Lock();
+
+            if !this.uart_rx_ready {
+                this.uart_rx = character as u8;
+                this.uart_rx_ready = true;
+            }
+
+            this.uart_mutex.Unlock();
+        }
+    }
+
     pub Emulate(&mut this) {
+        let uart_thread = Thread(Emulator::UartThread, this);
+        uart_thread.Detach();
+
         while !this.halted {
             this.Tick();
         }
