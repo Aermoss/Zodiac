@@ -25,10 +25,10 @@ func PrintVersion(executable: String) {
 }
 
 func PrintUsage(executable: String) {
-    WriteLine("OVERVIEW: Zodiac symbol table dumper");
+    WriteLine("OVERVIEW: Zodiac symbol dumper");
     WriteLine("USAGE: " + executable + " [options] <inputs...>");
     WriteLine("OPTIONS:");
-    WriteLine("  --version                Display symbol table dumper version");
+    WriteLine("  --version                Display symbol dumper version");
     WriteLine("  -h, --help               Display this help message");
 }
 

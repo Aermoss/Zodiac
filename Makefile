@@ -20,12 +20,12 @@ bin/zemu.exe: export PATH := C:\Program Files\LLVM\bin;$(PATH)
 bin/zemu.exe: $(wildcard src/Emulator/*.zir) $(wildcard src/Common/*.zir)
 	../Zircon/bin/zirconc.exe src/Emulator/Main.zir -o $@ -I ../Zircon/include -lDbgHelp -lucrt -lvcruntime -O0 -DEMULATOR
 
-bin/znm.exe: export PATH := C:\Program Files\LLVM\bin;$(PATH)
-bin/znm.exe: $(wildcard src/Names/*.zir) $(wildcard src/Common/*.zir)
-	../Zircon/bin/zirconc.exe src/Names/Main.zir -o $@ -I ../Zircon/include -lDbgHelp -lucrt -O0 -DNAMES
+bin/zym.exe: export PATH := C:\Program Files\LLVM\bin;$(PATH)
+bin/zym.exe: $(wildcard src/Symbols/*.zir) $(wildcard src/Common/*.zir)
+	../Zircon/bin/zirconc.exe src/Symbols/Main.zir -o $@ -I ../Zircon/include -lDbgHelp -lucrt -O0 -DSYMBOLS
 
-bin/zstrings.exe: export PATH := C:\Program Files\LLVM\bin;$(PATH)
-bin/zstrings.exe: $(wildcard src/Strings/*.zir) $(wildcard src/Common/*.zir)
+bin/ztr.exe: export PATH := C:\Program Files\LLVM\bin;$(PATH)
+bin/ztr.exe: $(wildcard src/Strings/*.zir) $(wildcard src/Common/*.zir)
 	../Zircon/bin/zirconc.exe src/Strings/Main.zir -o $@ -I ../Zircon/include -lDbgHelp -lucrt -O0 -DSTRINGS
 
 boot.o: bin/zas.exe boot.s
