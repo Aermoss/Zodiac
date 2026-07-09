@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#[include "std/io", "std/str", "std/vec", "std/pair", "std/file", "src/Archiver/Archiver.zir",
-    "src/Common/File.zir", "src/Common/Object.zir", "src/Common/Archive.zir", "src/Common/Logger.zir" : *]
+#[include "std/io", "std/str", "std/vec", "std/pair", "std/file", "src/Common/File.zir",
+    "src/Common/Object.zir", "src/Common/Archive.zir", "src/Common/Logger.zir" : *]
 
 func PrintVersion(executable: String) {
     WriteLine("Unversioned build of " + executable + ".");
@@ -79,7 +79,7 @@ func main(args: &mut Vector<String>) -> i32 {
         ret 1i32;
     }
 
-    let mut archiver = Archiver();
+    let mut archive = Archive();
 
     for input in inputs {
         let file = File(input);
@@ -92,14 +92,12 @@ func main(args: &mut Vector<String>) -> i32 {
         let magic = file.ReadWord();
 
         if magic == OBJECT_MAGIC {
-            archiver.objects.PushBack(Object::Read(file));
+            archive.objects.PushBack(Object::Read(file));
         } else {
             Logger::Log("Invalid input file '" + input + "'.", LogSeverity::Error);
             ret 1i32;
         }
     }
-
-    let archive = archiver.Archive();
 
     if output.Empty() {
         output = SplitExtension(inputs[0u64]).left + ".a";
