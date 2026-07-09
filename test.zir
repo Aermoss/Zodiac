@@ -95,10 +95,41 @@ func SetBaudRate(baud: u32) {
     *(0xFFF8u32 as *mut u32) = CLK_FREQ / baud;
 }
 
+/* class DivisionResult {
+    pub quotient: u32,
+    pub remainder: u32;
+}
+
+func SoftwareDivide(dividend: u32, divisor: u32) -> DivisionResult {
+    let result = DivisionResult();
+    result.remainder = dividend;
+
+    while result.remainder >= divisor {
+        result.remainder -= divisor;
+        result.quotient += 1u32;
+    } ret result;
+} */
+
 @nomangle
 func Main() {
     SetBaudRate(115200u32);
     Sleep(1u32);
+
+    /* let software_start = GetTime();
+    let software_result = SoftwareDivide(CLK_FREQ, 115200u32);
+    let software_time = GetTime() - software_start;
+
+    Write("Software division took ");
+    WriteInteger(software_start);
+    WriteLine(" ms.");
+
+    let hardware_start = GetTime();
+    let hardware_result = CLK_FREQ / 115200u32;
+    let hardware_time = GetTime() - hardware_start;
+
+    Write("Hardware division took ");
+    WriteInteger(hardware_time);
+    WriteLine(" ms."); */
 
     WriteLine("Zodiac interactive terminal initialized!");
     WriteLine("Type anything to echo, press 1-6 to toggle LEDs, or +/- to change RGB brightness.");
