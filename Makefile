@@ -55,5 +55,8 @@ simulate: dump.vcd
 emulate: bin/zemu.exe program.hex
 	$^
 
+all: bin/zas.exe bin/zda.exe bin/zar.exe bin/zld.exe bin/zemu.exe bin/zym.exe bin/ztr.exe
+
 clean:
-	rm -f dump.vcd sim.out program.hex bin/zld.exe boot.o program.o bin/zas.exe
+	rm -f dump.vcd sim.out boot.o program.o program.hex
+	rm -rf bin/*

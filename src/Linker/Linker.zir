@@ -145,11 +145,11 @@ class Linker {
             for relocation in object.relocations {
                 let mut symbol_index = this.symbol_names.Index(String(i as i64) + ":" + relocation.symbol);
 
-                if symbol_index == -1i64 {
+                if symbol_index == -1isize {
                     symbol_index = this.symbol_names.Index(relocation.symbol);
                 }
  
-                if symbol_index == -1i64 {
+                if symbol_index == -1isize {
                     Logger::Log("Undefined symbol '" + relocation.symbol + "' referenced in " + object.path + ".", LogSeverity::Error);
                     ret result;
                 }
