@@ -41,8 +41,11 @@ func main(args: &mut Vector<String>) -> i32 {
     }
 
     let mut input = String();
+    let mut i: usize = 1;
 
-    for arg in args {
+    while i < args.Size() {
+        let arg = args[i];
+
         if arg == "--help" || arg == "-h" {
             PrintUsage(executable);
             ret 0;
@@ -54,7 +57,7 @@ func main(args: &mut Vector<String>) -> i32 {
         } else {
             Logger::Log("Cannot find '" + arg + "'.", LogSeverity::Error);
             ret 1;
-        }
+        } i += 1;
     }
 
     if input.Empty() {

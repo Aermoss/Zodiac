@@ -44,7 +44,7 @@ func main(args: &mut Vector<String>) -> i32 {
 
     let mut output: String;
     let mut inputs: Vector<String>;
-    let mut i:usize = 1;
+    let mut i: usize = 1;
 
     while i < args.Size() {
         let arg = args[i];
