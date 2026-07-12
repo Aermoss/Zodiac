@@ -16,7 +16,7 @@
 
 #[include "std/str", "std/vec", "src/Common/File.zir", "src/Common/Object.zir" : *]
 
-const ARCHIVE_MAGIC: u32 = 0x4352415Au32;
+const ARCHIVE_MAGIC: u32 = 0x4352415A;
 
 class Archive {
     pub path: String,

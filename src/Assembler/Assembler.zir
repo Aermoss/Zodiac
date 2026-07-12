@@ -31,14 +31,14 @@ class Assembler {
 
     priv WriteHalf(&mut this, section: SectionType, value: u16) {
         this.WriteByte(section, value as u8);
-        this.WriteByte(section, (value >> 8u16) as u8);
+        this.WriteByte(section, (value >> 8) as u8);
     }
 
     priv WriteWord(&mut this, section: SectionType, value: u32) {
         this.WriteByte(section, value as u8);
-        this.WriteByte(section, (value >> 8u32) as u8);
-        this.WriteByte(section, (value >> 16u32) as u8);
-        this.WriteByte(section, (value >> 24u32) as u8);
+        this.WriteByte(section, (value >> 8) as u8);
+        this.WriteByte(section, (value >> 16) as u8);
+        this.WriteByte(section, (value >> 24) as u8);
     }
 
     priv GetSectionSize(&mut this, section: SectionType) -> u32 {
@@ -47,8 +47,8 @@ class Assembler {
 
     priv IsRegister(&mut this, value: &String) -> bool {
         if !value.StartsWith("x") { ret false; }
-        if value.Length() < 2usize || value.Length() > 3usize { ret false; }
-        let rest = value.SubString(1usize);
+        if value.Length() < 2 || value.Length() > 3 { ret false; }
+        let rest = value.SubString(1);
 
         for character in rest {
             if character < '0' || character > '9' {
@@ -56,8 +56,8 @@ class Assembler {
             }
         }
 
-        let number = rest.ToInteger(10i64);
-        ret number >= 0i64 && number <= 31i64;
+        let number = rest.ToInteger(10);
+        ret number >= 0 && number <= 31;
     }
 
     priv IsRelocatable(&mut this, node: *const Node) -> bool {
@@ -79,15 +79,15 @@ class Assembler {
             ret this.GetSectionSize(this.section);
         } else if node->_type == NodeType::LITERAL {
             let value = (node as *const LiteralNode)->value;
-            if value.StartsWith("0x") { ret value.SubString(2usize).ToInteger(16i64) as u32; }
-            else if value.StartsWith("0b") { ret value.SubString(2usize).ToInteger(2i64) as u32; }
-            else if value.StartsWith("0o") { ret value.SubString(2usize).ToInteger(8i64) as u32; }
-            else { ret value.ToInteger(10i64) as u32; }
+            if value.StartsWith("0x") { ret value.SubString(2).ToInteger(16) as u32; }
+            else if value.StartsWith("0b") { ret value.SubString(2).ToInteger(2) as u32; }
+            else if value.StartsWith("0o") { ret value.SubString(2).ToInteger(8) as u32; }
+            else { ret value.ToInteger(10) as u32; }
         } else if node->_type == NodeType::IDENTIFIER {
             let value = (node as *const IdentifierNode)->value;
 
             if this.IsRegister(value) {
-                ret value.SubString(1usize).ToInteger(10i64) as u32;
+                ret value.SubString(1).ToInteger(10) as u32;
             }
 
             for symbol in this.symbols {
@@ -98,7 +98,7 @@ class Assembler {
 
             if !this.externs.Contains(value) {
                 Logger::Log("Unknown identifier: '" + value + "'.", node, LogSeverity::Error);
-            } ret 0u32;
+            } ret 0;
         } else if node->_type == NodeType::BINARY_OPERATION {
             let binary = node as *const BinaryOperationNode;
             let left = this.AssembleExpression(binary->left);
@@ -114,20 +114,20 @@ class Assembler {
             else if binary->operator == TokenType::XOR { ret left ^ right; }
             else {
                 Logger::Log("Unknown binary operation: '" + binary->operator.ToString() + "'.", binary, LogSeverity::Error);
-                ret 0u32;
+                ret 0;
             }
         } else if node->_type == NodeType::UNARY_OPERATION {
             let unary = node as *const UnaryOperationNode;
             let operand = this.AssembleExpression(unary->operand);
-            if unary->operator == TokenType::MINUS { ret 0u32 - operand; }
+            if unary->operator == TokenType::MINUS { ret 0 - operand; }
             else if unary->operator == TokenType::NOT { ret !operand; }
             else {
                 Logger::Log("Unknown unary operation: '" + unary->operator.ToString() + "'.", unary, LogSeverity::Error);
-                ret 0u32;
+                ret 0;
             }
         } else {
             Logger::Log("Unknown expression: '" + node->_type.ToString() + "'.", node, LogSeverity::Error);
-            ret 0u32;
+            ret 0;
         }
     }
 
@@ -138,8 +138,8 @@ class Assembler {
         let mut section_sizes: Vector<u32>;
         section_sizes.Resize(SECTION_COUNT);
 
-        for i in 0usize..section_sizes.Size() {
-            section_sizes[i] = 0u32;
+        for i in 0..section_sizes.Size() {
+            section_sizes[i] = 0;
         }
  
         for node in root->declarations {
@@ -172,23 +172,23 @@ class Assembler {
                     } else if mnemonic == ".byte" {
                         section_sizes[this.section as usize] += operands.Size() as u32;
                     } else if mnemonic == ".half" {
-                        section_sizes[this.section as usize] += (operands.Size() * 2usize) as u32;
+                        section_sizes[this.section as usize] += (operands.Size() * 2) as u32;
                     } else if mnemonic == ".word" {
-                        section_sizes[this.section as usize] += (operands.Size() * 4usize) as u32;
+                        section_sizes[this.section as usize] += (operands.Size() * 4) as u32;
                     } else if mnemonic == ".string" {
                         for operand in operands {
                             let literal = operand->expression as *const LiteralNode;
-                            section_sizes[this.section as usize] += (literal->value.Length() + 1usize) as u32;
+                            section_sizes[this.section as usize] += (literal->value.Length() + 1) as u32;
                         }
                     } else if mnemonic == ".align" {
-                        let align = this.AssembleExpression(operands[0usize]->expression);
+                        let align = this.AssembleExpression(operands[0]->expression);
                         let remainder = section_sizes[this.section as usize] % align;
 
-                        if remainder != 0u32 {
+                        if remainder != 0 {
                             section_sizes[this.section as usize] += align - remainder;
                         }
                     } else if mnemonic == ".space" {
-                        section_sizes[this.section as usize] += this.AssembleExpression(operands[0usize]->expression);
+                        section_sizes[this.section as usize] += this.AssembleExpression(operands[0]->expression);
                     } else if mnemonic == ".global" {
                         for operand in operands {
                             if operand->expression->_type == NodeType::IDENTIFIER {
@@ -221,39 +221,39 @@ class Assembler {
                     } continue;
                 }
  
-                let remainder = section_sizes[this.section as usize] % 4u32;
+                let remainder = section_sizes[this.section as usize] % 4;
 
-                if remainder != 0u32 {
-                    section_sizes[this.section as usize] += (4u32 - remainder);
+                if remainder != 0 {
+                    section_sizes[this.section as usize] += (4 - remainder);
                 }
  
-                let mut size = 4u32;
+                let mut size: u32 = 4;
 
                 if mnemonic == "li" {
-                    if operands.Size() >= 2usize {
-                        if !this.IsRelocatable(operands[1usize]->expression) {
-                            let immediate = this.AssembleExpression(operands[1usize]->expression);
+                    if operands.Size() >= 2 {
+                        if !this.IsRelocatable(operands[1]->expression) {
+                            let immediate = this.AssembleExpression(operands[1]->expression);
 
                             if (immediate <= IMM16_SMAX) || (immediate >= IMM16_SMIN) {
-                                size = 4u32;
-                            } else if (immediate & IMM11_MASK) == 0u32 {
-                                size = 4u32;
+                                size = 4;
+                            } else if (immediate & IMM11_MASK) == 0 {
+                                size = 4;
                             } else {
-                                size = 8u32;
+                                size = 8;
                             }
                         } else {
-                            size = 8u32;
+                            size = 8;
                         }
                     }
                 } else if mnemonic == "la" {
-                    size = 8u32;
+                    size = 8;
                 }
 
                 section_sizes[this.section as usize] += size;
             }
         }
 
-        let mut index = 0usize;
+        let mut index = 0;
         this.section = SectionType::Text;
 
         for node in root->declarations {
@@ -285,7 +285,7 @@ class Assembler {
                         if this.IsRelocatable(operand->expression) {
                             let label = (operand->expression as *const IdentifierNode)->value;
                             this.relocations.PushBack(Relocation(this.section, offset, RelocationType::Absolute32, label));
-                            this.WriteWord(this.section, 0u32);
+                            this.WriteWord(this.section, 0);
                         } else {
                             this.WriteWord(this.section, this.AssembleExpression(operand->expression));
                         }
@@ -294,68 +294,68 @@ class Assembler {
                     for operand in operands {
                         let value = (operand->expression as *const LiteralNode)->value;
 
-                        for i in 0usize..value.Length() {
+                        for i in 0..value.Length() {
                             this.WriteByte(this.section, value.Data()[i] as u8);
-                        } this.WriteByte(this.section, 0u8);
+                        } this.WriteByte(this.section, 0);
                     }
                 } else if mnemonic == ".align" {
-                    let align = this.AssembleExpression(operands[0usize]->expression);
+                    let align = this.AssembleExpression(operands[0]->expression);
                     let remainder = offset % align;
 
-                    if remainder != 0u32 {
-                        for _ in 0u32..(align - remainder) {
-                            this.WriteByte(this.section, 0u8);
+                    if remainder != 0 {
+                        for _ in 0..(align - remainder) {
+                            this.WriteByte(this.section, 0);
                         }
                     }
                 } else if mnemonic == ".space" {
-                    for _ in 0u32..this.AssembleExpression(operands[0usize]->expression) {
-                        this.WriteByte(this.section, 0u8);
+                    for _ in 0..this.AssembleExpression(operands[0]->expression) {
+                        this.WriteByte(this.section, 0);
                     }
                 } continue;
             }
 
-            let remainder = offset % 4u32;
+            let remainder = offset % 4;
 
-            if remainder != 0u32 {
-                for _ in 0u32..(4u32 - remainder) {
-                    this.WriteByte(this.section, 0u8);
-                } offset += (4u32 - remainder);
+            if remainder != 0 {
+                for _ in 0..(4 - remainder) {
+                    this.WriteByte(this.section, 0);
+                } offset += (4 - remainder);
             }
 
             if mnemonic == "la" {
-                let register = this.AssembleExpression(operands[0usize]->expression);
-                let label = (operands[1usize]->expression as *const IdentifierNode)->value;
-                this.WriteWord(this.section, (Opcode::AUIPC << OPCODE_SHIFT) | (register << REG0_SHIFT) | (0u32 & IMM21_MASK));
-                this.WriteWord(this.section, (Opcode::ADDI << OPCODE_SHIFT) | (register << REG0_SHIFT) | (register << REG1_SHIFT) | (0u32 & IMM16_MASK));
+                let register = this.AssembleExpression(operands[0]->expression);
+                let label = (operands[1]->expression as *const IdentifierNode)->value;
+                this.WriteWord(this.section, (Opcode::AUIPC << OPCODE_SHIFT) | (register << REG0_SHIFT) | (0 & IMM21_MASK));
+                this.WriteWord(this.section, (Opcode::ADDI << OPCODE_SHIFT) | (register << REG0_SHIFT) | (register << REG1_SHIFT) | (0 & IMM16_MASK));
                 this.relocations.PushBack(Relocation(this.section, offset, RelocationType::PcRelativeUpper21, label));
-                this.relocations.PushBack(Relocation(this.section, offset + 4u32, RelocationType::PcRelativeLower11, label));
-                index += 1usize;
+                this.relocations.PushBack(Relocation(this.section, offset + 4, RelocationType::PcRelativeLower11, label));
+                index += 1;
                 continue;
             }
 
             if mnemonic == "li" {
-                let register = this.AssembleExpression(operands[0usize]->expression);
+                let register = this.AssembleExpression(operands[0]->expression);
 
-                if this.IsRelocatable(operands[1usize]->expression) {
-                    let label = (operands[1usize]->expression as *const IdentifierNode)->value;
-                    this.WriteWord(this.section, (Opcode::LUI << OPCODE_SHIFT) | (register << REG0_SHIFT) | (0u32 & IMM21_MASK));
-                    this.WriteWord(this.section, (Opcode::ORI << OPCODE_SHIFT) | (register << REG0_SHIFT) | (register << REG1_SHIFT) | (0u32 & IMM16_MASK));
+                if this.IsRelocatable(operands[1]->expression) {
+                    let label = (operands[1]->expression as *const IdentifierNode)->value;
+                    this.WriteWord(this.section, (Opcode::LUI << OPCODE_SHIFT) | (register << REG0_SHIFT) | (0 & IMM21_MASK));
+                    this.WriteWord(this.section, (Opcode::ORI << OPCODE_SHIFT) | (register << REG0_SHIFT) | (register << REG1_SHIFT) | (0 & IMM16_MASK));
                     this.relocations.PushBack(Relocation(this.section, offset, RelocationType::AbsoluteUpper21, label));
-                    this.relocations.PushBack(Relocation(this.section, offset + 4u32, RelocationType::AbsoluteLower11, label));
+                    this.relocations.PushBack(Relocation(this.section, offset + 4, RelocationType::AbsoluteLower11, label));
                 } else {
-                    let immediate = this.AssembleExpression(operands[1usize]->expression);
+                    let immediate = this.AssembleExpression(operands[1]->expression);
 
                     if (immediate <= IMM16_SMAX) || (immediate >= IMM16_SMIN) {
-                        this.WriteWord(this.section, (Opcode::ADDI << OPCODE_SHIFT) | (register << REG0_SHIFT) | (0u32 << REG1_SHIFT) | (immediate & IMM16_MASK));
-                    } else if (immediate & IMM11_MASK) == 0u32 {
-                        this.WriteWord(this.section, (Opcode::LUI << OPCODE_SHIFT) | (register << REG0_SHIFT) | ((immediate >> 11u32) & IMM21_MASK));
+                        this.WriteWord(this.section, (Opcode::ADDI << OPCODE_SHIFT) | (register << REG0_SHIFT) | (0 << REG1_SHIFT) | (immediate & IMM16_MASK));
+                    } else if (immediate & IMM11_MASK) == 0 {
+                        this.WriteWord(this.section, (Opcode::LUI << OPCODE_SHIFT) | (register << REG0_SHIFT) | ((immediate >> 11) & IMM21_MASK));
                     } else {
-                        this.WriteWord(this.section, (Opcode::LUI << OPCODE_SHIFT) | (register << REG0_SHIFT) | ((immediate >> 11u32) & IMM21_MASK));
+                        this.WriteWord(this.section, (Opcode::LUI << OPCODE_SHIFT) | (register << REG0_SHIFT) | ((immediate >> 11) & IMM21_MASK));
                         this.WriteWord(this.section, (Opcode::ORI << OPCODE_SHIFT) | (register << REG0_SHIFT) | (register << REG1_SHIFT) | (immediate & IMM11_MASK));
                     }
                 }
 
-                index += 1usize;
+                index += 1;
                 continue;
             }
 
@@ -371,12 +371,12 @@ class Assembler {
             else { pseudo = false; }
 
             if pseudo {
-                let destination = this.AssembleExpression(operands[0usize]->expression);
-                let source = this.AssembleExpression(operands[1usize]->expression);
-                let other = (_zero ? 0u32 : (negative ? -1i32 as u32 : 1u32));
+                let destination = this.AssembleExpression(operands[0]->expression);
+                let source = this.AssembleExpression(operands[1]->expression);
+                let other = (_zero ? 0 : (negative ? -1 as u32 : 1));
                 let (left, right) = ((reverse ? other : source), (reverse ? source : other));
                 this.WriteWord(this.section, (opcode << OPCODE_SHIFT) | (destination << REG0_SHIFT) | (left << REG1_SHIFT) | (register ? (right << REG2_SHIFT) : (right & IMM16_MASK)));
-                index += 1usize;
+                index += 1;
                 continue;
             }
 
@@ -393,18 +393,18 @@ class Assembler {
             else { pseudo = false; }
 
             if pseudo {
-                let _index = _zero ? 1usize : 2usize;
+                let _index: usize = _zero ? 1 : 2;
                 let target = this.AssembleExpression(operands[_index]->expression);
 
                 if this.IsRelocatable(operands[_index]->expression) {
                     this.relocations.PushBack(Relocation(this.section, offset, RelocationType::Branch16, (operands[_index]->expression as *const IdentifierNode)->value));
                 }
 
-                let source = this.AssembleExpression(operands[0usize]->expression);
-                let other = _zero ? 0u32 : this.AssembleExpression(operands[1usize]->expression);
+                let source = this.AssembleExpression(operands[0]->expression);
+                let other = _zero ? 0 : this.AssembleExpression(operands[1]->expression);
                 let (left, right) = ((reverse ? other : source), (reverse ? source : other));
                 this.WriteWord(this.section, (opcode << OPCODE_SHIFT) | (left << REG0_SHIFT) | (right << REG1_SHIFT) | (target & IMM16_MASK));
-                index += 1usize;
+                index += 1;
                 continue;
             }
 
@@ -466,70 +466,70 @@ class Assembler {
             let mut word = (opcode << OPCODE_SHIFT);
 
             if opcode >= Opcode::LB && opcode <= Opcode::SW {
-                word |= (this.AssembleExpression(operands[0usize]->expression) << REG0_SHIFT);
+                word |= (this.AssembleExpression(operands[0]->expression) << REG0_SHIFT);
 
                 if opcode == Opcode::LUI || opcode == Opcode::AUIPC {
-                    word |= (this.AssembleExpression(operands[1usize]->expression) & IMM21_MASK);
+                    word |= (this.AssembleExpression(operands[1]->expression) & IMM21_MASK);
                 } else {
-                    word |= (this.AssembleExpression(operands[1usize]->expression) << REG1_SHIFT);
-                    word |= (this.AssembleExpression(operands[1usize]->offset) & IMM16_MASK);
+                    word |= (this.AssembleExpression(operands[1]->expression) << REG1_SHIFT);
+                    word |= (this.AssembleExpression(operands[1]->offset) & IMM16_MASK);
                 }
             } else if opcode == Opcode::B {
-                word |= (((this.AssembleExpression(operands[0usize]->expression) - offset) >> 2u32) & IMM26_MASK);
+                word |= (((this.AssembleExpression(operands[0]->expression) - offset) >> 2) & IMM26_MASK);
 
-                if this.IsRelocatable(operands[0usize]->expression) {
-                    this.relocations.PushBack(Relocation(this.section, offset, RelocationType::Branch26, (operands[0usize]->expression as *const IdentifierNode)->value));
+                if this.IsRelocatable(operands[0]->expression) {
+                    this.relocations.PushBack(Relocation(this.section, offset, RelocationType::Branch26, (operands[0]->expression as *const IdentifierNode)->value));
                 }
             } else if opcode == Opcode::BL {
-                word |= (this.AssembleExpression(operands[0usize]->expression) << REG0_SHIFT);
-                word |= (((this.AssembleExpression(operands[1usize]->expression) - offset) >> 2u32) & IMM21_MASK);
+                word |= (this.AssembleExpression(operands[0]->expression) << REG0_SHIFT);
+                word |= (((this.AssembleExpression(operands[1]->expression) - offset) >> 2) & IMM21_MASK);
 
-                if this.IsRelocatable(operands[1usize]->expression) {
-                    this.relocations.PushBack(Relocation(this.section, offset, RelocationType::Branch21, (operands[1usize]->expression as *const IdentifierNode)->value));
+                if this.IsRelocatable(operands[1]->expression) {
+                    this.relocations.PushBack(Relocation(this.section, offset, RelocationType::Branch21, (operands[1]->expression as *const IdentifierNode)->value));
                 }
             } else if opcode == Opcode::BR {
-                word |= (this.AssembleExpression(operands[0usize]->expression) << REG0_SHIFT);
+                word |= (this.AssembleExpression(operands[0]->expression) << REG0_SHIFT);
             } else if opcode == Opcode::BLR {
-                word |= (this.AssembleExpression(operands[0usize]->expression) << REG0_SHIFT);
-                word |= (this.AssembleExpression(operands[1usize]->expression) << REG1_SHIFT);
+                word |= (this.AssembleExpression(operands[0]->expression) << REG0_SHIFT);
+                word |= (this.AssembleExpression(operands[1]->expression) << REG1_SHIFT);
             } else if opcode >= Opcode::BEQ && opcode <= Opcode::BGEU {
-                word |= (this.AssembleExpression(operands[0usize]->expression) << REG0_SHIFT);
-                word |= (this.AssembleExpression(operands[1usize]->expression) << REG1_SHIFT);
-                word |= (((this.AssembleExpression(operands[2usize]->expression) - offset) >> 2u32) & IMM16_MASK);
+                word |= (this.AssembleExpression(operands[0]->expression) << REG0_SHIFT);
+                word |= (this.AssembleExpression(operands[1]->expression) << REG1_SHIFT);
+                word |= (((this.AssembleExpression(operands[2]->expression) - offset) >> 2) & IMM16_MASK);
 
-                if this.IsRelocatable(operands[2usize]->expression) {
-                    this.relocations.PushBack(Relocation(this.section, offset, RelocationType::Branch16, (operands[2usize]->expression as *const IdentifierNode)->value));
+                if this.IsRelocatable(operands[2]->expression) {
+                    this.relocations.PushBack(Relocation(this.section, offset, RelocationType::Branch16, (operands[2]->expression as *const IdentifierNode)->value));
                 }
             } else if opcode >= Opcode::SLT && opcode <= Opcode::SLTIU {
-                word |= (this.AssembleExpression(operands[0usize]->expression) << REG0_SHIFT);
-                word |= (this.AssembleExpression(operands[1usize]->expression) << REG1_SHIFT);
+                word |= (this.AssembleExpression(operands[0]->expression) << REG0_SHIFT);
+                word |= (this.AssembleExpression(operands[1]->expression) << REG1_SHIFT);
 
                 if opcode == Opcode::SLT || opcode == Opcode::SLTU {
-                    word |= (this.AssembleExpression(operands[2usize]->expression) << REG2_SHIFT);
+                    word |= (this.AssembleExpression(operands[2]->expression) << REG2_SHIFT);
                 } else {
-                    word |= (this.AssembleExpression(operands[2usize]->expression) & IMM16_MASK);
+                    word |= (this.AssembleExpression(operands[2]->expression) & IMM16_MASK);
                 }
             } else if opcode >= Opcode::ADD && opcode <= Opcode::SRAI {
-                word |= (this.AssembleExpression(operands[0usize]->expression) << REG0_SHIFT);
-                word |= (this.AssembleExpression(operands[1usize]->expression) << REG1_SHIFT);
+                word |= (this.AssembleExpression(operands[0]->expression) << REG0_SHIFT);
+                word |= (this.AssembleExpression(operands[1]->expression) << REG1_SHIFT);
 
-                if (Opcode::ADD % 2u32 == opcode % 2u32) || (opcode >= Opcode::MUL && opcode <= Opcode::REMU) {
-                    word |= (this.AssembleExpression(operands[2usize]->expression) << REG2_SHIFT);
+                if (Opcode::ADD % 2 == opcode % 2) || (opcode >= Opcode::MUL && opcode <= Opcode::REMU) {
+                    word |= (this.AssembleExpression(operands[2]->expression) << REG2_SHIFT);
                 } else {
-                    word |= (this.AssembleExpression(operands[2usize]->expression) & IMM16_MASK);
+                    word |= (this.AssembleExpression(operands[2]->expression) & IMM16_MASK);
                 }
             }
 
             this.WriteWord(this.section, word);
-            index += 1usize;
+            index += 1;
         }
 
         for section in this.sections {
-            let remainder = section.Size() % 4usize;
+            let remainder = section.Size() % 4;
 
-            if remainder != 0usize {
-                for _ in 0usize..(4usize - remainder) {
-                    section.PushBack(0u8);
+            if remainder != 0 {
+                for _ in 0..(4 - remainder) {
+                    section.PushBack(0);
                 }
             }
         }
@@ -537,14 +537,14 @@ class Assembler {
         let object = Object();
         object.sections.Resize(this.sections.Size());
 
-        for i in 0usize..this.sections.Size() {
+        for i in 0..this.sections.Size() {
             let section = this.sections[i];
 
-            for j in 0usize..(section.Size() / 4usize) {
-                let mut word = section[j * 4usize] as u32;
-                word |= (section[j * 4usize + 1usize] as u32) << 8u32;
-                word |= (section[j * 4usize + 2usize] as u32) << 16u32;
-                word |= (section[j * 4usize + 3usize] as u32) << 24u32;
+            for j in 0..(section.Size() / 4) {
+                let mut word = section[j * 4] as u32;
+                word |= (section[j * 4 + 1] as u32) << 8;
+                word |= (section[j * 4 + 2] as u32) << 16;
+                word |= (section[j * 4 + 3] as u32) << 24;
                 object.sections[i].PushBack(word);
             }
         }

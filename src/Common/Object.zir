@@ -17,7 +17,7 @@
 #[include "std/str", "std/vec", "src/Common/File.zir", "src/Common/Section.zir",
     "src/Common/Symbol.zir", "src/Common/Relocation.zir" : *]
 
-const OBJECT_MAGIC: u32 = 0x4A424F5Au32;
+const OBJECT_MAGIC: u32 = 0x4A424F5A;
 
 class Object {
     pub path: String,
@@ -36,11 +36,11 @@ class Object {
             file.ReadWords(section.Data(), size);
         }
 
-        for i in 0u32..file.ReadWord() {
+        for i in 0..file.ReadWord() {
             this.symbols.PushBack(Symbol::Read(file));
         }
 
-        for i in 0u32..file.ReadWord() {
+        for i in 0..file.ReadWord() {
             this.relocations.PushBack(Relocation::Read(file));
         }
     }

@@ -151,35 +151,35 @@ __z16WriteHexadecimali:
     b __LBB5_1
 __LBB5_1:
     lw x1, 4(x31)
-    add x2, x0, x0
-    blt x1, x2, __LBB5_3
+    slli x2, x1, 2
+    lw x1, 0(x31)
+    srl x1, x1, x2
+    andi x1, x1, 15
+    sb x1, 11(x31)
+    addi x2, x0, 10
+    bltu x1, x2, __LBB5_3
     b __LBB5_4
 __LBB5_2:
     lw x30, 12(x31)
     addi x31, x31, 16
     br x30
 __LBB5_3:
-    b __LBB5_2
-__LBB5_4:
-    lw x1, 4(x31)
-    slli x2, x1, 2
-    lw x1, 0(x31)
-    srl x1, x1, x2
-    andi x2, x1, 15
-    sb x2, 11(x31)
-    addi x1, x0, 9
-    blt x1, x2, __LBB5_6
-    b __LBB5_5
-__LBB5_5:
     lbu x1, 11(x31)
     addi x1, x1, 48
     bl x30, __z14WriteCharacterc
-    b __LBB5_7
-__LBB5_6:
+    b __LBB5_5
+__LBB5_4:
     lbu x1, 11(x31)
     addi x1, x1, 55
     bl x30, __z14WriteCharacterc
-    b __LBB5_7
+    b __LBB5_5
+__LBB5_5:
+    lw x1, 4(x31)
+    add x2, x0, x0
+    bne x1, x2, __LBB5_7
+    b __LBB5_6
+__LBB5_6:
+    b __LBB5_2
 __LBB5_7:
     lw x1, 4(x31)
     addi x1, x1, -1
@@ -425,7 +425,7 @@ __LBB14_7:
     addi x2, x1, 1
     sw x2, 28(x31)
     addi x1, x0, 4
-    bltu x1, x2, __LBB14_9
+    blt x1, x2, __LBB14_9
     b __LBB14_10
 __LBB14_8:
     b __LBB14_11
@@ -439,7 +439,7 @@ __LBB14_10:
     la x1, .L__unnamed_11
     bl x30, __z5WritePc
     lw x1, 28(x31)
-    bl x30, __z12WriteIntegeri.1
+    bl x30, __z12WriteIntegeri
     la x1, .L__unnamed_12
     bl x30, __z5WritePc
     b __LBB14_8

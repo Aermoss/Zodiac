@@ -33,12 +33,12 @@ func PrintUsage(executable: String) {
 }
 
 func main(args: &mut Vector<String>) -> i32 {
-    let executable = SplitPath(args[0usize]).right;
+    let executable = SplitPath(args[0]).right;
     let mut logger = Logger(executable);
 
-    if args.Size() < 2usize {
+    if args.Size() < 2 {
         PrintUsage(executable);
-        ret 1i32;
+        ret 1;
     }
 
     let mut inputs: Vector<String>;
@@ -46,21 +46,21 @@ func main(args: &mut Vector<String>) -> i32 {
     for arg in args {
         if arg == "--help" || arg == "-h" {
             PrintUsage(executable);
-            ret 0i32;
+            ret 0;
         } else if arg == "--version" {
             PrintVersion(executable);
-            ret 0i32;
+            ret 0;
         } else if FileExists(arg) {
             inputs.PushBack(arg);
         } else {
             Logger::Log("Cannot find '" + arg + "'.", LogSeverity::Error);
-            ret 1i32;
+            ret 1;
         }
     }
 
     if inputs.Empty() {
         Logger::Log("No input files.", LogSeverity::Error);
-        ret 1i32;
+        ret 1;
     }
 
     let mut objects: Vector<Object>;
@@ -70,7 +70,7 @@ func main(args: &mut Vector<String>) -> i32 {
 
         if !file.Open(FileMode::ReadBinary) {
             Logger::Log("Failed to open file '" + input + "'.", LogSeverity::Error);
-            ret 1i32;
+            ret 1;
         }
 
         let magic = file.ReadWord();
@@ -81,7 +81,7 @@ func main(args: &mut Vector<String>) -> i32 {
             objects += Archive::Read(file).objects;
         } else {
             Logger::Log("Invalid input file '" + input + "'.", LogSeverity::Error);
-            ret 1i32;
+            ret 1;
         }
     }
 
@@ -94,7 +94,7 @@ func main(args: &mut Vector<String>) -> i32 {
             Write("\n");
         }
 
-        if !object.path.Empty() && inputs.Size() > 1usize {
+        if !object.path.Empty() && inputs.Size() > 1 {
             WriteLine(object.path + ':');
         }
 
@@ -107,8 +107,8 @@ func main(args: &mut Vector<String>) -> i32 {
                 character = symbol.binding == BindingType::Global ? 'D' : 'd';
             }
 
-            let mut address = String(symbol.offset as u64, 16u64);
-            while address.Length() < 8usize { address = "0" + address; }
+            let mut address = String(symbol.offset as u64, 16);
+            while address.Length() < 8 { address = "0" + address; }
             WriteLine(address + ' ' + character + ' ' + symbol.name);
         }
 
@@ -131,5 +131,5 @@ func main(args: &mut Vector<String>) -> i32 {
                 }
             }
         }
-    } ret 0i32;
+    } ret 0;
 }

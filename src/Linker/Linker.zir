@@ -96,8 +96,8 @@ class Linker {
         for object in this.objects {
             object.section_bases.Resize(SECTION_COUNT);
 
-            for i in 0usize..object.sections.Size() {
-                object.section_bases[i] = (this.sections[i].Size() as u32) * 4u32;
+            for i in 0..object.sections.Size() {
+                object.section_bases[i] = (this.sections[i].Size() as u32) * 4;
 
                 for word in object.sections[i] {
                     this.sections[i].PushBack(word);
@@ -105,21 +105,21 @@ class Linker {
             }
         }
 
-        let mut offset = 0u32;
+        let mut offset: u32 = 0;
 
-        for i in 0usize..this.sections.Size() {
-            this.section_bases[i] = offset * 4u32;
+        for i in 0..this.sections.Size() {
+            this.section_bases[i] = offset * 4;
 
-            if offset != 0u32 {
+            if offset != 0 {
                 for object in this.objects {
-                    object.section_bases[i] += offset * 4u32;
+                    object.section_bases[i] += offset * 4;
                 }
             }
 
             offset += this.sections[i].Size() as u32;
         }
 
-        for i in 0usize..this.objects.Size() {
+        for i in 0..this.objects.Size() {
             let object = this.objects[i];
 
             for symbol in object.symbols {
@@ -139,40 +139,40 @@ class Linker {
             }
         }
 
-        for i in 0usize..this.objects.Size() {
+        for i in 0..this.objects.Size() {
             let object = this.objects[i];
 
             for relocation in object.relocations {
                 let mut symbol_index = this.symbol_names.Index(String(i as i64) + ":" + relocation.symbol);
 
-                if symbol_index == -1isize {
+                if symbol_index == -1 {
                     symbol_index = this.symbol_names.Index(relocation.symbol);
                 }
  
-                if symbol_index == -1isize {
+                if symbol_index == -1 {
                     Logger::Log("Undefined symbol '" + relocation.symbol + "' referenced in " + object.path + ".", LogSeverity::Error);
                     ret result;
                 }
  
                 let target: u32 = this.symbol_addresses[symbol_index as usize];
                 let pc = object.section_bases[relocation.section as usize] + relocation.offset;
-                let index = ((pc - this.section_bases[relocation.section as usize]) / 4u32) as usize;
+                let index = ((pc - this.section_bases[relocation.section as usize]) / 4) as usize;
                 let mut word: u32 = this.sections[relocation.section as usize][index];
 
                 if relocation._type == RelocationType::AbsoluteUpper21 {
-                    word = (word & !IMM21_MASK) | ((target >> 11u32) & IMM21_MASK);
+                    word = (word & !IMM21_MASK) | ((target >> 11) & IMM21_MASK);
                 } else if relocation._type == RelocationType::AbsoluteLower11 {
                     word = (word & !IMM11_MASK) | (target & IMM11_MASK);
                 } else if relocation._type == RelocationType::PcRelativeUpper21 {
-                    word = (word & !IMM21_MASK) | (((target - pc) >> 11u32) & IMM21_MASK);
+                    word = (word & !IMM21_MASK) | (((target - pc) >> 11) & IMM21_MASK);
                 } else if relocation._type == RelocationType::PcRelativeLower11 {
-                    word = (word & !IMM16_MASK) | (((target - (pc - 4u32)) & IMM11_MASK) & IMM16_MASK);
+                    word = (word & !IMM16_MASK) | (((target - (pc - 4)) & IMM11_MASK) & IMM16_MASK);
                 } else if relocation._type == RelocationType::Branch16 {
-                    word = (word & !IMM16_MASK) | (((target - pc) >> 2u32) & IMM16_MASK);
+                    word = (word & !IMM16_MASK) | (((target - pc) >> 2) & IMM16_MASK);
                 } else if relocation._type == RelocationType::Branch21 {
-                    word = (word & !IMM21_MASK) | (((target - pc) >> 2u32) & IMM21_MASK);
+                    word = (word & !IMM21_MASK) | (((target - pc) >> 2) & IMM21_MASK);
                 } else if relocation._type == RelocationType::Branch26 {
-                    word = (word & !IMM26_MASK) | (((target - pc) >> 2u32) & IMM26_MASK);
+                    word = (word & !IMM26_MASK) | (((target - pc) >> 2) & IMM26_MASK);
                 } else if relocation._type == RelocationType::Absolute32 {
                     word = target;
                 } else {
@@ -190,8 +190,8 @@ class Linker {
 
         for section in this.sections {
             for word in section {
-                let mut hex = String(word as u64, 16u64);
-                while hex.Length() < 8usize { hex = "0" + hex; }
+                let mut hex = String(word as u64, 16);
+                while hex.Length() < 8 { hex = "0" + hex; }
                 result += hex + "\n";
             }
         }

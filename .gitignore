@@ -1,5 +1,14 @@
 *.out
 *.vcd
 *.gtkw
+*.exe
 *.hex
 *.o
+
+!bin/zas.exe
+!bin/zda.exe
+!bin/zar.exe
+!bin/zld.exe
+!bin/zemu.exe
+!bin/zym.exe
+!bin/ztr.exe

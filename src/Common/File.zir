@@ -60,70 +60,70 @@ class File {
     }
 
     pub ReadBytes(&this, pointer: *mut u8, count: usize) -> bool {
-        ret fread(pointer, 1usize, count, this.handle) == count;
+        ret fread(pointer, 1, count, this.handle) == count;
     }
 
     pub ReadHalves(&this, pointer: *mut u16, count: usize) -> bool {
-        ret fread(pointer, 2usize, count, this.handle) == count;
+        ret fread(pointer, 2, count, this.handle) == count;
     }
 
     pub ReadWords(&this, pointer: *mut u32, count: usize) -> bool {
-        ret fread(pointer, 4usize, count, this.handle) == count;
+        ret fread(pointer, 4, count, this.handle) == count;
     }
 
     pub ReadByte(&this) -> u8 {
         let mut result: u8;
 
-        if !this.ReadBytes(&mut result, 1usize) {
-            result = 0u8;
+        if !this.ReadBytes(&mut result, 1) {
+            result = 0;
         } ret result;
     }
 
     pub ReadHalf(&this) -> u16 {
         let mut result: u16;
 
-        if !this.ReadHalves(&mut result, 1usize) {
-            result = 0u16;
+        if !this.ReadHalves(&mut result, 1) {
+            result = 0;
         } ret result;
     }
 
     pub ReadWord(&this) -> u32 {
         let mut result: u32;
 
-        if !this.ReadWords(&mut result, 1usize) {
-            result = 0u32;
+        if !this.ReadWords(&mut result, 1) {
+            result = 0;
         } ret result;
     }
 
     pub WriteBytes(&this, pointer: *const u8, count: usize) -> bool {
-        ret fwrite(pointer, 1usize, count, this.handle) == count;
+        ret fwrite(pointer, 1, count, this.handle) == count;
     }
 
     pub WriteHalves(&this, pointer: *const u16, count: usize) -> bool {
-        ret fwrite(pointer, 2usize, count, this.handle) == count;
+        ret fwrite(pointer, 2, count, this.handle) == count;
     }
 
     pub WriteWords(&this, pointer: *const u32, count: usize) -> bool {
-        ret fwrite(pointer, 4usize, count, this.handle) == count;
+        ret fwrite(pointer, 4, count, this.handle) == count;
     }
 
     pub WriteByte(&this, value: u8) -> bool {
-        ret this.WriteBytes(&value, 1usize);
+        ret this.WriteBytes(&value, 1);
     }
 
     pub WriteHalf(&this, value: u16) -> bool {
-        ret this.WriteHalves(&value, 1usize);
+        ret this.WriteHalves(&value, 1);
     }
 
     pub WriteWord(&this, value: u32) -> bool {
-        ret this.WriteWords(&value, 1usize);
+        ret this.WriteWords(&value, 1);
     }
 
     pub ReadString(&this) -> String {
         let length = this.ReadWord() as usize;
-        let buffer = new u8[length + 1usize];
+        let buffer = new u8[length + 1];
         this.ReadBytes(buffer, length);
-        buffer[length] = 0u8;
+        buffer[length] = 0;
         let string = String(buffer as *const i8);
         del[] buffer;
         ret string;

@@ -34,12 +34,12 @@ class Disassembler {
 
     priv DisassembleInstruction(&this, word: u32, offset: u32, section: SectionType, object: &Object) -> String {
         let opcode = (word >> OPCODE_SHIFT);
-        let (reg0, reg1, reg2) = ((word >> REG0_SHIFT) & 0x1Fu32, (word >> REG1_SHIFT) & 0x1Fu32, (word >> REG2_SHIFT) & 0x1Fu32);
+        let (reg0, reg1, reg2) = ((word >> REG0_SHIFT) & 0x1F, (word >> REG1_SHIFT) & 0x1F, (word >> REG2_SHIFT) & 0x1F);
         let (imm11, imm16, imm21, imm26) = (word & IMM11_MASK, word & IMM16_MASK, word & IMM21_MASK, word & IMM26_MASK);
-        let simm11 = (((imm11 as i32) ^ (1i32 << 10i32)) - (1i32 << 10i32)) as i64;
-        let simm16 = (((imm16 as i32) ^ (1i32 << 15i32)) - (1i32 << 15i32)) as i64;
-        let simm21 = (((imm21 as i32) ^ (1i32 << 20i32)) - (1i32 << 20i32)) as i64;
-        let simm26 = (((imm26 as i32) ^ (1i32 << 25i32)) - (1i32 << 25i32)) as i64;
+        let simm11 = (((imm11 as i32) ^ (1 << 10)) - (1 << 10)) as i64;
+        let simm16 = (((imm16 as i32) ^ (1 << 15)) - (1 << 15)) as i64;
+        let simm21 = (((imm21 as i32) ^ (1 << 20)) - (1 << 20)) as i64;
+        let simm26 = (((imm26 as i32) ^ (1 << 25)) - (1 << 25)) as i64;
         let mut mnemonic: String;
 
         if opcode == Opcode::NOP { mnemonic = "nop"; }
@@ -93,7 +93,7 @@ class Disassembler {
         else if opcode == Opcode::SRAI { mnemonic = "srai"; }
         else if opcode == Opcode::HLT { mnemonic = "hlt"; }
         else {
-            ret ".word 0x" + String(word as u64, 16u64);
+            ret ".word 0x" + String(word as u64, 16);
         }
 
         if opcode >= Opcode::LB && opcode <= Opcode::SW {
@@ -127,7 +127,7 @@ class Disassembler {
                 ret mnemonic + " " + this.DisassembleRegister(reg0) + ", " + this.DisassembleRegister(reg1) + ", " + String(simm16);
             }
         } else if opcode >= Opcode::ADD && opcode <= Opcode::SRAI {
-            if (Opcode::ADD % 2u32 == opcode % 2u32) {
+            if (Opcode::ADD % 2 == opcode % 2) {
                 ret mnemonic + " " + this.DisassembleRegister(reg0) + ", " + this.DisassembleRegister(reg1) + ", " + this.DisassembleRegister(reg2);
             } else {
                 ret mnemonic + " " + this.DisassembleRegister(reg0) + ", " + this.DisassembleRegister(reg1) + ", " + String(simm16);
@@ -138,15 +138,15 @@ class Disassembler {
     }
 
     priv FormatHexWord(&this, word: u32) -> String {
-        let mut hex = String(word as u64, 16u64);
-        while hex.Length() < 8usize { hex = "0" + hex; }
-        ret hex.SubString(0usize, 2usize) + " " + hex.SubString(2usize, 2usize) + " "
-            + hex.SubString(4usize, 2usize) + " " + hex.SubString(6usize, 2usize);
+        let mut hex = String(word as u64, 16);
+        while hex.Length() < 8 { hex = "0" + hex; }
+        ret hex.SubString(0, 2) + " " + hex.SubString(2, 2) + " "
+            + hex.SubString(4, 2) + " " + hex.SubString(6, 2);
     }
 
     priv FormatHexAddress(&this, address: u32) -> String {
-        let mut hex = String(address as u64, 16u64);
-        while hex.Length() < 8usize { hex = "0" + hex; }
+        let mut hex = String(address as u64, 16);
+        while hex.Length() < 8 { hex = "0" + hex; }
         ret hex;
     }
 
@@ -174,7 +174,7 @@ class Disassembler {
                 }
             }
 
-            for index in 0usize..object.sections.Size() {
+            for index in 0..object.sections.Size() {
                 let section_type = index as SectionType;
                 let section_name = section_type == SectionType::Text ? ".text" : ".data";
                 let section = object.sections[index];
@@ -186,7 +186,7 @@ class Disassembler {
                     result += section_name.ToString() + '\n';
                 }
 
-                let mut offset = 0u32;
+                let mut offset: u32 = 0;
 
                 for word in section {
                     for symbol in object.symbols {
@@ -219,7 +219,7 @@ class Disassembler {
                         } else {
                             result += "    .word " + String(word as i64) + '\n';
                         }
-                    } offset += 4u32;
+                    } offset += 4;
                 } result += '\n';
             }
         } ret result;

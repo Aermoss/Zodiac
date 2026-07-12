@@ -23,25 +23,25 @@ enum Opcode: u32 {
     MUL, MULH, MULHSU, MULHU, DIV, DIVU, REM, REMU,
     AND, ANDI, OR, ORI, XOR, XORI,
     SLL, SLLI, SRL, SRLI, SRA, SRAI,
-    HLT = 0x3Fu32
+    HLT = 0x3F
 }
 
-const OPCODE_SHIFT: u32 = 26u32;
-const REG0_SHIFT: u32 = 21u32;
-const REG1_SHIFT: u32 = 16u32;
-const REG2_SHIFT: u32 = 11u32;
+const OPCODE_SHIFT: u32 = 26;
+const REG0_SHIFT: u32 = 21;
+const REG1_SHIFT: u32 = 16;
+const REG2_SHIFT: u32 = 11;
 
-const IMM11_MASK: u32 = (1u32 << 11u32) - 1u32;
-const IMM16_MASK: u32 = (1u32 << 16u32) - 1u32;
-const IMM21_MASK: u32 = (1u32 << 21u32) - 1u32;
-const IMM26_MASK: u32 = (1u32 << 26u32) - 1u32;
+const IMM11_MASK: u32 = (1 << 11) - 1;
+const IMM16_MASK: u32 = (1 << 16) - 1;
+const IMM21_MASK: u32 = (1 << 21) - 1;
+const IMM26_MASK: u32 = (1 << 26) - 1;
 
-const IMM11_SMAX: u32 = (1u32 << 10u32) - 1u32;
-const IMM16_SMAX: u32 = (1u32 << 15u32) - 1u32;
-const IMM21_SMAX: u32 = (1u32 << 20u32) - 1u32;
-const IMM26_SMAX: u32 = (1u32 << 25u32) - 1u32;
+const IMM11_SMAX: u32 = (1 << 10) - 1;
+const IMM16_SMAX: u32 = (1 << 15) - 1;
+const IMM21_SMAX: u32 = (1 << 20) - 1;
+const IMM26_SMAX: u32 = (1 << 25) - 1;
 
-const IMM11_SMIN: u32 = 0u32 - (1u32 << 10u32);
-const IMM16_SMIN: u32 = 0u32 - (1u32 << 15u32);
-const IMM21_SMIN: u32 = 0u32 - (1u32 << 20u32);
-const IMM26_SMIN: u32 = 0u32 - (1u32 << 25u32);
+const IMM11_SMIN: u32 = 0 - (1 << 10);
+const IMM16_SMIN: u32 = 0 - (1 << 15);
+const IMM21_SMIN: u32 = 0 - (1 << 20);
+const IMM26_SMIN: u32 = 0 - (1 << 25);

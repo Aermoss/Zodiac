@@ -24,7 +24,7 @@ class Parser {
 
     priv Current(&this) -> Token {
         if this.index >= this.tokens.Size() {
-            ret this.tokens[this.tokens.Size() - 1usize];
+            ret this.tokens[this.tokens.Size() - 1];
         } else {
             ret this.tokens[this.index];
         }
@@ -33,7 +33,7 @@ class Parser {
     priv Peek(&this, offset: usize) -> Token {
         let index = this.index + offset;
         if index >= this.tokens.Size() {
-            ret this.tokens[this.tokens.Size() - 1usize];
+            ret this.tokens[this.tokens.Size() - 1];
         } else {
             ret this.tokens[index];
         }
@@ -42,7 +42,7 @@ class Parser {
     priv Advance(&mut this) -> Token {
         let token = this.Current();
         if this.index < this.tokens.Size() {
-            this.index += 1usize;
+            this.index += 1;
         } ret token;
     }
 
@@ -82,17 +82,17 @@ class Parser {
     }
 
     priv GetBinaryOperatorPrecedence(&this, _type: TokenType) -> i32 {
-        if _type == TokenType::OR { ret 1i32; }
-        else if _type == TokenType::XOR { ret 2i32; }
-        else if _type == TokenType::AND { ret 3i32; }
-        else if _type == TokenType::LSHIFT || _type == TokenType::RSHIFT { ret 4i32; }
-        else if _type == TokenType::PLUS || _type == TokenType::MINUS { ret 5i32; }
-        else if _type == TokenType::MUL || _type == TokenType::DIV || _type == TokenType::MOD { ret 6i32; }
-        else { ret -1i32; }
+        if _type == TokenType::OR { ret 1; }
+        else if _type == TokenType::XOR { ret 2; }
+        else if _type == TokenType::AND { ret 3; }
+        else if _type == TokenType::LSHIFT || _type == TokenType::RSHIFT { ret 4; }
+        else if _type == TokenType::PLUS || _type == TokenType::MINUS { ret 5; }
+        else if _type == TokenType::MUL || _type == TokenType::DIV || _type == TokenType::MOD { ret 6; }
+        else { ret -1; }
     }
 
     priv IsBinaryOperator(&this, _type: TokenType) -> bool {
-        ret this.GetBinaryOperatorPrecedence(_type) > 0i32;
+        ret this.GetBinaryOperatorPrecedence(_type) > 0;
     }
 
     priv IsUnaryOperator(&this, _type: TokenType) -> bool {
@@ -151,14 +151,14 @@ class Parser {
             if precedence < min_precedence { break; }
             this.Advance();
 
-            let right = this.ParseBinary(precedence + 1i32);
+            let right = this.ParseBinary(precedence + 1);
             if right == null { ret null; }
             left = this.arena.New<BinaryOperationNode>(left, right, token._type, token);
         } ret left;
     }
 
     priv ParseExpression(&mut this) -> *const Node {
-        ret this.ParseBinary(0i32);
+        ret this.ParseBinary(0);
     }
 
     priv ParseOperand(&mut this) -> *const OperandNode {
@@ -182,13 +182,13 @@ class Parser {
         let instruction = this.arena.New<InstructionNode>(mnemonic, token);
 
         if this.Current()._type != TokenType::NEWLINE && this.Current()._type != TokenType::EOF {
-            let mut index = 0usize;
+            let mut index = 0;
 
             loop {
                 let operand = this.ParseOperand();
 
                 if operand != null {
-                    let state = (mnemonic == "lb" || mnemonic == "lbu" || mnemonic == "lh" || mnemonic == "lhu" || mnemonic == "lw" || mnemonic == "sb" || mnemonic == "sh" || mnemonic == "sw") && index == 1usize;
+                    let state = (mnemonic == "lb" || mnemonic == "lbu" || mnemonic == "lh" || mnemonic == "lhu" || mnemonic == "lw" || mnemonic == "sb" || mnemonic == "sh" || mnemonic == "sw") && index == 1;
                     let mut is_reloc = false;
 
                     if operand->offset != null {
@@ -199,16 +199,16 @@ class Parser {
                     }
 
                     if state && operand->offset == null {
-                        Logger::Log("Instruction '" + mnemonic + "' requires dereference operator 'offset(reg)' for operand " + String(index as u64 + 1u64) + ".", token, LogSeverity::Error);
+                        Logger::Log("Instruction '" + mnemonic + "' requires dereference operator 'offset(reg)' for operand " + String(index as u64 + 1) + ".", token, LogSeverity::Error);
                     } else if !state && operand->offset != null && !is_reloc {
-                        Logger::Log("Instruction '" + mnemonic + "' does not support dereference operator for operand " + String(index as u64 + 1u64) + ".", token, LogSeverity::Error);
+                        Logger::Log("Instruction '" + mnemonic + "' does not support dereference operator for operand " + String(index as u64 + 1) + ".", token, LogSeverity::Error);
                     }
 
                     instruction->operands.PushBack(operand);
                 }
 
                 if this.Match(TokenType::COMMA) {
-                    index += 1usize;
+                    index += 1;
                 } else {
                     break;
                 }
@@ -223,7 +223,7 @@ class Parser {
     }
 
     pub Parse(&mut this, tokens: &Vector<Token>) -> *const RootNode {
-        (this.tokens, this.index) = (tokens, 0usize);
+        (this.tokens, this.index) = (tokens, 0);
         this.arena.Clear();
         let root = this.arena.New<RootNode>();
 
@@ -232,7 +232,7 @@ class Parser {
             let token = this.Current();
 
             if token._type == TokenType::IDENTIFIER {
-                if this.Peek(1usize)._type == TokenType::COLON {
+                if this.Peek(1)._type == TokenType::COLON {
                     root->declarations.PushBack(this.ParseLabel());
                 } else {
                     root->declarations.PushBack(this.ParseInstruction());

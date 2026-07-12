@@ -33,12 +33,12 @@ func PrintUsage(executable: String) {
 }
 
 func main(args: &mut Vector<String>) -> i32 {
-    let executable = SplitPath(args[0usize]).right;
+    let executable = SplitPath(args[0]).right;
     let mut logger = Logger(executable);
 
-    if args.Size() < 2usize {
+    if args.Size() < 2 {
         PrintUsage(executable);
-        ret 1i32;
+        ret 1;
     }
 
     let mut inputs: Vector<String>;
@@ -46,21 +46,21 @@ func main(args: &mut Vector<String>) -> i32 {
     for arg in args {
         if arg == "--help" || arg == "-h" {
             PrintUsage(executable);
-            ret 0i32;
+            ret 0;
         } else if arg == "--version" {
             PrintVersion(executable);
-            ret 0i32;
+            ret 0;
         } else if FileExists(arg) {
             inputs.PushBack(arg);
         } else {
             Logger::Log("Cannot find '" + arg + "'.", LogSeverity::Error);
-            ret 1i32;
+            ret 1;
         }
     }
 
     if inputs.Empty() {
         Logger::Log("No input files.", LogSeverity::Error);
-        ret 1i32;
+        ret 1;
     }
 
     let mut first = true;
@@ -72,7 +72,7 @@ func main(args: &mut Vector<String>) -> i32 {
             Write("\n");
         }
 
-        if inputs.Size() > 1usize {
+        if inputs.Size() > 1 {
             WriteLine(input + ':');
         }
 
@@ -86,23 +86,23 @@ func main(args: &mut Vector<String>) -> i32 {
         let mut result = String();
 
         loop {
-            let mut byte = 0u8;
+            let mut byte: u8 = 0;
 
-            if !file.ReadBytes(&mut byte, 1usize) {
+            if !file.ReadBytes(&mut byte, 1) {
                 break;
             }
 
-            if byte >= 32u8 && byte <= 126u8 {
+            if byte >= 32 && byte <= 126 {
                 result += byte as i8;
             } else {
-                if result.Length() >= 4usize {
+                if result.Length() >= 4 {
                     WriteLine(result);
                 } result = "";
             }
         }
 
-        if result.Length() >= 4usize {
+        if result.Length() >= 4 {
             WriteLine(result);
         }
-    } ret 0i32;
+    } ret 0;
 }
