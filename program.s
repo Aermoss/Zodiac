@@ -349,35 +349,48 @@ Main:
     bl x30, __z9WriteLinePc
     lui x1, 524288
     ori x1, x1, 0
+    sw x1, 8(x31)
+    lui x1, 1824183
+    ori x1, x1, 1775
     sw x1, 12(x31)
     la x1, .L__unnamed_5
     bl x30, __z9WriteLinePc
-    lw x2, 12(x31)
-    lui x1, 1824183
-    ori x1, x1, 1775
-    sw x1, 8(x31)
+    lw x2, 8(x31)
+    lw x1, 12(x31)
     sw x1, 0(x2)
     la x1, .L__unnamed_6
-    bl x30, __z9WriteLinePc
+    bl x30, __z5WritePc
     lw x1, 12(x31)
-    lw x1, 0(x1)
-    sw x1, 16(x31)
+    bl x30, __z16WriteHexadecimali
     la x1, .L__unnamed_7
     bl x30, __z5WritePc
-    lw x1, 16(x31)
+    lw x1, 8(x31)
     bl x30, __z16WriteHexadecimali
     la x1, .L__unnamed_8
     bl x30, __z9WriteLinePc
-    lw x2, 8(x31)
+    lw x1, 8(x31)
+    lw x1, 0(x1)
+    sw x1, 16(x31)
+    la x1, .L__unnamed_9
+    bl x30, __z5WritePc
     lw x1, 16(x31)
+    bl x30, __z16WriteHexadecimali
+    la x1, .L__unnamed_10
+    bl x30, __z5WritePc
+    lw x1, 8(x31)
+    bl x30, __z16WriteHexadecimali
+    la x1, .L__unnamed_11
+    bl x30, __z9WriteLinePc
+    lw x1, 16(x31)
+    lw x2, 12(x31)
     bne x1, x2, __LBB14_2
     b __LBB14_1
 __LBB14_1:
-    la x1, .L__unnamed_9
+    la x1, .L__unnamed_12
     bl x30, __z9WriteLinePc
     b __LBB14_3
 __LBB14_2:
-    la x1, .L__unnamed_10
+    la x1, .L__unnamed_13
     bl x30, __z9WriteLinePc
     b __LBB14_3
 __LBB14_3:
@@ -436,11 +449,11 @@ __LBB14_9:
 __LBB14_10:
     add x1, x0, x0
     sb x1, 35(x31)
-    la x1, .L__unnamed_11
+    la x1, .L__unnamed_14
     bl x30, __z5WritePc
     lw x1, 28(x31)
     bl x30, __z12WriteIntegeri
-    la x1, .L__unnamed_12
+    la x1, .L__unnamed_15
     bl x30, __z5WritePc
     b __LBB14_8
 __LBB14_11:
@@ -708,11 +721,11 @@ __LBB14_64:
     sb x1, 43(x31)
     b __LBB14_65
 __LBB14_65:
-    la x1, .L__unnamed_13
+    la x1, .L__unnamed_16
     bl x30, __z5WritePc
     lbu x1, 43(x31)
     bl x30, __z12WriteIntegeri.1
-    la x1, .L__unnamed_14
+    la x1, .L__unnamed_17
     bl x30, __z5WritePc
     b __LBB14_66
 __LBB14_66:
@@ -736,11 +749,11 @@ __LBB14_70:
     sb x1, 43(x31)
     b __LBB14_71
 __LBB14_71:
-    la x1, .L__unnamed_15
+    la x1, .L__unnamed_18
     bl x30, __z5WritePc
     lbu x1, 43(x31)
     bl x30, __z12WriteIntegeri.1
-    la x1, .L__unnamed_16
+    la x1, .L__unnamed_19
     bl x30, __z5WritePc
     b __LBB14_72
 __LBB14_72:
@@ -766,35 +779,44 @@ __LBB14_72:
 	.string	"Running SDRAM test..."
 
 .L__unnamed_6:
-	.string	"Written 0xDEADBEEF to 0x40000000."
+	.string	"Written "
 
 .L__unnamed_7:
-	.string	"Read "
+	.string	" to "
 
 .L__unnamed_8:
-	.string	" from 0x40000000."
+	.string	"."
 
 .L__unnamed_9:
-	.string	"SDRAM test successful!"
+	.string	"Read "
 
 .L__unnamed_10:
-	.string	"SDRAM test failed!"
+	.string	" from "
 
 .L__unnamed_11:
-	.string	"WS2812 Mode: "
+	.string	"."
 
 .L__unnamed_12:
-	.string	"\n"
+	.string	"SDRAM test successful!"
 
 .L__unnamed_13:
-	.string	"Brightness: "
+	.string	"SDRAM test failed!"
 
 .L__unnamed_14:
-	.string	"/255\n"
+	.string	"WS2812 Mode: "
 
 .L__unnamed_15:
-	.string	"Brightness: "
+	.string	"\n"
 
 .L__unnamed_16:
+	.string	"Brightness: "
+
+.L__unnamed_17:
+	.string	"/255\n"
+
+.L__unnamed_18:
+	.string	"Brightness: "
+
+.L__unnamed_19:
 	.string	"/255\n"
 
