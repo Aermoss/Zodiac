@@ -499,10 +499,10 @@ __LBB14_17:
     beq x1, x2, __LBB14_21
     b __LBB14_22
 __LBB14_18:
-    addi x1, x0, 255
-    sb x1, 25(x31)
     addi x1, x0, 1
     sw x1, 20(x31)
+    addi x1, x0, 255
+    sb x1, 25(x31)
     b __LBB14_19
 __LBB14_19:
     b __LBB14_20
@@ -524,10 +524,10 @@ __LBB14_22:
     beq x1, x2, __LBB14_27
     b __LBB14_28
 __LBB14_23:
-    add x1, x0, x0
-    sb x1, 24(x31)
     addi x1, x0, 2
     sw x1, 20(x31)
+    add x1, x0, x0
+    sb x1, 24(x31)
     b __LBB14_25
 __LBB14_24:
     lbu x1, 24(x31)
@@ -552,10 +552,10 @@ __LBB14_28:
     beq x1, x2, __LBB14_32
     b __LBB14_33
 __LBB14_29:
-    addi x1, x0, 255
-    sb x1, 26(x31)
     addi x1, x0, 3
     sw x1, 20(x31)
+    addi x1, x0, 255
+    sb x1, 26(x31)
     b __LBB14_30
 __LBB14_30:
     b __LBB14_31
@@ -572,10 +572,10 @@ __LBB14_33:
     beq x1, x2, __LBB14_38
     b __LBB14_39
 __LBB14_34:
-    add x1, x0, x0
-    sb x1, 25(x31)
     addi x1, x0, 4
     sw x1, 20(x31)
+    add x1, x0, x0
+    sb x1, 25(x31)
     b __LBB14_36
 __LBB14_35:
     lbu x1, 25(x31)
@@ -600,10 +600,10 @@ __LBB14_39:
     bltu x1, x2, __LBB14_43
     b __LBB14_44
 __LBB14_40:
-    addi x1, x0, 255
-    sb x1, 24(x31)
     addi x1, x0, 5
     sw x1, 20(x31)
+    addi x1, x0, 255
+    sb x1, 24(x31)
     b __LBB14_41
 __LBB14_41:
     b __LBB14_42
@@ -611,8 +611,8 @@ __LBB14_42:
     b __LBB14_37
 __LBB14_43:
     add x1, x0, x0
-    sb x1, 26(x31)
     sw x1, 20(x31)
+    sb x1, 26(x31)
     b __LBB14_45
 __LBB14_44:
     lbu x1, 26(x31)
