@@ -23,22 +23,6 @@ extern "C" {
 
 const CLK_FREQ: u32 = 33000000;
 
-func UartThread(pointer: *mut void) {
-    let emulator = pointer as *mut Emulator;
-
-    loop {
-        let character = _getch();
-        emulator->uart_mutex.Lock();
-
-        if !emulator->uart_rx_ready {
-            emulator->uart_rx = character as u8;
-            emulator->uart_rx_ready = true;
-        }
-
-        emulator->uart_mutex.Unlock();
-    }
-}
-
 class Emulator {
     pub pc: u32,
     pub halted: bool,
@@ -99,11 +83,11 @@ class Emulator {
         }
     }
 
-    pub GetRegister(&this, index: u32) -> u32 {
+    priv GetRegister(&this, index: u32) -> u32 {
         ret this.registers[index as usize];
     }
 
-    pub SetRegister(&mut this, index: u32, value: u32) {
+    priv SetRegister(&mut this, index: u32, value: u32) {
         if index != 0 {
             this.registers[index as usize] = value;
         }
@@ -180,7 +164,7 @@ class Emulator {
         }
     }
 
-    pub Tick(&mut this) {
+    priv Tick(&mut this) {
         let word = this.ReadWord(this.pc);
         let opcode = (word >> OPCODE_SHIFT);
         let (reg0, reg1, reg2) = ((word >> REG0_SHIFT) & 0x1F, (word >> REG1_SHIFT) & 0x1F, (word >> REG2_SHIFT) & 0x1F);
@@ -254,13 +238,13 @@ class Emulator {
                 next_pc = (this.pc as i32 + (simm16 << 2)) as u32;
             }
         } else if opcode == Opcode::SLT {
-            this.SetRegister(reg0, (this.GetRegister(reg1) as i32 < this.GetRegister(reg2) as i32) ? 1u32 : 0u32);
+            this.SetRegister(reg0, (this.GetRegister(reg1) as i32 < this.GetRegister(reg2) as i32) ? 1 : 0);
         } else if opcode == Opcode::SLTU {
-            this.SetRegister(reg0, (this.GetRegister(reg1) < this.GetRegister(reg2)) ? 1u32 : 0u32);
+            this.SetRegister(reg0, (this.GetRegister(reg1) < this.GetRegister(reg2)) ? 1 : 0);
         } else if opcode == Opcode::SLTI {
-            this.SetRegister(reg0, (this.GetRegister(reg1) as i32 < simm16) ? 1u32 : 0u32);
+            this.SetRegister(reg0, (this.GetRegister(reg1) as i32 < simm16) ? 1 : 0);
         } else if opcode == Opcode::SLTIU {
-            this.SetRegister(reg0, (this.GetRegister(reg1) < imm16) ? 1u32 : 0u32);
+            this.SetRegister(reg0, (this.GetRegister(reg1) < imm16) ? 1 : 0);
         } else if opcode == Opcode::ADD {
             this.SetRegister(reg0, this.GetRegister(reg1) + this.GetRegister(reg2));
         } else if opcode == Opcode::ADDI {
@@ -328,8 +312,22 @@ class Emulator {
         }
     }
 
+    priv UartThread(&mut this) {
+        loop {
+            let character = _getch();
+            this.uart_mutex.Lock();
+
+            if !this.uart_rx_ready {
+                this.uart_rx = character as u8;
+                this.uart_rx_ready = true;
+            }
+
+            this.uart_mutex.Unlock();
+        }
+    }
+
     pub Emulate(&mut this) {
-        let uart_thread = Thread(UartThread, this);
+        let uart_thread = Thread(this.UartThread as ThreadFunction, this);
         uart_thread.Detach();
 
         while !this.halted {

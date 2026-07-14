@@ -175,7 +175,7 @@ class Parser {
         ret this.arena.New<OperandNode>(expr, null, token);
     }
 
-    pub ParseInstruction(&mut this) -> *const InstructionNode {
+    priv ParseInstruction(&mut this) -> *const InstructionNode {
         let token = this.Expect(TokenType::IDENTIFIER);
         if token._type == TokenType::UNKNOWN { ret null; }
         let mnemonic = token.value;
@@ -216,7 +216,7 @@ class Parser {
         } ret instruction;
     }
 
-    pub ParseLabel(&mut this) -> *const LabelNode {
+    priv ParseLabel(&mut this) -> *const LabelNode {
         let token = this.Expect(TokenType::IDENTIFIER);
         if token._type == TokenType::UNKNOWN || !this.Expect2(TokenType::COLON) { ret null; }
         ret this.arena.New<LabelNode>(token.value, token);
