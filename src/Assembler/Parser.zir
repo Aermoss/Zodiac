@@ -199,9 +199,9 @@ class Parser {
                     }
 
                     if state && operand->offset == null {
-                        Logger::Log("Instruction '" + mnemonic + "' requires dereference operator 'offset(reg)' for operand " + String(index as u64 + 1) + ".", token, LogSeverity::Error);
+                        Logger::Log("Instruction '" + mnemonic + "' requires dereference operator 'offset(reg)' for operand " + String::FromInteger(index as u64 + 1) + ".", token, LogSeverity::Error);
                     } else if !state && operand->offset != null && !is_reloc {
-                        Logger::Log("Instruction '" + mnemonic + "' does not support dereference operator for operand " + String(index as u64 + 1) + ".", token, LogSeverity::Error);
+                        Logger::Log("Instruction '" + mnemonic + "' does not support dereference operator for operand " + String::FromInteger(index as u64 + 1) + ".", token, LogSeverity::Error);
                     }
 
                     instruction->operands.PushBack(operand);

@@ -127,7 +127,7 @@ class Linker {
                 let mut name = symbol.name;
 
                 if symbol.binding == BindingType::Local {
-                    name = String(i as i64) + ":" + name;
+                    name = String::FromInteger(i as u64) + ":" + name;
                 } else if symbol.binding == BindingType::Global {
                     if this.symbol_names.Contains(name) {
                         Logger::Log("Duplicate global symbol definition '" + name + "'.", LogSeverity::Error);
@@ -143,7 +143,7 @@ class Linker {
             let object = this.objects[i];
 
             for relocation in object.relocations {
-                let mut symbol_index = this.symbol_names.Index(String(i as i64) + ":" + relocation.symbol);
+                let mut symbol_index = this.symbol_names.Index(String::FromInteger(i as u64) + ":" + relocation.symbol);
 
                 if symbol_index == -1 {
                     symbol_index = this.symbol_names.Index(relocation.symbol);
@@ -190,7 +190,7 @@ class Linker {
 
         for section in this.sections {
             for word in section {
-                let mut hex = String(word as u64, 16);
+                let mut hex = String::FromInteger(word as u64, 16);
                 while hex.Length() < 8 { hex = "0" + hex; }
                 result += hex + "\n";
             }

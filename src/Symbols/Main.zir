@@ -110,7 +110,7 @@ func main(args: &mut Vector<String>) -> i32 {
                 character = symbol.binding == BindingType::Global ? 'D' : 'd';
             }
 
-            let mut address = String(symbol.offset as u64, 16);
+            let mut address = String::FromInteger(symbol.offset as u64, 16);
             while address.Length() < 8 { address = "0" + address; }
             WriteLine(address + ' ' + character + ' ' + symbol.name);
         }

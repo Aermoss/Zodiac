@@ -29,7 +29,7 @@ class Disassembler {
     }
 
     priv DisassembleRegister(&this, register: u32) -> String {
-        ret "x" + String(register as u64);
+        ret "x" + String::FromInteger(register as u64);
     }
 
     priv DisassembleInstruction(&this, word: u32, offset: u32, section: SectionType, object: &Object) -> String {
@@ -93,25 +93,25 @@ class Disassembler {
         else if opcode == Opcode::SRAI { mnemonic = "srai"; }
         else if opcode == Opcode::HLT { mnemonic = "hlt"; }
         else {
-            ret ".word 0x" + String(word as u64, 16);
+            ret ".word 0x" + String::FromInteger(word as u64, 16);
         }
 
         if opcode >= Opcode::LB && opcode <= Opcode::SW {
             if opcode == Opcode::LUI || opcode == Opcode::AUIPC {
                 let relocation = this.GetRelocationSymbol(object, section, offset);
                 if !relocation.Empty() { ret mnemonic + " " + this.DisassembleRegister(reg0) + ", " + relocation; }
-                ret mnemonic + " " + this.DisassembleRegister(reg0) + ", " + String(simm21);
+                ret mnemonic + " " + this.DisassembleRegister(reg0) + ", " + String::FromInteger(simm21);
             } else {
-                ret mnemonic + " " + this.DisassembleRegister(reg0) + ", " + String(simm16) + "(" + this.DisassembleRegister(reg1) + ")";
+                ret mnemonic + " " + this.DisassembleRegister(reg0) + ", " + String::FromInteger(simm16) + "(" + this.DisassembleRegister(reg1) + ")";
             }
         } else if opcode == Opcode::B {
             let relocation = this.GetRelocationSymbol(object, section, offset);
             if !relocation.Empty() { ret mnemonic + " " + relocation; }
-            ret mnemonic + " " + String(simm26);
+            ret mnemonic + " " + String::FromInteger(simm26);
         } else if opcode == Opcode::BL {
             let relocation = this.GetRelocationSymbol(object, section, offset);
             if !relocation.Empty() { ret mnemonic + " " + this.DisassembleRegister(reg0) + ", " + relocation; }
-            ret mnemonic + " " + this.DisassembleRegister(reg0) + ", " + String(simm21);
+            ret mnemonic + " " + this.DisassembleRegister(reg0) + ", " + String::FromInteger(simm21);
         } else if opcode == Opcode::BR {
             ret mnemonic + " " + this.DisassembleRegister(reg0);
         } else if opcode == Opcode::BLR {
@@ -119,18 +119,18 @@ class Disassembler {
         } else if opcode >= Opcode::BEQ && opcode <= Opcode::BGEU {
             let relocation = this.GetRelocationSymbol(object, section, offset);
             if !relocation.Empty() { ret mnemonic + " " + this.DisassembleRegister(reg0) + ", " + this.DisassembleRegister(reg1) + ", " + relocation; }
-            ret mnemonic + " " + this.DisassembleRegister(reg0) + ", " + this.DisassembleRegister(reg1) + ", " + String(simm16);
+            ret mnemonic + " " + this.DisassembleRegister(reg0) + ", " + this.DisassembleRegister(reg1) + ", " + String::FromInteger(simm16);
         } else if opcode >= Opcode::SLT && opcode <= Opcode::SLTIU {
             if opcode == Opcode::SLT || opcode == Opcode::SLTU {
                 ret mnemonic + " " + this.DisassembleRegister(reg0) + ", " + this.DisassembleRegister(reg1) + ", " + this.DisassembleRegister(reg2);
             } else {
-                ret mnemonic + " " + this.DisassembleRegister(reg0) + ", " + this.DisassembleRegister(reg1) + ", " + String(simm16);
+                ret mnemonic + " " + this.DisassembleRegister(reg0) + ", " + this.DisassembleRegister(reg1) + ", " + String::FromInteger(simm16);
             }
         } else if opcode >= Opcode::ADD && opcode <= Opcode::SRAI {
             if (Opcode::ADD % 2 == opcode % 2) {
                 ret mnemonic + " " + this.DisassembleRegister(reg0) + ", " + this.DisassembleRegister(reg1) + ", " + this.DisassembleRegister(reg2);
             } else {
-                ret mnemonic + " " + this.DisassembleRegister(reg0) + ", " + this.DisassembleRegister(reg1) + ", " + String(simm16);
+                ret mnemonic + " " + this.DisassembleRegister(reg0) + ", " + this.DisassembleRegister(reg1) + ", " + String::FromInteger(simm16);
             }
         } else {
             ret mnemonic;
@@ -138,14 +138,14 @@ class Disassembler {
     }
 
     priv FormatHexWord(&this, word: u32) -> String {
-        let mut hex = String(word as u64, 16);
+        let mut hex = String::FromInteger(word as u64, 16);
         while hex.Length() < 8 { hex = "0" + hex; }
         ret hex.SubString(0, 2) + " " + hex.SubString(2, 2) + " "
             + hex.SubString(4, 2) + " " + hex.SubString(6, 2);
     }
 
     priv FormatHexAddress(&this, address: u32) -> String {
-        let mut hex = String(address as u64, 16);
+        let mut hex = String::FromInteger(address as u64, 16);
         while hex.Length() < 8 { hex = "0" + hex; }
         ret hex;
     }
@@ -217,7 +217,7 @@ class Disassembler {
                         if section_type == SectionType::Text {
                             result += "    " + this.DisassembleInstruction(word, offset, section_type, object) + '\n';
                         } else {
-                            result += "    .word " + String(word as i64) + '\n';
+                            result += "    .word " + String::FromInteger(word as i64) + '\n';
                         }
                     } offset += 4;
                 } result += '\n';

@@ -138,7 +138,7 @@ class Emulator {
         if address == 0xFFFF {
             Write((value as i8).ToString());
         } else if address == 0xFFF0 {
-            WriteLine("[LEDs: 0x" + String(value as u64, 16) + ']');
+            WriteLine("[LEDs: 0x" + String::FromInteger(value as u64, 16) + ']');
         } else if (address & 0xC0000000) == 0x40000000 {
             this.sdram[(address & 0x7FFFFF) as usize] = value;
         } else if address < 16384 {
@@ -153,9 +153,9 @@ class Emulator {
 
     priv WriteWord(&mut this, address: u32, value: u32) {
         if address == 0xFFE0 {
-            WriteLine("[WS2812: RGB(0x" + String(value as u64, 16) + ")]");
+            WriteLine("[WS2812: RGB(0x" + String::FromInteger(value as u64, 16) + ")]");
         } else if address == 0xFFF8 {
-            WriteLine("[UART Baud Rate: ~" + String((CLK_FREQ / value) as u64, 10) + ']');
+            WriteLine("[UART Baud Rate: ~" + String::FromInteger((CLK_FREQ / value) as u64, 10) + ']');
         } else {
             this.WriteByte(address, (value & 0xFF) as u8);
             this.WriteByte(address + 1, ((value >> 8) & 0xFF) as u8);
