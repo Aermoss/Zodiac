@@ -1,6 +1,9 @@
-COMPILER = "../Zircon/bin/zirconc.exe"
-OTHER_COMPILER = "../Zircon/bin/zirconc2.exe"
-INCLUDE = "../Zircon/include"
+ZIRCON_PATH := $(abspath ../Zircon)
+LLVM_PATH := $(abspath ../llvm-project/build/Debug)
+
+COMPILER := $(ZIRCON_PATH)/bin/zirconc.exe
+OTHER_COMPILER := $(abspath bin/zirconc.exe)
+INCLUDE := $(ZIRCON_PATH)/include
 
 default: simulate
 
@@ -28,10 +31,14 @@ bin/ztr.exe: $(wildcard src/Strings/*.zir) $(wildcard src/Common/*.zir)
 boot.o: bin/zas.exe boot.s
 	$^ -o $@
 
-program.o: export PATH := C:\Users\rencb\Documents\GitHub\llvm-project\build\Debug\bin;$(PATH)
-program.o: test.zir
-	$(OTHER_COMPILER) $< -o program.s -S -ffreestanding -target zodiac
-	bin/zas.exe program.s -o $@
+$(OTHER_COMPILER): $(wildcard $(ZIRCON_PATH)/src/*.zir)
+	cd $(ZIRCON_PATH) && $(COMPILER) src/Main.zir -o $@ -I$(INCLUDE) -L$(LLVM_PATH)/lib -lLLVM-C -lDbgHelp -DZODIAC -g -v
+
+program.s: $(OTHER_COMPILER) test.zir
+	set PATH=$(LLVM_PATH)/bin;%PATH% && $^ -o $@ -S -ffreestanding -target zodiac
+
+program.o: program.s
+	bin/zas.exe $< -o $@
 
 program.hex: bin/zld.exe boot.o program.o
 	$^ -o $@
