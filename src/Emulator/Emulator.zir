@@ -166,7 +166,7 @@ class Emulator {
 
     priv Tick(&mut this) {
         let word = this.ReadWord(this.pc);
-        let opcode = (word >> OPCODE_SHIFT);
+        let opcode = (word >> OPCODE_SHIFT) as Opcode;
         let (reg0, reg1, reg2) = ((word >> REG0_SHIFT) & 0x1F, (word >> REG1_SHIFT) & 0x1F, (word >> REG2_SHIFT) & 0x1F);
         let (imm11, imm16, imm21, imm26) = (word & IMM11_MASK, word & IMM16_MASK, word & IMM21_MASK, word & IMM26_MASK);
         let simm11 = (((imm11 as i32) ^ (1 << 10)) - (1 << 10));

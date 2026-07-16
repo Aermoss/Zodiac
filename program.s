@@ -1,6 +1,6 @@
 	.text
-	.global	__z14WriteCharacterc
-__z14WriteCharacterc:
+	.global	__z14WriteCharacteri8
+__z14WriteCharacteri8:
     addi x31, x31, -8
     sb x1, 7(x31)
     b __LBB0_1
@@ -22,8 +22,8 @@ __LBB0_3:
     addi x31, x31, 8
     br x30
 
-	.global	__z5WritePc
-__z5WritePc:
+	.global	__z5WritePi8
+__z5WritePi8:
     addi x31, x31, -8
     sw x30, 4(x31)
     sw x1, 0(x31)
@@ -37,7 +37,7 @@ __LBB1_1:
 __LBB1_2:
     lw x1, 0(x31)
     lbu x1, 0(x1)
-    bl x30, __z14WriteCharacterc
+    bl x30, __z14WriteCharacteri8
     lw x1, 0(x31)
     addi x1, x1, 1
     sw x1, 0(x31)
@@ -47,20 +47,20 @@ __LBB1_3:
     addi x31, x31, 8
     br x30
 
-	.global	__z9WriteLinePc
-__z9WriteLinePc:
+	.global	__z9WriteLinePi8
+__z9WriteLinePi8:
     addi x31, x31, -8
     sw x30, 4(x31)
     sw x1, 0(x31)
-    bl x30, __z5WritePc
+    bl x30, __z5WritePi8
     addi x1, x0, 10
-    bl x30, __z14WriteCharacterc
+    bl x30, __z14WriteCharacteri8
     lw x30, 4(x31)
     addi x31, x31, 8
     br x30
 
-	.global	__z12WriteIntegeri
-__z12WriteIntegeri:
+	.global	__z12WriteIntegeri32
+__z12WriteIntegeri32:
     addi x31, x31, -8
     sw x30, 4(x31)
     add x2, x1, x0
@@ -70,7 +70,7 @@ __z12WriteIntegeri:
     b __LBB3_1
 __LBB3_1:
     addi x1, x0, 45
-    bl x30, __z14WriteCharacterc
+    bl x30, __z14WriteCharacteri8
     lw x2, 0(x31)
     add x1, x0, x0
     sub x1, x1, x2
@@ -89,7 +89,7 @@ __LBB3_3:
     srli x2, x1, 31
     srai x1, x1, 2
     add x1, x1, x2
-    bl x30, __z12WriteIntegeri
+    bl x30, __z12WriteIntegeri32
     b __LBB3_4
 __LBB3_4:
     lw x1, 0(x31)
@@ -103,13 +103,13 @@ __LBB3_4:
     mul x2, x2, x3
     sub x1, x1, x2
     addi x1, x1, 48
-    bl x30, __z14WriteCharacterc
+    bl x30, __z14WriteCharacteri8
     lw x30, 4(x31)
     addi x31, x31, 8
     br x30
 
-	.global	__z12WriteIntegeri.1
-__z12WriteIntegeri.1:
+	.global	__z12WriteIntegeru32
+__z12WriteIntegeru32:
     addi x31, x31, -8
     sw x30, 4(x31)
     sw x1, 0(x31)
@@ -122,7 +122,7 @@ __LBB4_1:
     ori x2, x2, 1229
     mulhu x1, x1, x2
     srli x1, x1, 3
-    bl x30, __z12WriteIntegeri.1
+    bl x30, __z12WriteIntegeru32
     b __LBB4_2
 __LBB4_2:
     lw x1, 0(x31)
@@ -134,18 +134,18 @@ __LBB4_2:
     mul x2, x2, x3
     sub x1, x1, x2
     ori x1, x1, 48
-    bl x30, __z14WriteCharacterc
+    bl x30, __z14WriteCharacteri8
     lw x30, 4(x31)
     addi x31, x31, 8
     br x30
 
-	.global	__z16WriteHexadecimali
-__z16WriteHexadecimali:
+	.global	__z16WriteHexadecimalu32
+__z16WriteHexadecimalu32:
     addi x31, x31, -16
     sw x30, 12(x31)
     sw x1, 0(x31)
     la x1, .L__unnamed_1
-    bl x30, __z5WritePc
+    bl x30, __z5WritePi8
     addi x1, x0, 7
     sw x1, 4(x31)
     b __LBB5_1
@@ -166,12 +166,12 @@ __LBB5_2:
 __LBB5_3:
     lbu x1, 11(x31)
     addi x1, x1, 48
-    bl x30, __z14WriteCharacterc
+    bl x30, __z14WriteCharacteri8
     b __LBB5_5
 __LBB5_4:
     lbu x1, 11(x31)
     addi x1, x1, 55
-    bl x30, __z14WriteCharacterc
+    bl x30, __z14WriteCharacteri8
     b __LBB5_5
 __LBB5_5:
     lw x1, 4(x31)
@@ -186,8 +186,8 @@ __LBB5_7:
     sw x1, 4(x31)
     b __LBB5_1
 
-	.global	__z7SetLEDsc
-__z7SetLEDsc:
+	.global	__z7SetLEDsi8
+__z7SetLEDsi8:
     addi x31, x31, -8
     sb x1, 7(x31)
     lui x2, 31
@@ -196,8 +196,8 @@ __z7SetLEDsc:
     addi x31, x31, 8
     br x30
 
-	.global	__z9SetWS2812cccc
-__z9SetWS2812cccc:
+	.global	__z9SetWS2812u8u8u8u8
+__z9SetWS2812u8u8u8u8:
     addi x31, x31, -16
     add x5, x4, x0
     add x4, x1, x0
@@ -296,8 +296,8 @@ __z7GetTime:
     lw x1, 0(x1)
     br x30
 
-	.global	__z5Sleepi
-__z5Sleepi:
+	.global	__z5Sleepu32
+__z5Sleepu32:
     addi x31, x31, -16
     sw x30, 12(x31)
     sw x1, 4(x31)
@@ -318,8 +318,8 @@ __LBB12_3:
     addi x31, x31, 16
     br x30
 
-	.global	__z11SetBaudRatei
-__z11SetBaudRatei:
+	.global	__z11SetBaudRateu32
+__z11SetBaudRateu32:
     addi x31, x31, -8
     add x2, x1, x0
     sw x2, 4(x31)
@@ -338,15 +338,15 @@ Main:
     sw x30, 84(x31)
     lui x1, 56
     ori x1, x1, 512
-    bl x30, __z11SetBaudRatei
+    bl x30, __z11SetBaudRateu32
     addi x1, x0, 1
-    bl x30, __z5Sleepi
+    bl x30, __z5Sleepu32
     la x1, .L__unnamed_2
-    bl x30, __z9WriteLinePc
+    bl x30, __z9WriteLinePi8
     la x1, .L__unnamed_3
-    bl x30, __z9WriteLinePc
+    bl x30, __z9WriteLinePi8
     la x1, .L__unnamed_4
-    bl x30, __z9WriteLinePc
+    bl x30, __z9WriteLinePi8
     lui x1, 524288
     ori x1, x1, 0
     sw x1, 40(x31)
@@ -354,44 +354,44 @@ Main:
     ori x1, x1, 1775
     sw x1, 44(x31)
     la x1, .L__unnamed_5
-    bl x30, __z9WriteLinePc
+    bl x30, __z9WriteLinePi8
     lw x2, 40(x31)
     lw x1, 44(x31)
     sw x1, 0(x2)
     la x1, .L__unnamed_6
-    bl x30, __z5WritePc
+    bl x30, __z5WritePi8
     lw x1, 44(x31)
-    bl x30, __z16WriteHexadecimali
+    bl x30, __z16WriteHexadecimalu32
     la x1, .L__unnamed_7
-    bl x30, __z5WritePc
+    bl x30, __z5WritePi8
     lw x1, 40(x31)
-    bl x30, __z16WriteHexadecimali
+    bl x30, __z16WriteHexadecimalu32
     la x1, .L__unnamed_8
-    bl x30, __z9WriteLinePc
+    bl x30, __z9WriteLinePi8
     lw x1, 40(x31)
     lw x1, 0(x1)
     sw x1, 48(x31)
     la x1, .L__unnamed_9
-    bl x30, __z5WritePc
+    bl x30, __z5WritePi8
     lw x1, 48(x31)
-    bl x30, __z16WriteHexadecimali
+    bl x30, __z16WriteHexadecimalu32
     la x1, .L__unnamed_10
-    bl x30, __z5WritePc
+    bl x30, __z5WritePi8
     lw x1, 40(x31)
-    bl x30, __z16WriteHexadecimali
+    bl x30, __z16WriteHexadecimalu32
     la x1, .L__unnamed_11
-    bl x30, __z9WriteLinePc
+    bl x30, __z9WriteLinePi8
     lw x1, 48(x31)
     lw x2, 44(x31)
     bne x1, x2, __LBB14_2
     b __LBB14_1
 __LBB14_1:
     la x1, .L__unnamed_12
-    bl x30, __z9WriteLinePc
+    bl x30, __z9WriteLinePi8
     b __LBB14_3
 __LBB14_2:
     la x1, .L__unnamed_13
-    bl x30, __z9WriteLinePc
+    bl x30, __z9WriteLinePi8
     b __LBB14_3
 __LBB14_3:
     add x1, x0, x0
@@ -403,7 +403,7 @@ __LBB14_3:
     sb x1, 58(x31)
     addi x1, x0, 63
     sb x1, 59(x31)
-    bl x30, __z7SetLEDsc
+    bl x30, __z7SetLEDsi8
     lw x1, 36(x31)
     sw x1, 60(x31)
     bl x30, __z13ButtonPressed
@@ -450,11 +450,11 @@ __LBB14_10:
     add x1, x0, x0
     sb x1, 67(x31)
     la x1, .L__unnamed_14
-    bl x30, __z5WritePc
+    bl x30, __z5WritePi8
     lw x1, 60(x31)
-    bl x30, __z12WriteIntegeri
+    bl x30, __z12WriteIntegeri32
     la x1, .L__unnamed_15
-    bl x30, __z5WritePc
+    bl x30, __z5WritePi8
     b __LBB14_8
 __LBB14_11:
     lw x1, 76(x31)
@@ -511,7 +511,7 @@ __LBB14_20:
     lbu x3, 58(x31)
     lbu x2, 57(x31)
     lbu x1, 56(x31)
-    bl x30, __z9SetWS2812cccc
+    bl x30, __z9SetWS2812u8u8u8u8
     b __LBB14_46
 __LBB14_21:
     lbu x1, 56(x31)
@@ -628,7 +628,7 @@ __LBB14_47:
     addi x1, x0, 255
     add x3, x0, x0
     add x2, x3, x0
-    bl x30, __z9SetWS2812cccc
+    bl x30, __z9SetWS2812u8u8u8u8
     b __LBB14_49
 __LBB14_48:
     lw x1, 60(x31)
@@ -642,7 +642,7 @@ __LBB14_50:
     addi x2, x0, 255
     add x3, x0, x0
     add x1, x3, x0
-    bl x30, __z9SetWS2812cccc
+    bl x30, __z9SetWS2812u8u8u8u8
     b __LBB14_52
 __LBB14_51:
     lw x1, 60(x31)
@@ -656,14 +656,14 @@ __LBB14_53:
     add x2, x0, x0
     addi x3, x0, 255
     add x1, x2, x0
-    bl x30, __z9SetWS2812cccc
+    bl x30, __z9SetWS2812u8u8u8u8
     b __LBB14_55
 __LBB14_54:
     lbu x4, 75(x31)
     add x3, x0, x0
     add x1, x3, x0
     add x2, x3, x0
-    bl x30, __z9SetWS2812cccc
+    bl x30, __z9SetWS2812u8u8u8u8
     b __LBB14_55
 __LBB14_55:
     b __LBB14_52
@@ -706,7 +706,7 @@ __LBB14_58:
     lbu x1, 59(x31)
     xor x1, x1, x2
     sb x1, 59(x31)
-    bl x30, __z7SetLEDsc
+    bl x30, __z7SetLEDsi8
     b __LBB14_62
 __LBB14_59:
     lbu x1, 83(x31)
@@ -762,11 +762,11 @@ __LBB14_66:
     b __LBB14_67
 __LBB14_67:
     la x1, .L__unnamed_16
-    bl x30, __z5WritePc
+    bl x30, __z5WritePi8
     lbu x1, 75(x31)
-    bl x30, __z12WriteIntegeri.1
+    bl x30, __z12WriteIntegeru32
     la x1, .L__unnamed_17
-    bl x30, __z5WritePc
+    bl x30, __z5WritePi8
     b __LBB14_68
 __LBB14_68:
     b __LBB14_62
@@ -777,7 +777,7 @@ __LBB14_69:
     b __LBB14_72
 __LBB14_70:
     lbu x1, 83(x31)
-    bl x30, __z14WriteCharacterc
+    bl x30, __z14WriteCharacteri8
     b __LBB14_74
 __LBB14_71:
     add x1, x0, x0
@@ -790,11 +790,11 @@ __LBB14_72:
     b __LBB14_73
 __LBB14_73:
     la x1, .L__unnamed_18
-    bl x30, __z5WritePc
+    bl x30, __z5WritePi8
     lbu x1, 75(x31)
-    bl x30, __z12WriteIntegeri.1
+    bl x30, __z12WriteIntegeru32
     la x1, .L__unnamed_19
-    bl x30, __z5WritePc
+    bl x30, __z5WritePi8
     b __LBB14_74
 __LBB14_74:
     b __LBB14_68

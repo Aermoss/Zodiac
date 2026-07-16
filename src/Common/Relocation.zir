@@ -39,9 +39,9 @@ class Relocation {
     }
 
     pub Read(&mut this, file: &File) {
-        this.section = file.ReadWord();
+        this.section = file.ReadWord() as SectionType;
         this.offset = file.ReadWord();
-        this._type = file.ReadWord();
+        this._type = file.ReadWord() as RelocationType;
         this.symbol = file.ReadString();
     }
 
@@ -52,9 +52,9 @@ class Relocation {
     }
 
     pub Write(&mut this, file: &File) {
-        file.WriteWord(this.section);
+        file.WriteWord(this.section as u32);
         file.WriteWord(this.offset);
-        file.WriteWord(this._type);
+        file.WriteWord(this._type as u32);
         file.WriteString(this.symbol);
     }
 }

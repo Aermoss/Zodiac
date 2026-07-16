@@ -325,8 +325,8 @@ class Assembler {
             if mnemonic == "la" {
                 let register = this.AssembleExpression(operands[0]->expression);
                 let label = (operands[1]->expression as *const IdentifierNode)->value;
-                this.WriteWord(this.section, (Opcode::AUIPC << OPCODE_SHIFT) | (register << REG0_SHIFT) | (0 & IMM21_MASK));
-                this.WriteWord(this.section, (Opcode::ADDI << OPCODE_SHIFT) | (register << REG0_SHIFT) | (register << REG1_SHIFT) | (0 & IMM16_MASK));
+                this.WriteWord(this.section, (Opcode::AUIPC as u32 << OPCODE_SHIFT) | (register << REG0_SHIFT) | (0 & IMM21_MASK));
+                this.WriteWord(this.section, (Opcode::ADDI as u32 << OPCODE_SHIFT) | (register << REG0_SHIFT) | (register << REG1_SHIFT) | (0 & IMM16_MASK));
                 this.relocations.PushBack(Relocation(this.section, offset, RelocationType::PcRelativeUpper21, label));
                 this.relocations.PushBack(Relocation(this.section, offset + 4, RelocationType::PcRelativeLower11, label));
                 index += 1;
@@ -338,20 +338,20 @@ class Assembler {
 
                 if this.IsRelocatable(operands[1]->expression) {
                     let label = (operands[1]->expression as *const IdentifierNode)->value;
-                    this.WriteWord(this.section, (Opcode::LUI << OPCODE_SHIFT) | (register << REG0_SHIFT) | (0 & IMM21_MASK));
-                    this.WriteWord(this.section, (Opcode::ORI << OPCODE_SHIFT) | (register << REG0_SHIFT) | (register << REG1_SHIFT) | (0 & IMM16_MASK));
+                    this.WriteWord(this.section, (Opcode::LUI as u32 << OPCODE_SHIFT) | (register << REG0_SHIFT) | (0 & IMM21_MASK));
+                    this.WriteWord(this.section, (Opcode::ORI as u32 << OPCODE_SHIFT) | (register << REG0_SHIFT) | (register << REG1_SHIFT) | (0 & IMM16_MASK));
                     this.relocations.PushBack(Relocation(this.section, offset, RelocationType::AbsoluteUpper21, label));
                     this.relocations.PushBack(Relocation(this.section, offset + 4, RelocationType::AbsoluteLower11, label));
                 } else {
                     let immediate = this.AssembleExpression(operands[1]->expression);
 
                     if (immediate <= IMM16_SMAX) || (immediate >= IMM16_SMIN) {
-                        this.WriteWord(this.section, (Opcode::ADDI << OPCODE_SHIFT) | (register << REG0_SHIFT) | (0 << REG1_SHIFT) | (immediate & IMM16_MASK));
+                        this.WriteWord(this.section, (Opcode::ADDI as u32 << OPCODE_SHIFT) | (register << REG0_SHIFT) | (0 << REG1_SHIFT) | (immediate & IMM16_MASK));
                     } else if (immediate & IMM11_MASK) == 0 {
-                        this.WriteWord(this.section, (Opcode::LUI << OPCODE_SHIFT) | (register << REG0_SHIFT) | ((immediate >> 11) & IMM21_MASK));
+                        this.WriteWord(this.section, (Opcode::LUI as u32 << OPCODE_SHIFT) | (register << REG0_SHIFT) | ((immediate >> 11) & IMM21_MASK));
                     } else {
-                        this.WriteWord(this.section, (Opcode::LUI << OPCODE_SHIFT) | (register << REG0_SHIFT) | ((immediate >> 11) & IMM21_MASK));
-                        this.WriteWord(this.section, (Opcode::ORI << OPCODE_SHIFT) | (register << REG0_SHIFT) | (register << REG1_SHIFT) | (immediate & IMM11_MASK));
+                        this.WriteWord(this.section, (Opcode::LUI as u32 << OPCODE_SHIFT) | (register << REG0_SHIFT) | ((immediate >> 11) & IMM21_MASK));
+                        this.WriteWord(this.section, (Opcode::ORI as u32 << OPCODE_SHIFT) | (register << REG0_SHIFT) | (register << REG1_SHIFT) | (immediate & IMM11_MASK));
                     }
                 }
 
@@ -375,7 +375,7 @@ class Assembler {
                 let source = this.AssembleExpression(operands[1]->expression);
                 let other = (_zero ? 0 : (negative ? -1 as u32 : 1));
                 let (left, right) = ((reverse ? other : source), (reverse ? source : other));
-                this.WriteWord(this.section, (opcode << OPCODE_SHIFT) | (destination << REG0_SHIFT) | (left << REG1_SHIFT) | (register ? (right << REG2_SHIFT) : (right & IMM16_MASK)));
+                this.WriteWord(this.section, (opcode as u32 << OPCODE_SHIFT) | (destination << REG0_SHIFT) | (left << REG1_SHIFT) | (register ? (right << REG2_SHIFT) : (right & IMM16_MASK)));
                 index += 1;
                 continue;
             }
@@ -403,7 +403,7 @@ class Assembler {
                 let source = this.AssembleExpression(operands[0]->expression);
                 let other = _zero ? 0 : this.AssembleExpression(operands[1]->expression);
                 let (left, right) = ((reverse ? other : source), (reverse ? source : other));
-                this.WriteWord(this.section, (opcode << OPCODE_SHIFT) | (left << REG0_SHIFT) | (right << REG1_SHIFT) | (target & IMM16_MASK));
+                this.WriteWord(this.section, (opcode as u32 << OPCODE_SHIFT) | (left << REG0_SHIFT) | (right << REG1_SHIFT) | (target & IMM16_MASK));
                 index += 1;
                 continue;
             }
@@ -463,7 +463,7 @@ class Assembler {
                 continue;
             }
 
-            let mut word = (opcode << OPCODE_SHIFT);
+            let mut word = (opcode as u32 << OPCODE_SHIFT);
 
             if opcode >= Opcode::LB && opcode <= Opcode::SW {
                 word |= (this.AssembleExpression(operands[0]->expression) << REG0_SHIFT);
@@ -513,7 +513,7 @@ class Assembler {
                 word |= (this.AssembleExpression(operands[0]->expression) << REG0_SHIFT);
                 word |= (this.AssembleExpression(operands[1]->expression) << REG1_SHIFT);
 
-                if (Opcode::ADD % 2 == opcode % 2) || (opcode >= Opcode::MUL && opcode <= Opcode::REMU) {
+                if (Opcode::ADD as u32 % 2 == opcode as u32 % 2) || (opcode >= Opcode::MUL && opcode <= Opcode::REMU) {
                     word |= (this.AssembleExpression(operands[2]->expression) << REG2_SHIFT);
                 } else {
                     word |= (this.AssembleExpression(operands[2]->expression) & IMM16_MASK);

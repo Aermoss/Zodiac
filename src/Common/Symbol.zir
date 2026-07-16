@@ -32,9 +32,9 @@ class Symbol {
 
     pub Read(&mut this, file: &File) {
         this.name = file.ReadString();
-        this.section = file.ReadWord();
+        this.section = file.ReadWord() as SectionType;
         this.offset = file.ReadWord();
-        this.binding = file.ReadWord();
+        this.binding = file.ReadWord() as BindingType;
     }
 
     pub Read(file: &File) -> Symbol {
@@ -45,8 +45,8 @@ class Symbol {
 
     pub Write(&mut this, file: &File) {
         file.WriteString(this.name);
-        file.WriteWord(this.section);
+        file.WriteWord(this.section as u32);
         file.WriteWord(this.offset);
-        file.WriteWord(this.binding);
+        file.WriteWord(this.binding as u32);
     }
 }
