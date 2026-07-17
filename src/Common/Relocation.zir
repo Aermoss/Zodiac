@@ -38,20 +38,20 @@ class Relocation {
         (this.section, this.offset, this._type, this.symbol) = (section, offset, _type, symbol);
     }
 
-    pub Read(&mut this, file: &File) {
+    pub fn Read(&mut this, file: &File) {
         this.section = file.ReadWord() as SectionType;
         this.offset = file.ReadWord();
         this._type = file.ReadWord() as RelocationType;
         this.symbol = file.ReadString();
     }
 
-    pub Read(file: &File) -> Relocation {
+    pub fn Read(file: &File) -> Relocation {
         let relocation = Relocation();
         relocation.Read(file);
-        ret relocation;
+        return relocation;
     }
 
-    pub Write(&mut this, file: &File) {
+    pub fn Write(&mut this, file: &File) {
         file.WriteWord(this.section as u32);
         file.WriteWord(this.offset);
         file.WriteWord(this._type as u32);

@@ -20,12 +20,12 @@
 class Linker {
     pub objects: Vector<Object>,
     pub archives: Vector<Archive>,
-    priv symbol_names: Vector<String>,
-    priv symbol_addresses: Vector<u32>,
-    priv sections: Vector<Vector<u32>>,
-    priv section_bases: Vector<u32>;
+    symbol_names: Vector<String>,
+    symbol_addresses: Vector<u32>,
+    sections: Vector<Vector<u32>>,
+    section_bases: Vector<u32>;
  
-    pub Link(&mut this) -> String {
+    pub fn Link(&mut this) -> String {
         loop {
             let mut defined_symbols: Vector<String>;
 
@@ -131,7 +131,7 @@ class Linker {
                 } else if symbol.binding == BindingType::Global {
                     if this.symbol_names.Contains(name) {
                         Logger::Log("Duplicate global symbol definition '" + name + "'.", LogSeverity::Error);
-                        ret result;
+                        return result;
                     }
                 }
 
@@ -151,7 +151,7 @@ class Linker {
  
                 if symbol_index == -1 {
                     Logger::Log("Undefined symbol '" + relocation.symbol + "' referenced in " + object.path + ".", LogSeverity::Error);
-                    ret result;
+                    return result;
                 }
  
                 let target: u32 = this.symbol_addresses[symbol_index as usize];
@@ -177,7 +177,7 @@ class Linker {
                     word = target;
                 } else {
                     Logger::Log("Unknown relocation type.", LogSeverity::Error);
-                    ret result;
+                    return result;
                 }
 
                 this.sections[relocation.section as usize][index] = word;
@@ -197,6 +197,6 @@ class Linker {
         }
         
         this.sections.Clear();
-        ret result;
+        return result;
     }
 }

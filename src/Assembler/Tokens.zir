@@ -26,34 +26,34 @@ enum TokenType: i32 {
     COMMA, COLON, DOLLAR
 }
 
-func ToString(_type: TokenType) -> String {
-    if _type == TokenType::EOF { ret "EOF".ToString(); }
-    else if _type == TokenType::NEWLINE { ret "NEWLINE".ToString(); }
-    else if _type == TokenType::IDENTIFIER { ret "IDENTIFIER".ToString(); }
-    else if _type == TokenType::NUMBER { ret "NUMBER".ToString(); }
-    else if _type == TokenType::STRING { ret "STRING".ToString(); }
-    else if _type == TokenType::CHAR { ret "CHAR".ToString(); }
-    else if _type == TokenType::PLUS { ret "PLUS".ToString(); }
-    else if _type == TokenType::MINUS { ret "MINUS".ToString(); }
-    else if _type == TokenType::MUL { ret "MUL".ToString(); }
-    else if _type == TokenType::DIV { ret "DIV".ToString(); }
-    else if _type == TokenType::MOD { ret "MOD".ToString(); }
-    else if _type == TokenType::AND { ret "AND".ToString(); }
-    else if _type == TokenType::OR { ret "OR".ToString(); }
-    else if _type == TokenType::XOR { ret "XOR".ToString(); }
-    else if _type == TokenType::NOT { ret "NOT".ToString(); }
-    else if _type == TokenType::LSHIFT { ret "LSHIFT".ToString(); }
-    else if _type == TokenType::RSHIFT { ret "RSHIFT".ToString(); }
-    else if _type == TokenType::LPAREN { ret "LPAREN".ToString(); }
-    else if _type == TokenType::RPAREN { ret "RPAREN".ToString(); }
-    else if _type == TokenType::LBRACE { ret "LBRACE".ToString(); }
-    else if _type == TokenType::RBRACE { ret "RBRACE".ToString(); }
-    else if _type == TokenType::LBRACKET { ret "LBRACKET".ToString(); }
-    else if _type == TokenType::RBRACKET { ret "RBRACKET".ToString(); }
-    else if _type == TokenType::COMMA { ret "COMMA".ToString(); }
-    else if _type == TokenType::COLON { ret "COLON".ToString(); }
-    else if _type == TokenType::DOLLAR { ret "DOLLAR".ToString(); }
-    else { ret "UNKNOWN".ToString(); }
+fn ToString(_type: TokenType) -> String {
+    if _type == TokenType::EOF { return "EOF".ToString(); }
+    else if _type == TokenType::NEWLINE { return "NEWLINE".ToString(); }
+    else if _type == TokenType::IDENTIFIER { return "IDENTIFIER".ToString(); }
+    else if _type == TokenType::NUMBER { return "NUMBER".ToString(); }
+    else if _type == TokenType::STRING { return "STRING".ToString(); }
+    else if _type == TokenType::CHAR { return "CHAR".ToString(); }
+    else if _type == TokenType::PLUS { return "PLUS".ToString(); }
+    else if _type == TokenType::MINUS { return "MINUS".ToString(); }
+    else if _type == TokenType::MUL { return "MUL".ToString(); }
+    else if _type == TokenType::DIV { return "DIV".ToString(); }
+    else if _type == TokenType::MOD { return "MOD".ToString(); }
+    else if _type == TokenType::AND { return "AND".ToString(); }
+    else if _type == TokenType::OR { return "OR".ToString(); }
+    else if _type == TokenType::XOR { return "XOR".ToString(); }
+    else if _type == TokenType::NOT { return "NOT".ToString(); }
+    else if _type == TokenType::LSHIFT { return "LSHIFT".ToString(); }
+    else if _type == TokenType::RSHIFT { return "RSHIFT".ToString(); }
+    else if _type == TokenType::LPAREN { return "LPAREN".ToString(); }
+    else if _type == TokenType::RPAREN { return "RPAREN".ToString(); }
+    else if _type == TokenType::LBRACE { return "LBRACE".ToString(); }
+    else if _type == TokenType::RBRACE { return "RBRACE".ToString(); }
+    else if _type == TokenType::LBRACKET { return "LBRACKET".ToString(); }
+    else if _type == TokenType::RBRACKET { return "RBRACKET".ToString(); }
+    else if _type == TokenType::COMMA { return "COMMA".ToString(); }
+    else if _type == TokenType::COLON { return "COLON".ToString(); }
+    else if _type == TokenType::DOLLAR { return "DOLLAR".ToString(); }
+    else { return "UNKNOWN".ToString(); }
 }
 
 class Token {

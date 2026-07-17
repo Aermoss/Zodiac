@@ -24,17 +24,17 @@ enum NodeType: i32 {
     LITERAL, IDENTIFIER, ADDRESS,
 }
 
-func ToString(_type: NodeType) -> String {
-    if _type == NodeType::ROOT { ret "ROOT".ToString(); }
-    else if _type == NodeType::INSTRUCTION { ret "INSTRUCTION".ToString(); }
-    else if _type == NodeType::LABEL { ret "LABEL".ToString(); }
-    else if _type == NodeType::OPERAND { ret "OPERAND".ToString(); }
-    else if _type == NodeType::BINARY_OPERATION { ret "BINARY_OPERATION".ToString(); }
-    else if _type == NodeType::UNARY_OPERATION { ret "UNARY_OPERATION".ToString(); }
-    else if _type == NodeType::LITERAL { ret "LITERAL".ToString(); }
-    else if _type == NodeType::IDENTIFIER { ret "IDENTIFIER".ToString(); }
-    else if _type == NodeType::ADDRESS { ret "ADDRESS".ToString(); }
-    else { ret "UNKNOWN".ToString(); }
+fn ToString(_type: NodeType) -> String {
+    if _type == NodeType::ROOT { return "ROOT".ToString(); }
+    else if _type == NodeType::INSTRUCTION { return "INSTRUCTION".ToString(); }
+    else if _type == NodeType::LABEL { return "LABEL".ToString(); }
+    else if _type == NodeType::OPERAND { return "OPERAND".ToString(); }
+    else if _type == NodeType::BINARY_OPERATION { return "BINARY_OPERATION".ToString(); }
+    else if _type == NodeType::UNARY_OPERATION { return "UNARY_OPERATION".ToString(); }
+    else if _type == NodeType::LITERAL { return "LITERAL".ToString(); }
+    else if _type == NodeType::IDENTIFIER { return "IDENTIFIER".ToString(); }
+    else if _type == NodeType::ADDRESS { return "ADDRESS".ToString(); }
+    else { return "UNKNOWN".ToString(); }
 }
 
 class Node {
@@ -68,36 +68,36 @@ class AddressNode : Node {
 }
 
 class BinaryOperationNode : Node {
-    pub left: *const Node,
-    pub right: *const Node,
-    pub operator: TokenType;
+    pub left: *Node,
+    pub right: *Node,
+    pub _operator: TokenType;
 
-    BinaryOperationNode(&mut this, left: *const Node, right: *const Node, operator: TokenType, start: Token) : Node(NodeType::BINARY_OPERATION, start) {
-        (this.left, this.right, this.operator) = (left, right, operator);
+    BinaryOperationNode(&mut this, left: *Node, right: *Node, _operator: TokenType, start: Token) : Node(NodeType::BINARY_OPERATION, start) {
+        (this.left, this.right, this._operator) = (left, right, _operator);
     }
 }
 
 class UnaryOperationNode : Node {
-    pub operand: *const Node,
-    pub operator: TokenType;
+    pub operand: *Node,
+    pub _operator: TokenType;
 
-    UnaryOperationNode(&mut this, operand: *const Node, operator: TokenType, start: Token) : Node(NodeType::UNARY_OPERATION, start) {
-        (this.operand, this.operator) = (operand, operator);
+    UnaryOperationNode(&mut this, operand: *Node, _operator: TokenType, start: Token) : Node(NodeType::UNARY_OPERATION, start) {
+        (this.operand, this._operator) = (operand, _operator);
     }
 }
 
 class OperandNode : Node {
-    pub expression: *const Node,
-    pub offset: *const Node;
+    pub expression: *Node,
+    pub offset: *Node;
 
-    OperandNode(&mut this, expression: *const Node, offset: *const Node, start: Token) : Node(NodeType::OPERAND, start) {
+    OperandNode(&mut this, expression: *Node, offset: *Node, start: Token) : Node(NodeType::OPERAND, start) {
         (this.expression, this.offset) = (expression, offset);
     }
 }
 
 class InstructionNode : Node {
     pub mnemonic: String,
-    pub operands: Vector<*const OperandNode>;
+    pub operands: Vector<*OperandNode>;
 
     InstructionNode(&mut this, mnemonic: String, start: Token) : Node(NodeType::INSTRUCTION, start) {
         this.mnemonic = mnemonic;
@@ -113,7 +113,7 @@ class LabelNode : Node {
 }
 
 class RootNode : Node {
-    pub declarations: Vector<*const Node>;
+    pub declarations: Vector<*Node>;
 
     RootNode(&mut this) : Node(NodeType::ROOT, Token()) {}
 }

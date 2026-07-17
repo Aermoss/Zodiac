@@ -16,14 +16,14 @@
 
 #[include "std/io", "std/str", "std/vec", "src/Emulator/Emulator.zir", "src/Common/Logger.zir" : *]
 
-func PrintVersion(executable: String) {
+fn PrintVersion(executable: String) {
     WriteLine("Unversioned build of " + executable + ".");
     WriteLine("Copyright (c) 2026 Yusuf Rençber.");
     WriteLine("Licensed under the Apache License, Version 2.0.");
     WriteLine("See the LICENSE file for details.");
 }
 
-func PrintUsage(executable: String) {
+fn PrintUsage(executable: String) {
     WriteLine("OVERVIEW: Zodiac emulator");
     WriteLine("USAGE: " + executable + " [options] <input>");
     WriteLine("OPTIONS:");
@@ -31,13 +31,13 @@ func PrintUsage(executable: String) {
     WriteLine("  -h, --help               Display this help message");
 }
 
-func main(args: &mut Vector<String>) -> i32 {
+fn Main(args: &mut Vector<String>) -> i32 {
     let executable = SplitPath(args[0]).right;
     let mut logger = Logger(executable);
 
     if args.Size() < 2 {
         PrintUsage(executable);
-        ret 1;
+        return 1;
     }
 
     let mut input = String();
@@ -48,21 +48,21 @@ func main(args: &mut Vector<String>) -> i32 {
 
         if arg == "--help" || arg == "-h" {
             PrintUsage(executable);
-            ret 0;
+            return 0;
         } else if arg == "--version" {
             PrintVersion(executable);
-            ret 0;
+            return 0;
         } else if FileExists(arg) {
             input = arg;
         } else {
             Logger::Log("Cannot find '" + arg + "'.", LogSeverity::Error);
-            ret 1;
+            return 1;
         } i += 1;
     }
 
     if input.Empty() {
         Logger::Log("No input file.", LogSeverity::Error);
-        ret 1;
+        return 1;
     }
 
     let mut emulator = Emulator();
@@ -75,14 +75,14 @@ func main(args: &mut Vector<String>) -> i32 {
         loaded = emulator.LoadBinary(input);
     } else {
         Logger::Log("Invalid input file '" + input + "'.", LogSeverity::Error);
-        ret 1;
+        return 1;
     }
 
     if !loaded {
         Logger::Log("Failed to load program '" + input + "'.", LogSeverity::Error);
-        ret 1;
+        return 1;
     }
 
     emulator.Emulate();
-    ret 0;
+    return 0;
 }

@@ -18,120 +18,120 @@
     "src/Common/Instruction.zir", "src/Common/Section.zir", "src/Common/Symbol.zir", "src/Common/Relocation.zir" : *]
 
 class Assembler {
-    priv section: SectionType,
-    priv sections: Vector<Vector<u8>>,
-    priv symbols: Vector<Symbol>,
-    priv relocations: Vector<Relocation>,
-    priv globals: Vector<String>,
-    priv externs: Vector<String>;
+    section: SectionType,
+    sections: Vector<Vector<u8>>,
+    symbols: Vector<Symbol>,
+    relocations: Vector<Relocation>,
+    globals: Vector<String>,
+    externs: Vector<String>;
 
-    priv WriteByte(&mut this, section: SectionType, value: u8) {
+    fn WriteByte(&mut this, section: SectionType, value: u8) {
         this.sections[section as usize].PushBack(value);
     }
 
-    priv WriteHalf(&mut this, section: SectionType, value: u16) {
+    fn WriteHalf(&mut this, section: SectionType, value: u16) {
         this.WriteByte(section, value as u8);
         this.WriteByte(section, (value >> 8) as u8);
     }
 
-    priv WriteWord(&mut this, section: SectionType, value: u32) {
+    fn WriteWord(&mut this, section: SectionType, value: u32) {
         this.WriteByte(section, value as u8);
         this.WriteByte(section, (value >> 8) as u8);
         this.WriteByte(section, (value >> 16) as u8);
         this.WriteByte(section, (value >> 24) as u8);
     }
 
-    priv GetSectionSize(&mut this, section: SectionType) -> u32 {
-        ret this.sections[section as usize].Size() as u32;
+    fn GetSectionSize(&mut this, section: SectionType) -> u32 {
+        return this.sections[section as usize].Size() as u32;
     }
 
-    priv IsRegister(&mut this, value: &String) -> bool {
-        if !value.StartsWith("x") { ret false; }
-        if value.Length() < 2 || value.Length() > 3 { ret false; }
+    fn IsRegister(&mut this, value: &String) -> bool {
+        if !value.StartsWith("x") { return false; }
+        if value.Length() < 2 || value.Length() > 3 { return false; }
         let rest = value.SubString(1);
 
         for character in rest {
             if character < '0' || character > '9' {
-                ret false;
+                return false;
             }
         }
 
         let number = rest.ToInteger(10);
-        ret number >= 0 && number <= 31;
+        return number >= 0 && number <= 31;
     }
 
-    priv IsRelocatable(&mut this, node: *const Node) -> bool {
+    fn IsRelocatable(&mut this, node: *Node) -> bool {
         if node->_type == NodeType::IDENTIFIER {
-            ret !this.IsRegister((node as *const IdentifierNode)->value);
+            return !this.IsRegister((node as *IdentifierNode)->value);
         } else if node->_type == NodeType::BINARY_OPERATION {
-            let binary = node as *const BinaryOperationNode;
-            ret this.IsRelocatable(binary->left) || this.IsRelocatable(binary->right);
+            let binary = node as *BinaryOperationNode;
+            return this.IsRelocatable(binary->left) || this.IsRelocatable(binary->right);
         } else if node->_type == NodeType::UNARY_OPERATION {
-            let unary = node as *const UnaryOperationNode;
-            ret this.IsRelocatable(unary->operand);
+            let unary = node as *UnaryOperationNode;
+            return this.IsRelocatable(unary->operand);
         } else {
-            ret false;
+            return false;
         }
     }
 
-    priv AssembleExpression(&mut this, node: *const Node) -> u32 {
+    fn AssembleExpression(&mut this, node: *Node) -> u32 {
         if node->_type == NodeType::ADDRESS {
-            ret this.GetSectionSize(this.section);
+            return this.GetSectionSize(this.section);
         } else if node->_type == NodeType::LITERAL {
-            let value = (node as *const LiteralNode)->value;
-            if value.StartsWith("0x") { ret value.SubString(2).ToInteger(16) as u32; }
-            else if value.StartsWith("0b") { ret value.SubString(2).ToInteger(2) as u32; }
-            else if value.StartsWith("0o") { ret value.SubString(2).ToInteger(8) as u32; }
-            else { ret value.ToInteger(10) as u32; }
+            let value = (node as *LiteralNode)->value;
+            if value.StartsWith("0x") { return value.SubString(2).ToInteger(16) as u32; }
+            else if value.StartsWith("0b") { return value.SubString(2).ToInteger(2) as u32; }
+            else if value.StartsWith("0o") { return value.SubString(2).ToInteger(8) as u32; }
+            else { return value.ToInteger(10) as u32; }
         } else if node->_type == NodeType::IDENTIFIER {
-            let value = (node as *const IdentifierNode)->value;
+            let value = (node as *IdentifierNode)->value;
 
             if this.IsRegister(value) {
-                ret value.SubString(1).ToInteger(10) as u32;
+                return value.SubString(1).ToInteger(10) as u32;
             }
 
             for symbol in this.symbols {
                 if symbol.name == value {
-                    ret symbol.offset;
+                    return symbol.offset;
                 }
             }
 
             if !this.externs.Contains(value) {
                 Logger::Log("Unknown identifier: '" + value + "'.", node, LogSeverity::Error);
-            } ret 0;
+            } return 0;
         } else if node->_type == NodeType::BINARY_OPERATION {
-            let binary = node as *const BinaryOperationNode;
+            let binary = node as *BinaryOperationNode;
             let left = this.AssembleExpression(binary->left);
             let right = this.AssembleExpression(binary->right);
-            if binary->operator == TokenType::PLUS { ret left + right; }
-            else if binary->operator == TokenType::MINUS { ret left - right; }
-            else if binary->operator == TokenType::MUL { ret left * right; }
-            else if binary->operator == TokenType::DIV { ret left / right; }
-            else if binary->operator == TokenType::LSHIFT { ret left << right; }
-            else if binary->operator == TokenType::RSHIFT { ret left >> right; }
-            else if binary->operator == TokenType::AND { ret left & right; }
-            else if binary->operator == TokenType::OR { ret left | right; }
-            else if binary->operator == TokenType::XOR { ret left ^ right; }
+            if binary->_operator == TokenType::PLUS { return left + right; }
+            else if binary->_operator == TokenType::MINUS { return left - right; }
+            else if binary->_operator == TokenType::MUL { return left * right; }
+            else if binary->_operator == TokenType::DIV { return left / right; }
+            else if binary->_operator == TokenType::LSHIFT { return left << right; }
+            else if binary->_operator == TokenType::RSHIFT { return left >> right; }
+            else if binary->_operator == TokenType::AND { return left & right; }
+            else if binary->_operator == TokenType::OR { return left | right; }
+            else if binary->_operator == TokenType::XOR { return left ^ right; }
             else {
-                Logger::Log("Unknown binary operation: '" + binary->operator.ToString() + "'.", binary, LogSeverity::Error);
-                ret 0;
+                Logger::Log("Unknown binary operation: '" + binary->_operator.ToString() + "'.", binary, LogSeverity::Error);
+                return 0;
             }
         } else if node->_type == NodeType::UNARY_OPERATION {
-            let unary = node as *const UnaryOperationNode;
+            let unary = node as *UnaryOperationNode;
             let operand = this.AssembleExpression(unary->operand);
-            if unary->operator == TokenType::MINUS { ret 0 - operand; }
-            else if unary->operator == TokenType::NOT { ret !operand; }
+            if unary->_operator == TokenType::MINUS { return 0 - operand; }
+            else if unary->_operator == TokenType::NOT { return !operand; }
             else {
-                Logger::Log("Unknown unary operation: '" + unary->operator.ToString() + "'.", unary, LogSeverity::Error);
-                ret 0;
+                Logger::Log("Unknown unary operation: '" + unary->_operator.ToString() + "'.", unary, LogSeverity::Error);
+                return 0;
             }
         } else {
             Logger::Log("Unknown expression: '" + node->_type.ToString() + "'.", node, LogSeverity::Error);
-            ret 0;
+            return 0;
         }
     }
 
-    pub Assemble(&mut this, root: *const RootNode) -> Object {
+    pub fn Assemble(&mut this, root: *RootNode) -> Object {
         this.section = SectionType::Text;
         this.sections.Resize(SECTION_COUNT);
 
@@ -144,7 +144,7 @@ class Assembler {
  
         for node in root->declarations {
             if node->_type == NodeType::LABEL {
-                let name = (node as *const LabelNode)->name;
+                let name = (node as *LabelNode)->name;
                 let mut found = false;
 
                 for symbol in this.symbols {
@@ -160,7 +160,7 @@ class Assembler {
                     this.symbols.PushBack(Symbol(name, this.section, section_sizes[this.section as usize], binding));
                 }
             } else if node->_type == NodeType::INSTRUCTION {
-                let instruction = node as *const InstructionNode;
+                let instruction = node as *InstructionNode;
                 let (mnemonic, operands) = (instruction->mnemonic, instruction->operands);
                 let directive = mnemonic.StartsWith(".");
  
@@ -177,7 +177,7 @@ class Assembler {
                         section_sizes[this.section as usize] += (operands.Size() * 4) as u32;
                     } else if mnemonic == ".string" {
                         for operand in operands {
-                            let literal = operand->expression as *const LiteralNode;
+                            let literal = operand->expression as *LiteralNode;
                             section_sizes[this.section as usize] += (literal->value.Length() + 1) as u32;
                         }
                     } else if mnemonic == ".align" {
@@ -192,7 +192,7 @@ class Assembler {
                     } else if mnemonic == ".global" {
                         for operand in operands {
                             if operand->expression->_type == NodeType::IDENTIFIER {
-                                let value = (operand->expression as *const IdentifierNode)->value;
+                                let value = (operand->expression as *IdentifierNode)->value;
 
                                 if !this.globals.Contains(value) {
                                     this.globals.PushBack(value);
@@ -209,7 +209,7 @@ class Assembler {
                     } else if mnemonic == ".extern" {
                         for operand in operands {
                             if operand->expression->_type == NodeType::IDENTIFIER {
-                                let value = (operand->expression as *const IdentifierNode)->value;
+                                let value = (operand->expression as *IdentifierNode)->value;
 
                                 if !this.externs.Contains(value) {
                                     this.externs.PushBack(value);
@@ -263,7 +263,7 @@ class Assembler {
                 continue;
             }
 
-            let instruction = node as *const InstructionNode;
+            let instruction = node as *InstructionNode;
             let (mnemonic, operands) = (instruction->mnemonic, instruction->operands);
             let directive = mnemonic.StartsWith(".");
 
@@ -283,7 +283,7 @@ class Assembler {
                 } else if mnemonic == ".word" {
                     for operand in operands {
                         if this.IsRelocatable(operand->expression) {
-                            let label = (operand->expression as *const IdentifierNode)->value;
+                            let label = (operand->expression as *IdentifierNode)->value;
                             this.relocations.PushBack(Relocation(this.section, offset, RelocationType::Absolute32, label));
                             this.WriteWord(this.section, 0);
                         } else {
@@ -292,7 +292,7 @@ class Assembler {
                     }
                 } else if mnemonic == ".string" {
                     for operand in operands {
-                        let value = (operand->expression as *const LiteralNode)->value;
+                        let value = (operand->expression as *LiteralNode)->value;
 
                         for i in 0..value.Length() {
                             this.WriteByte(this.section, value.Data()[i] as u8);
@@ -324,7 +324,7 @@ class Assembler {
 
             if mnemonic == "la" {
                 let register = this.AssembleExpression(operands[0]->expression);
-                let label = (operands[1]->expression as *const IdentifierNode)->value;
+                let label = (operands[1]->expression as *IdentifierNode)->value;
                 this.WriteWord(this.section, (Opcode::AUIPC as u32 << OPCODE_SHIFT) | (register << REG0_SHIFT) | (0 & IMM21_MASK));
                 this.WriteWord(this.section, (Opcode::ADDI as u32 << OPCODE_SHIFT) | (register << REG0_SHIFT) | (register << REG1_SHIFT) | (0 & IMM16_MASK));
                 this.relocations.PushBack(Relocation(this.section, offset, RelocationType::PcRelativeUpper21, label));
@@ -337,7 +337,7 @@ class Assembler {
                 let register = this.AssembleExpression(operands[0]->expression);
 
                 if this.IsRelocatable(operands[1]->expression) {
-                    let label = (operands[1]->expression as *const IdentifierNode)->value;
+                    let label = (operands[1]->expression as *IdentifierNode)->value;
                     this.WriteWord(this.section, (Opcode::LUI as u32 << OPCODE_SHIFT) | (register << REG0_SHIFT) | (0 & IMM21_MASK));
                     this.WriteWord(this.section, (Opcode::ORI as u32 << OPCODE_SHIFT) | (register << REG0_SHIFT) | (register << REG1_SHIFT) | (0 & IMM16_MASK));
                     this.relocations.PushBack(Relocation(this.section, offset, RelocationType::AbsoluteUpper21, label));
@@ -397,7 +397,7 @@ class Assembler {
                 let target = this.AssembleExpression(operands[_index]->expression);
 
                 if this.IsRelocatable(operands[_index]->expression) {
-                    this.relocations.PushBack(Relocation(this.section, offset, RelocationType::Branch16, (operands[_index]->expression as *const IdentifierNode)->value));
+                    this.relocations.PushBack(Relocation(this.section, offset, RelocationType::Branch16, (operands[_index]->expression as *IdentifierNode)->value));
                 }
 
                 let source = this.AssembleExpression(operands[0]->expression);
@@ -478,14 +478,14 @@ class Assembler {
                 word |= (((this.AssembleExpression(operands[0]->expression) - offset) >> 2) & IMM26_MASK);
 
                 if this.IsRelocatable(operands[0]->expression) {
-                    this.relocations.PushBack(Relocation(this.section, offset, RelocationType::Branch26, (operands[0]->expression as *const IdentifierNode)->value));
+                    this.relocations.PushBack(Relocation(this.section, offset, RelocationType::Branch26, (operands[0]->expression as *IdentifierNode)->value));
                 }
             } else if opcode == Opcode::BL {
                 word |= (this.AssembleExpression(operands[0]->expression) << REG0_SHIFT);
                 word |= (((this.AssembleExpression(operands[1]->expression) - offset) >> 2) & IMM21_MASK);
 
                 if this.IsRelocatable(operands[1]->expression) {
-                    this.relocations.PushBack(Relocation(this.section, offset, RelocationType::Branch21, (operands[1]->expression as *const IdentifierNode)->value));
+                    this.relocations.PushBack(Relocation(this.section, offset, RelocationType::Branch21, (operands[1]->expression as *IdentifierNode)->value));
                 }
             } else if opcode == Opcode::BR {
                 word |= (this.AssembleExpression(operands[0]->expression) << REG0_SHIFT);
@@ -498,7 +498,7 @@ class Assembler {
                 word |= (((this.AssembleExpression(operands[2]->expression) - offset) >> 2) & IMM16_MASK);
 
                 if this.IsRelocatable(operands[2]->expression) {
-                    this.relocations.PushBack(Relocation(this.section, offset, RelocationType::Branch16, (operands[2]->expression as *const IdentifierNode)->value));
+                    this.relocations.PushBack(Relocation(this.section, offset, RelocationType::Branch16, (operands[2]->expression as *IdentifierNode)->value));
                 }
             } else if opcode >= Opcode::SLT && opcode <= Opcode::SLTIU {
                 word |= (this.AssembleExpression(operands[0]->expression) << REG0_SHIFT);
@@ -554,6 +554,6 @@ class Assembler {
         object.relocations.Swap(this.relocations);
         this.globals.Clear();
         this.externs.Clear();
-        ret object;
+        return object;
     }
 }

@@ -17,46 +17,46 @@
 #[include "std/str", "std/vec", "src/Assembler/Tokens.zir", "src/Common/Logger.zir" : *]
 
 class Lexer {
-    priv row: u32, priv column: u32,
-    priv text: String, priv file: String,
-    priv length: usize, priv index: usize;
+    row: u32, column: u32,
+    text: String, file: String,
+    length: usize, index: usize;
 
-    priv IsDigit(&this, character: i8) -> bool {
-        ret character >= '0' && character <= '9';
+    fn IsDigit(&this, character: i8) -> bool {
+        return character >= '0' && character <= '9';
     }
 
-    priv IsHexDigit(&this, character: i8) -> bool {
-        ret (character >= '0' && character <= '9') || (character >= 'a' && character <= 'f') || (character >= 'A' && character <= 'F');
+    fn IsHexDigit(&this, character: i8) -> bool {
+        return (character >= '0' && character <= '9') || (character >= 'a' && character <= 'f') || (character >= 'A' && character <= 'F');
     }
 
-    priv IsBinDigit(&this, character: i8) -> bool {
-        ret character == '0' || character == '1';
+    fn IsBinDigit(&this, character: i8) -> bool {
+        return character == '0' || character == '1';
     }
 
-    priv IsOctDigit(&this, character: i8) -> bool {
-        ret character >= '0' && character <= '7';
+    fn IsOctDigit(&this, character: i8) -> bool {
+        return character >= '0' && character <= '7';
     }
 
-    priv IsAlpha(&this, character: i8) -> bool {
-        ret (character >= 'a' && character <= 'z') || (character >= 'A' && character <= 'Z') || character == '_' || character == '.';
+    fn IsAlpha(&this, character: i8) -> bool {
+        return (character >= 'a' && character <= 'z') || (character >= 'A' && character <= 'Z') || character == '_' || character == '.';
     }
 
-    priv IsAlphaNum(&this, character: i8) -> bool {
-        ret this.IsAlpha(character) || this.IsDigit(character);
+    fn IsAlphaNum(&this, character: i8) -> bool {
+        return this.IsAlpha(character) || this.IsDigit(character);
     }
 
-    priv CurrentChar(&this) -> i8 {
-        if this.index >= this.length { ret '\0'; }
-        ret this.text.Data()[this.index];
+    fn CurrentChar(&this) -> i8 {
+        if this.index >= this.length { return '\0'; }
+        return this.text.Data()[this.index];
     }
 
-    priv PeekChar(&this, offset: usize) -> i8 {
+    fn PeekChar(&this, offset: usize) -> i8 {
         let peek_index = this.index + offset;
-        if peek_index >= this.length { ret '\0'; }
-        ret this.text.Data()[peek_index];
+        if peek_index >= this.length { return '\0'; }
+        return this.text.Data()[peek_index];
     }
 
-    priv Advance(&mut this, count: usize) {
+    fn Advance(&mut this, count: usize) {
         for _ in 0..count {
             if this.index < this.length {
                 if this.CurrentChar() == '\n' {
@@ -69,21 +69,21 @@ class Lexer {
         }
     }
 
-    priv SkipWhitespace(&mut this) {
+    fn SkipWhitespace(&mut this) {
         while this.CurrentChar() == ' ' || this.CurrentChar() == '\t' || this.CurrentChar() == '\r' {
             this.Advance(1);
         }
     }
 
-    priv SkipComment(&mut this) -> bool {
+    fn SkipComment(&mut this) -> bool {
         if this.CurrentChar() == ';' {
             while this.CurrentChar() != '\n' && this.CurrentChar() != '\0' {
                 this.Advance(1);
-            } ret true;
-        } ret false;
+            } return true;
+        } return false;
     }
 
-    priv LexString(&mut this) -> Token {
+    fn LexString(&mut this) -> Token {
         let mut token: Token;
         (token.row, token.column, token.file) = (this.row, this.column, this.file);
         let quote_char = this.CurrentChar();
@@ -164,10 +164,10 @@ class Lexer {
             this.Advance(1);
         } else {
             Logger::Log("Unterminated string literal.", token, LogSeverity::Error);
-        } ret token;
+        } return token;
     }
 
-    priv LexNumber(&mut this) -> Token {
+    fn LexNumber(&mut this) -> Token {
         let mut token: Token;
         (token.row, token.column, token.file) = (this.row, this.column, this.file);
         token._type = TokenType::NUMBER;
@@ -211,10 +211,10 @@ class Lexer {
                 token.value += this.CurrentChar();
                 this.Advance(1);
             }
-        } ret token;
+        } return token;
     }
 
-    priv LexIdentifier(&mut this) -> Token {
+    fn LexIdentifier(&mut this) -> Token {
         let mut token: Token;
         (token.row, token.column, token.file) = (this.row, this.column, this.file);
         token._type = TokenType::IDENTIFIER;
@@ -246,10 +246,10 @@ class Lexer {
                     break;
                 }
             }
-        } ret token;
+        } return token;
     }
 
-    priv LexSymbol(&mut this) -> Token {
+    fn LexSymbol(&mut this) -> Token {
         let mut token: Token;
         (token.row, token.column, token.file) = (this.row, this.column, this.file);
         let current = this.CurrentChar();
@@ -321,10 +321,10 @@ class Lexer {
         } else {
             Logger::Log("Invalid symbol '" + current.ToString() + "'.", token, LogSeverity::Error);
             this.Advance(1);
-        } ret token;
+        } return token;
     }
 
-    pub Lex(&mut this, text: String, file: String) -> Vector<Token> {
+    pub fn Lex(&mut this, text: String, file: String) -> Vector<Token> {
         (this.index, this.row, this.column) = (0, 1, 1);
         (this.file, this.text, this.length) = (file, text, text.Size());
         let mut tokens: Vector<Token>;
@@ -365,6 +365,6 @@ class Lexer {
         let mut eof: Token;
         (eof._type, eof.row, eof.column, eof.file) = (TokenType::EOF, this.row, this.column, this.file);
         tokens.PushBack(eof);
-        ret tokens;
+        return tokens;
     }
 }

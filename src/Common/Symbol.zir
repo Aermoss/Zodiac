@@ -30,20 +30,20 @@ class Symbol {
         (this.name, this.section, this.offset, this.binding) = (name, section, offset, binding);
     }
 
-    pub Read(&mut this, file: &File) {
+    pub fn Read(&mut this, file: &File) {
         this.name = file.ReadString();
         this.section = file.ReadWord() as SectionType;
         this.offset = file.ReadWord();
         this.binding = file.ReadWord() as BindingType;
     }
 
-    pub Read(file: &File) -> Symbol {
+    pub fn Read(file: &File) -> Symbol {
         let symbol = Symbol();
         symbol.Read(file);
-        ret symbol;
+        return symbol;
     }
 
-    pub Write(&mut this, file: &File) {
+    pub fn Write(&mut this, file: &File) {
         file.WriteString(this.name);
         file.WriteWord(this.section as u32);
         file.WriteWord(this.offset);

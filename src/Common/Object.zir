@@ -26,7 +26,7 @@ class Object {
     pub symbols: Vector<Symbol>,
     pub relocations: Vector<Relocation>;
 
-    pub Read(&mut this, file: &File) {
+    pub fn Read(&mut this, file: &File) {
         this.path = file.path;
         this.sections.Resize(SECTION_COUNT);
 
@@ -45,13 +45,13 @@ class Object {
         }
     }
 
-    pub Read(file: &File) -> Object {
+    pub fn Read(file: &File) -> Object {
         let object = Object();
         object.Read(file);
-        ret object;
+        return object;
     }
 
-    pub Write(&mut this, file: &File) {
+    pub fn Write(&mut this, file: &File) {
         for section in this.sections {
             file.WriteWord(section.Size() as u32);
             file.WriteWords(section.Data(), section.Size());

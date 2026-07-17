@@ -17,14 +17,14 @@
 #[include "std/io", "std/str", "std/vec", "std/pair", "std/file", "src/Common/Logger.zir",
     "src/Assembler/Lexer.zir", "src/Assembler/Parser.zir", "src/Assembler/Assembler.zir" : *]
 
-func PrintVersion(executable: String) {
+fn PrintVersion(executable: String) {
     WriteLine("Unversioned build of " + executable + ".");
     WriteLine("Copyright (c) 2026 Yusuf Rençber.");
     WriteLine("Licensed under the Apache License, Version 2.0.");
     WriteLine("See the LICENSE file for details.");
 }
 
-func PrintUsage(executable: String) {
+fn PrintUsage(executable: String) {
     WriteLine("OVERVIEW: Zodiac assembler");
     WriteLine("USAGE: " + executable + " [options] <input>");
     WriteLine("OPTIONS:");
@@ -33,13 +33,13 @@ func PrintUsage(executable: String) {
     WriteLine("  -h, --help               Display this help message");
 }
 
-func main(args: &mut Vector<String>) -> i32 {
+fn Main(args: &mut Vector<String>) -> i32 {
     let executable = SplitPath(args[0]).right;
     let mut logger = Logger(executable);
 
     if args.Size() < 2 {
         PrintUsage(executable);
-        ret 1;
+        return 1;
     }
 
     let mut input: String;
@@ -51,10 +51,10 @@ func main(args: &mut Vector<String>) -> i32 {
 
         if arg == "--help" || arg == "-h" {
             PrintUsage(executable);
-            ret 0;
+            return 0;
         } else if arg == "--version" {
             PrintVersion(executable);
-            ret 0;
+            return 0;
         } else if arg == "-o" {
             i += 1;
 
@@ -62,7 +62,7 @@ func main(args: &mut Vector<String>) -> i32 {
                 output = args[i];
             } else {
                 Logger::Log("Missing argument to '-o'.", LogSeverity::Error);
-                ret 1;
+                return 1;
             }
         } else {
             if FileExists(arg) {
@@ -70,33 +70,33 @@ func main(args: &mut Vector<String>) -> i32 {
                     input = arg;
                 } else {
                     Logger::Log("Already specified an input file.", LogSeverity::Error);
-                    ret 1;
+                    return 1;
                 }
             } else {
                 Logger::Log("Cannot find '" + arg + "'.", LogSeverity::Error);
-                ret 1;
+                return 1;
             }
         } i += 1;
     }
 
     if input.Empty() {
         Logger::Log("No input file.", LogSeverity::Error);
-        ret 1;
+        return 1;
     }
 
     let content = _ReadFile(input);
-    if content.Empty() { ret 1; }
+    if content.Empty() { return 1; }
 
     let mut lexer = Lexer();
     let tokens = lexer.Lex(content, input);
 
     let mut parser = Parser();
     let root = parser.Parse(tokens);
-    if root == null { ret 1; }
+    if root == null { return 1; }
 
     let mut assembler = Assembler();
     let object = assembler.Assemble(root);
-    if Logger::HasError() { ret 1; }
+    if Logger::HasError() { return 1; }
 
     if output.Empty() {
         output = SplitExtension(input).left + ".o";
@@ -106,10 +106,10 @@ func main(args: &mut Vector<String>) -> i32 {
 
     if !file.Open(FileMode::WriteBinary) {
         Logger::Log("Failed to write object file '" + output + "'.", LogSeverity::Error);
-        ret 1;
+        return 1;
     }
 
     file.WriteWord(OBJECT_MAGIC);
     object.Write(file);
-    ret 0;
+    return 0;
 }

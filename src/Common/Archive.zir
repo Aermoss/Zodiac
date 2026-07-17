@@ -22,7 +22,7 @@ class Archive {
     pub path: String,
     pub objects: Vector<Object>;
 
-    pub Read(&mut this, file: &File) {
+    pub fn Read(&mut this, file: &File) {
         this.path = file.path;
         this.objects.Resize(file.ReadWord() as usize);
 
@@ -31,13 +31,13 @@ class Archive {
         }
     }
 
-    pub Read(file: &File) -> Archive {
+    pub fn Read(file: &File) -> Archive {
         let archive = Archive();
         archive.Read(file);
-        ret archive;
+        return archive;
     }
 
-    pub Write(&mut this, file: &File) {
+    pub fn Write(&mut this, file: &File) {
         file.WriteWord(this.objects.Size() as u32);
 
         for object in this.objects {
