@@ -30,7 +30,7 @@ module bram #(
     assign word_addr = addr[2 + $clog2(WORD_DEPTH) - 1:2];
 
     initial begin
-        $readmemh("program.hex", mem);
+        $readmemh("C:\\Users\\rencb\\Documents\\GitHub\\Zodiac\\program.hex", mem);
     end
 
     always_ff @(posedge clk) begin

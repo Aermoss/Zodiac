@@ -25,6 +25,11 @@ module top (
     output logic [5:0] leds,
     output logic ws2812,
 
+    output wire spi_cs_pin,
+    output wire spi_clk_pin,
+    output wire spi_mosi_pin,
+    input wire spi_miso_pin,
+
     output logic O_sdram_clk,
     output logic O_sdram_cke,
     output logic O_sdram_cs_n,
@@ -143,6 +148,24 @@ module top (
         .O_sdrc_cmd_ack(sdrc_cmd_ack)
     );
 
+    logic flash_req;
+    logic [23:0] flash_addr;
+    logic [31:0] flash_rdata;
+    logic flash_ready;
+
+    flash flash0 (
+        .clk(sys_clk),
+        .rst(rst_reg),
+        .flash_req(flash_req),
+        .flash_addr(flash_addr),
+        .flash_rdata(flash_rdata),
+        .flash_ready(flash_ready),
+        .flash_cs(spi_cs_pin),
+        .flash_sck(spi_clk_pin),
+        .flash_mosi(spi_mosi_pin),
+        .flash_miso(spi_miso_pin)
+    );
+
     bus bus0 (
         .clk(sys_clk),
         .rst(rst_reg),
@@ -166,6 +189,11 @@ module top (
         .sdrc_data_w(sdrc_data_w),
         .sdrc_data_r(sdrc_data_r),
         .sdrc_init_done(sdrc_init_done),
-        .sdrc_cmd_ack(sdrc_cmd_ack)
+        .sdrc_cmd_ack(sdrc_cmd_ack),
+
+        .flash_req(flash_req),
+        .flash_addr(flash_addr),
+        .flash_rdata(flash_rdata),
+        .flash_ready(flash_ready)
     );
 endmodule

@@ -138,8 +138,8 @@ fn Main() {
     WriteLine("Type anything to echo, press 1-6 to toggle LEDs, or +/- to change RGB brightness.");
     WriteLine("Press the button on the board to cycle WS2812 animation modes.");
 
-    let address: u32 = 0x40000000;
-    let written_value: u32 = 0xDEADBEEF;
+    let mut address: u32 = 0x40000000;
+    let mut written_value: u32 = 0xDEADBEEF;
     WriteLine("Running SDRAM test...");
     *(address as *mut u32) = written_value;
     Write("Written ");
@@ -147,7 +147,7 @@ fn Main() {
     Write(" to ");
     WriteHexadecimal(address);
     WriteLine(".");
-    let read_value = *(address as *u32);
+    let mut read_value = *(address as *u32);
     Write("Read ");
     WriteHexadecimal(read_value);
     Write(" from ");
@@ -158,6 +158,21 @@ fn Main() {
         WriteLine("SDRAM test successful!");
     } else {
         WriteLine("SDRAM test failed!");
+    }
+
+    address = 0x80000000;
+    WriteLine("Running flash read test...");
+    read_value = *(address as *u32);
+    Write("Read ");
+    WriteHexadecimal(read_value);
+    Write(" from ");
+    WriteHexadecimal(address);
+    WriteLine(".");
+
+    if read_value == *(0x00000000 as *u32) {
+        WriteLine("Flash read test successful!");
+    } else {
+        WriteLine("Flash read test failed!");
     }
 
     let mut color_state = 0;
