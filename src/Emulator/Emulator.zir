@@ -24,16 +24,16 @@ extern "C" {
 const CLK_FREQ: u32 = 33000000;
 
 class Emulator {
-    pub pc: u32,
-    pub halted: bool,
-    pub registers: *mut u32,
-    pub bram: *mut u8,
-    pub sdram: *mut u8,
-    pub ms_counter: u32,
-    pub tick_counter: u32,
-    pub uart_rx: u8,
-    pub uart_rx_ready: bool,
-    pub uart_mutex: Mutex;
+    pc: u32,
+    halted: bool,
+    registers: *mut u32,
+    bram: *mut u8,
+    sdram: *mut u8,
+    ms_counter: u32,
+    tick_counter: u32,
+    uart_rx: u8,
+    uart_rx_ready: bool,
+    uart_mutex: Mutex;
 
     Emulator(&mut this) {
         this.registers = new u32[32];
