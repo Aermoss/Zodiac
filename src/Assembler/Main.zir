@@ -105,7 +105,7 @@ fn Main(args: &mut Vector<String>) -> i32 {
     let file = File(output);
 
     if !file.Open(FileMode::WriteBinary) {
-        Logger::Log("Failed to write object file '" + output + "'.", LogSeverity::Error);
+        Logger::Log("Failed to open file '" + output + "'.", LogSeverity::Error);
         return 1;
     }
 

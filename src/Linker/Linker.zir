@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#[include "std/str", "std/vec", "src/Common/Object.zir", "src/Common/Logger.zir",
+#[include "std/str", "std/vec", "src/Common/Object.zir", "src/Common/Archive.zir", "src/Common/Binary.zir", "src/Common/Logger.zir",
     "src/Common/Instruction.zir", "src/Common/Section.zir", "src/Common/Symbol.zir", "src/Common/Relocation.zir" : *]
 
 class Linker {
@@ -25,7 +25,7 @@ class Linker {
     sections: Vector<Vector<u32>>,
     section_bases: Vector<u32>;
  
-    pub fn Link(&mut this) -> String {
+    pub fn Link(&mut this) -> Binary {
         loop {
             let mut defined_symbols: Vector<String>;
 
@@ -91,7 +91,7 @@ class Linker {
 
         this.sections.Resize(SECTION_COUNT);
         this.section_bases.Resize(SECTION_COUNT);
-        let mut result = String();
+        let result = Binary();
 
         for object in this.objects {
             object.section_bases.Resize(SECTION_COUNT);
@@ -189,13 +189,9 @@ class Linker {
         this.section_bases.Clear();
 
         for section in this.sections {
-            for word in section {
-                let mut hex = String::FromInteger(word as u64, 16);
-                while hex.Length() < 8 { hex = "0" + hex; }
-                result += hex + "\n";
-            }
+            result.words += section;
         }
-        
+
         this.sections.Clear();
         return result;
     }

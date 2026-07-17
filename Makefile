@@ -41,7 +41,10 @@ program.o: program.s
 	bin/zas.exe $< -o $@
 
 program.hex: bin/zld.exe boot.o program.o
-	$^ -o $@
+	$^ -o $@ --format=hex
+
+program.bin: bin/zld.exe boot.o program.o
+	$^ -o $@ --format=bin
 
 ram.sv: program.hex
 
@@ -51,7 +54,7 @@ sim.out: $(filter-out top.sv, $(wildcard *.sv))
 dump.vcd: sim.out program.hex
 	vvp $<
 
-build: program.hex
+build: program.hex program.bin
 
 simulate: dump.vcd
 	gtkwave -S $< cpu.gtkw

@@ -28,7 +28,7 @@ fn PrintUsage(executable: String) {
     WriteLine("OVERVIEW: Zodiac archiver");
     WriteLine("USAGE: " + executable + " [options] <inputs...>");
     WriteLine("OPTIONS:");
-    WriteLine("  -o <file>                Write linked output to <file> (default: program.hex)");
+    WriteLine("  -o <file>                Write output to <file>");
     WriteLine("  --version                Display archiver version");
     WriteLine("  -h, --help               Display this help message");
 }

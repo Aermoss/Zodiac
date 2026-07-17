@@ -5,6 +5,7 @@
 *.ilk
 *.pdb
 *.hex
+*.bin
 *.o
 
 !bin/zas.exe

@@ -164,8 +164,14 @@ fn Main(args: &mut Vector<String>) -> i32 {
 
     if output.Empty() {
         WriteLine(result);
-    } else if !_WriteFile(output, result) {
-        Logger::Log("Failed to write result file '" + output + "'.", LogSeverity::Error);
-        return 1;
+    } else {
+        let file = File(output);
+
+        if !file.Open(FileMode::Write) {
+            Logger::Log("Failed to open file '" + output + "'.", LogSeverity::Error);
+            return 1;
+        }
+
+        file.WriteBytes(result.Data() as *u8, result.Length());
     } return 0;
 }

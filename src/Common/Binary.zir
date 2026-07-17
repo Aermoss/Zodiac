@@ -1,0 +1,37 @@
+/*
+ * Copyright 2026 Yusuf Rençber
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+#[include "std/str", "std/vec", "src/Common/File.zir" : *]
+
+class Binary {
+    pub words: Vector<u32>;
+
+    pub fn WriteHexadecimal(&this, file: &File) {
+        for word in this.words {
+            let mut result = String::FromInteger(word as u64, 16);
+
+            while result.Length() < 8 {
+                result = "0" + result;
+            } result += "\n";
+
+            file.WriteBytes(result.Data() as *u8, result.Length());
+        }
+    }
+
+    pub fn Write(&this, file: &File) {
+        file.WriteWords(this.words.Data(), this.words.Size());
+    }
+}
