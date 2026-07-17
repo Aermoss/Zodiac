@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#[include "std/str", "std/vec", "src/Common/File.zir" : *]
+#[include "std/str", "std/vec", "src/Common/File.zir", "src/Common/Endian.zir" : *]
 
 class Binary {
     pub words: Vector<u32>;
@@ -32,6 +32,12 @@ class Binary {
     }
 
     pub fn Write(&this, file: &File) {
-        file.WriteWords(this.words.Data(), this.words.Size());
+        let words = Vector<u32>();
+
+        for word in this.words {
+            words.PushBack(ByteSwap32(word));
+        }
+
+        file.WriteWords(words.Data(), words.Size());
     }
 }
