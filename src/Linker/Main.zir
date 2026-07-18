@@ -44,8 +44,9 @@ fn Main(args: &mut Vector<String>) -> i32 {
     }
 
     let mut binary = true;
-    let mut output: String;
-    let mut inputs: Vector<String>;
+    let mut linker = Linker();
+    let mut inputs = Vector<String>();
+    let mut output = String();
     let mut i: usize = 1;
 
     while i < args.Size() {
@@ -67,6 +68,18 @@ fn Main(args: &mut Vector<String>) -> i32 {
             } else {
                 Logger::Log("Unknown format '" + format + "', expected 'bin' or 'hex'.", LogSeverity::Error);
                 return 1;
+            }
+        } else if arg.StartsWith("--origin=") {
+            let origin = arg.SubString(9);
+
+            if origin.StartsWith("0x") {
+                linker.origin = String::ToInteger(origin.SubString(2), 16) as u32;
+            } else if origin.StartsWith("0o") {
+                linker.origin = String::ToInteger(origin.SubString(2), 8) as u32;
+            } else if origin.StartsWith("0b") {
+                linker.origin = String::ToInteger(origin.SubString(2), 2) as u32;
+            } else {
+                linker.origin = String::ToInteger(origin, 10) as u32;
             }
         } else if arg == "-o" {
             i += 1;
@@ -91,8 +104,6 @@ fn Main(args: &mut Vector<String>) -> i32 {
         Logger::Log("No input files.", LogSeverity::Error);
         return 1;
     }
-
-    let mut linker = Linker();
 
     for input in inputs {
         let file = File(input);

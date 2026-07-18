@@ -378,6 +378,8 @@ class Assembler {
                 this.WriteWord(this.section, (opcode as u32 << OPCODE_SHIFT) | (destination << REG0_SHIFT) | (left << REG1_SHIFT) | (register ? (right << REG2_SHIFT) : (right & IMM16_MASK)));
                 index += 1;
                 continue;
+            } else {
+                pseudo = true;
             }
 
             if mnemonic == "beqz" { opcode = Opcode::BEQ; }

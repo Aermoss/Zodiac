@@ -23,7 +23,8 @@ class Linker {
     symbol_names: Vector<String>,
     symbol_addresses: Vector<u32>,
     sections: Vector<Vector<u32>>,
-    section_bases: Vector<u32>;
+    section_bases: Vector<u32>,
+    pub origin: u32 = 0;
  
     pub fn Link(&mut this) -> Binary {
         loop {
@@ -105,18 +106,18 @@ class Linker {
             }
         }
 
-        let mut offset: u32 = 0;
+        let mut offset = this.origin;
 
         for i in 0..this.sections.Size() {
-            this.section_bases[i] = offset * 4;
+            this.section_bases[i] = offset;
 
             if offset != 0 {
                 for object in this.objects {
-                    object.section_bases[i] += offset * 4;
+                    object.section_bases[i] += offset;
                 }
             }
 
-            offset += this.sections[i].Size() as u32;
+            offset += this.sections[i].Size() as u32 * 4;
         }
 
         for i in 0..this.objects.Size() {
