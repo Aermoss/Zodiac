@@ -15,7 +15,7 @@
  */
 
 #[include "std/io", "std/str", "std/vec", "std/file", "std/thrd",
-    "src/Common/File.zir", "src/Common/Instruction.zir" : *]
+    "src/Common/File.zir", "src/Common/Endian.zir", "src/Common/Instruction.zir" : *]
 
 extern "C" {
     fn _getch() -> i32;
@@ -69,7 +69,7 @@ class Emulator {
         loop {
             let mut word: u32 = 0;
             if !file.ReadWords(&mut word, 1) { break; }
-            this.WriteWord(offset, word);
+            this.WriteWord(offset, ByteSwap32(word));
             offset += 4;
         } return true;
     }

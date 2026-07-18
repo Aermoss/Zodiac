@@ -28,38 +28,44 @@ bin/zym.exe: $(wildcard src/Symbols/*.zir) $(wildcard src/Common/*.zir)
 bin/ztr.exe: $(wildcard src/Strings/*.zir) $(wildcard src/Common/*.zir)
 	$(COMPILER) src/Strings/Main.zir -o $@ -I$(INCLUDE) -lDbgHelp -lucrt -DSTRINGS
 
-boot.o: bin/zas.exe boot.s
-	$^ -o $@
-
 $(OTHER_COMPILER): $(wildcard $(ZIRCON_PATH)/src/*.zir)
 	cd $(ZIRCON_PATH) && $(COMPILER) src/Main.zir -o $@ -I$(INCLUDE) -L$(LLVM_PATH)/lib -lLLVM-C -lDbgHelp -DZODIAC -g -v
 
-program.s: $(OTHER_COMPILER) test.zir
+boot.o: bin/zas.exe boot.s
+	$^ -o $@
+
+boot.hex: bin/zld.exe boot.o
+	$^ -o $@ --format=hex
+
+start.o: bin/zas.exe start.s
+	$^ -o $@
+
+program.s: $(OTHER_COMPILER) program.zir
 	set PATH=$(LLVM_PATH)/bin;%PATH% && $^ -o $@ -S -ffreestanding -target zodiac
 
 program.o: program.s
 	bin/zas.exe $< -o $@
 
-program.hex: bin/zld.exe boot.o program.o
+program.bin: bin/zld.exe start.o program.o
+	$^ -o $@ --format=bin --origin=0x40000000
+
+program.hex: bin/zld.exe start.o program.o
 	$^ -o $@ --format=hex
 
-program.bin: bin/zld.exe boot.o program.o
-	$^ -o $@ --format=bin
-
-ram.sv: program.hex
+ram.sv: boot.hex program.hex
 
 sim.out: $(filter-out top.sv, $(wildcard *.sv))
 	iverilog -o $@ -g2012 $^
 
-dump.vcd: sim.out program.hex
+dump.vcd: sim.out boot.hex program.hex
 	vvp $<
 
-build: program.hex program.bin
+build: boot.hex program.bin program.hex
 
 simulate: dump.vcd
 	gtkwave -S $< cpu.gtkw
 
-emulate: bin/zemu.exe program.hex
+emulate: bin/zemu.exe program.bin
 	$^
 
 all: bin/zas.exe bin/zda.exe bin/zar.exe bin/zld.exe bin/zemu.exe bin/zym.exe bin/ztr.exe
@@ -71,5 +77,5 @@ count: bin/Count.exe
 	$<
 
 clean:
-	del /Q dump.vcd sim.out boot.o program.o program.hex
+	del /Q dump.vcd sim.out boot.o boot.hex start.o program.o program.bin program.hex
 	del /Q bin\*

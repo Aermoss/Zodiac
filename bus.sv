@@ -74,6 +74,7 @@ module bus (
     logic [31:0] r_sdrc_data_w;
     logic [2:0] r_sdrc_cmd;
     logic [3:0] r_sdrc_dqm;
+    logic r_sdrc_is_read;
 
     assign sdrc_addr = r_sdrc_addr;
     assign sdrc_data_w = r_sdrc_data_w;
@@ -88,6 +89,7 @@ module bus (
             r_sdrc_addr <= 21'b0;
             r_sdrc_data_w <= 32'b0;
             r_sdrc_dqm <= 4'b0000;
+            r_sdrc_is_read <= 1'b0;
             sdram_read_reg <= 32'b0;
             sdram_read_active <= 1'b0;
             read_delay_counter <= 3'b0;
@@ -108,6 +110,7 @@ module bus (
                         r_sdrc_addr <= sdram_word_addr;
                         r_sdrc_data_w <= cpu_mem_write;
                         r_sdrc_dqm <= (cpu_mem_we != 4'b0000) ? ~cpu_mem_we : 4'b0000; 
+                        r_sdrc_is_read <= (cpu_mem_we == 4'b0000);
                         r_sdrc_cmd <= 3'b011;
                         state <= S_ACTIVATE_WAIT;
                     end else if (is_flash_addr && cpu_mem_access && (cpu_mem_we == 4'b0000)) begin
@@ -123,10 +126,10 @@ module bus (
                     if (sdrc_cmd_ack) begin
                         sdrc_cmd_en <= 1'b1;
 
-                        if (cpu_mem_we != 4'b0000)
-                            r_sdrc_cmd <= 3'b100;
-                        else
+                        if (r_sdrc_is_read)
                             r_sdrc_cmd <= 3'b101;
+                        else
+                            r_sdrc_cmd <= 3'b100;
 
                         state <= S_SDRAM_WAIT;
                     end
@@ -136,7 +139,7 @@ module bus (
                     sdrc_cmd_en <= 1'b0;
 
                     if (sdrc_cmd_ack) begin
-                        if (r_sdrc_cmd == 3'b101) begin
+                        if (r_sdrc_is_read) begin
                             read_delay_counter <= 3'd5;
                             state <= S_READ_DELAY;
                         end else begin

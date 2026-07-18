@@ -160,19 +160,16 @@ fn Main() {
         WriteLine("SDRAM test failed!");
     }
 
-    address = 0x80000000;
-    WriteLine("Running flash read test...");
-    read_value = *(address as *u32);
-    Write("Read ");
-    WriteHexadecimal(read_value);
-    Write(" from ");
-    WriteHexadecimal(address);
-    WriteLine(".");
+    address = 0x80100000;
 
-    if read_value == *(0x00000000 as *u32) {
-        WriteLine("Flash read test successful!");
-    } else {
-        WriteLine("Flash read test failed!");
+    for i in 0..16 {
+        read_value = *(address as *u32);
+        Write("Read ");
+        WriteHexadecimal(read_value);
+        Write(" from ");
+        WriteHexadecimal(address);
+        WriteLine(".");
+        address += 4;
     }
 
     let mut color_state = 0;
