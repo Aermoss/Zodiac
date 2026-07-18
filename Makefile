@@ -57,13 +57,13 @@ ram.sv: boot.hex program.hex
 sim.out: $(filter-out top.sv, $(wildcard *.sv))
 	iverilog -o $@ -g2012 $^
 
-dump.vcd: sim.out boot.hex program.hex
-	vvp $<
+wave.fst: sim.out boot.hex program.hex
+	vvp $< -fst
 
 build: boot.hex program.bin program.hex
 
-simulate: dump.vcd
-	gtkwave -S $< cpu.gtkw
+simulate: wave.fst
+	gtkwave $<
 
 emulate: bin/zemu.exe program.bin
 	$^
@@ -77,5 +77,5 @@ count: bin/Count.exe
 	$<
 
 clean:
-	del /Q dump.vcd sim.out boot.o boot.hex start.o program.o program.bin program.hex
+	del /Q sim.out wave.fst boot.o boot.hex start.o program.o program.bin program.hex
 	del /Q bin\*

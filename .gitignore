@@ -1,5 +1,5 @@
 *.out
-*.vcd
+*.fst
 *.gtkw
 *.exe
 *.ilk

@@ -59,7 +59,7 @@ module tb;
     always #3 clk = ~clk;
 
     initial begin
-        $dumpfile("dump.vcd");
+        $dumpfile("wave.fst");
         $dumpvars(0, tb);
 
         for (i = 0; i < 32; i++)
