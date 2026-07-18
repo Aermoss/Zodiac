@@ -505,7 +505,7 @@ module cpu #(
 
             OP_BLR: begin
                 ex_result = ex_pc + 4;
-                branch_target = ex_reg0_fwd;
+                branch_target = ex_reg1_fwd;
                 should_take_branch = 1;
             end
 
