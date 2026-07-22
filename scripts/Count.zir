@@ -18,6 +18,7 @@
 
 class Stats {
     pub hardware_counts: Map<String, usize>,
+    pub software_counts: Map<String, usize>,
     pub toolchain_counts: Map<String, usize>,
     pub other_counts: Map<String, usize>
 }
@@ -56,11 +57,17 @@ fn ProcessDirectory(directory: &String, stats: &mut Stats) {
                     } else {
                         stats.toolchain_counts[toolchain] = lines;
                     }
+                } else if path.EndsWith("program.zir") {
+                    stats.software_counts[path] = lines;
                 } else {
                     stats.other_counts[path] = lines;
                 }
             } else if file_name.EndsWith(".sv") {
                 stats.hardware_counts[path] = GetLineCount(path);
+            } else if file_name.EndsWith(".s") {
+                if !path.EndsWith("program.s") {
+                    stats.software_counts[path] = GetLineCount(path);
+                }
             }
         }
 
@@ -77,11 +84,11 @@ fn PrintMap(title: *i8, map: Map<String, usize>) -> usize {
     WriteLine("--- " + title.ToString() + " ---");
 
     for pair in map {
-        WriteLine(pair.left + ": " + String(pair.right as i64) + " lines");
+        WriteLine(pair.left + ": " + String::FromInteger(pair.right as i64) + " lines");
         total += pair.right;
     }
 
-    WriteLine("Subtotal: " + String(total as i64) + " lines\n");
+    WriteLine("Subtotal: " + String::FromInteger(total as i64) + " lines\n");
     return total;
 }
 
@@ -89,11 +96,12 @@ fn Main(args: &mut Vector<String>) -> i32 {
     let mut stats: Stats;
     ProcessDirectory(".".ToString(), &mut stats);
     let hardware_total = PrintMap("Hardware", stats.hardware_counts);
+    let software_total = PrintMap("Software", stats.software_counts);
     let toolchain_total = PrintMap("Toolchain", stats.toolchain_counts);
     let other_total = PrintMap("Other", stats.other_counts);
-    let total = hardware_total + toolchain_total + other_total;
+    let total = hardware_total + software_total + toolchain_total + other_total;
     WriteLine("==========================================");
-    WriteLine("TOTAL LINES:  " + String(total as i64) + " lines");
+    WriteLine("TOTAL LINES:  " + String::FromInteger(total as i64) + " lines");
     WriteLine("==========================================");
     return 0;
 }
