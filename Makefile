@@ -1,8 +1,9 @@
 ZIRCON_PATH := $(abspath ../Zircon)
-LLVM_PATH := $(abspath ../llvm-project/build/Debug)
+LLVM_PATH := $(abspath ../llvm-project)
 
 COMPILER := $(ZIRCON_PATH)/bin/zirconc.exe
 OTHER_COMPILER := $(abspath bin/zirconc.exe)
+TRANSPILER := $(ZIRCON_PATH)/bin/zirgen.exe
 INCLUDE := $(ZIRCON_PATH)/include
 
 default: simulate
@@ -28,8 +29,14 @@ bin/zym.exe: $(wildcard src/Symbols/*.zir) $(wildcard src/Common/*.zir)
 bin/ztr.exe: $(wildcard src/Strings/*.zir) $(wildcard src/Common/*.zir)
 	$(COMPILER) src/Strings/Main.zir -o $@ -I$(INCLUDE) -lDbgHelp -lucrt -DSTRINGS
 
-$(OTHER_COMPILER): $(wildcard $(ZIRCON_PATH)/src/*.zir)
-	cd $(ZIRCON_PATH) && $(COMPILER) src/Main.zir -o $@ -I$(INCLUDE) -L$(LLVM_PATH)/lib -lLLVM-C -lDbgHelp -DZODIAC -g -v
+bin/zirgen.exe:
+	cd $(ZIRCON_PATH) && $(MAKE) $@
+
+transpile-llvm: bin/zirgen.exe
+	cd $(ZIRCON_PATH) && $(TRANSPILER) "$(LLVM_PATH)\llvm\include\llvm-c" -I "$(LLVM_PATH)\llvm\include" -I "$(LLVM_PATH)\build\include"
+
+$(OTHER_COMPILER): transpile-llvm $(wildcard $(ZIRCON_PATH)/src/*.zir) $(wildcard $(ZIRCON_PATH)/include/vendor/llvm-c/*.zir)
+	cd $(ZIRCON_PATH) && $(COMPILER) src/Main.zir -o $@ -I$(INCLUDE) -L$(LLVM_PATH)/build/Debug/lib -lLLVM-C -lDbgHelp -g -v
 
 boot.o: bin/zas.exe boot.s
 	$^ -o $@
@@ -41,7 +48,7 @@ start.o: bin/zas.exe start.s
 	$^ -o $@
 
 program.s: $(OTHER_COMPILER) program.zir
-	set PATH=$(LLVM_PATH)/bin;%PATH% && $^ -o $@ -S -ffreestanding -target zodiac
+	set PATH=$(LLVM_PATH)/build/Debug/bin;%PATH% && $^ -o $@ -S -ffreestanding -target zodiac
 
 program.o: program.s
 	bin/zas.exe $< -o $@
