@@ -46,18 +46,36 @@ class Assembler {
     }
 
     fn IsRegister(&mut this, value: &String) -> bool {
-        if !value.StartsWith("x") { return false; }
-        if value.Length() < 2 || value.Length() > 3 { return false; }
-        let rest = value.SubString(1);
+        if value == "zero" || value == "ra" || value == "sp" || value == "gp" || value == "tp" || value == "fp" {
+            return true;
+        } else if value.StartsWith('x') || value.StartsWith('s') || value.StartsWith('t') || value.StartsWith('a') {
+            let rest = value.SubString(1);
 
-        for character in rest {
-            if character < '0' || character > '9' {
-                return false;
+            for character in rest {
+                if character < '0' || character > '9' {
+                    return false;
+                }
             }
-        }
 
-        let number = rest.ToInteger(10);
-        return number >= 0 && number <= 31;
+            let index = rest.ToInteger(10);
+            return index >= 0 && index <= (value.StartsWith('x') ? 31 : value.StartsWith('s') ? 11 : value.StartsWith('t') ? 6 : 7);
+        } else {
+            return false;
+        }
+    }
+
+    fn GetRegisterIndex(&mut this, value: &String) -> u32 {
+        if value == "zero" { return 0; }
+        else if value == "ra" { return 1; }
+        else if value == "sp" { return 2; }
+        else if value == "gp" { return 3; }
+        else if value == "tp" { return 4; }
+        else if value == "fp" { return 5; }
+        else if value.StartsWith('x') || value.StartsWith('s') || value.StartsWith('t') || value.StartsWith('a') {
+            return value.SubString(1).ToInteger(10) as u32 + (value.StartsWith('x') ? 0 : value.StartsWith('s') ? 5 : value.StartsWith('t') ? 17 : 24);
+        } else {
+            return 0;
+        }
     }
 
     fn IsRelocatable(&mut this, node: *Node) -> bool {
@@ -87,7 +105,7 @@ class Assembler {
             let value = (node as *IdentifierNode)->value;
 
             if this.IsRegister(value) {
-                return value.SubString(1).ToInteger(10) as u32;
+                return this.GetRegisterIndex(value);
             }
 
             for symbol in this.symbols {
