@@ -79,7 +79,7 @@ fn Main(args: &mut Vector<String>) -> i32 {
             WriteLine(input + ':');
         }
 
-        let file = File(input);
+        let mut file = File(input);
 
         if !file.Open(FileMode::ReadBinary) {
             Logger::Log("Failed to open file '" + input + "'.", LogSeverity::Error);

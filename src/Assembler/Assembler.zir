@@ -554,7 +554,7 @@ class Assembler {
             }
         }
 
-        let object = Object();
+        let mut object = Object();
         object.sections.Resize(this.sections.Size());
 
         for i in 0..this.sections.Size() {

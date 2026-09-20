@@ -95,14 +95,14 @@ fn Main(args: &mut Vector<String>) -> i32 {
     if root == null { return 1; }
 
     let mut assembler = Assembler();
-    let object = assembler.Assemble(root);
+    let mut object = assembler.Assemble(root);
     if Logger::HasError() { return 1; }
 
     if output.Empty() {
         output = SplitExtension(input).left + ".o";
     }
 
-    let file = File(output);
+    let mut file = File(output);
 
     if !file.Open(FileMode::WriteBinary) {
         Logger::Log("Failed to open file '" + output + "'.", LogSeverity::Error);

@@ -65,7 +65,7 @@ class Emulator {
     }
 
     pub fn LoadBinary(&mut this, path: &String) -> bool {
-        let file = File(path);
+        let mut file = File(path);
         if !file.Open(FileMode::ReadBinary) { return false; }
         let mut offset: u32 = 0;
 
@@ -334,7 +334,7 @@ class Emulator {
     }
 
     pub fn Emulate(&mut this) {
-        let uart_thread = Thread(this.UartThread as ThreadFunction, this);
+        let uart_thread = Thread(Emulator::UartThread as ThreadFunction, this);
         uart_thread.Detach();
 
         while !this.halted {

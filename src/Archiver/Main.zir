@@ -82,7 +82,7 @@ fn Main(args: &mut Vector<String>) -> i32 {
     let mut archive = Archive();
 
     for input in inputs {
-        let file = File(input);
+        let mut file = File(input);
 
         if !file.Open(FileMode::ReadBinary) {
             Logger::Log("Failed to open file '" + input + "'.", LogSeverity::Error);
@@ -103,7 +103,7 @@ fn Main(args: &mut Vector<String>) -> i32 {
         output = SplitExtension(inputs[0]).left + ".a";
     }
 
-    let file = File(output);
+    let mut file = File(output);
 
     if !file.Open(FileMode::WriteBinary) {
         Logger::Log("Failed to write archive file '" + output + "'.", LogSeverity::Error);

@@ -32,12 +32,12 @@ class Archive {
     }
 
     pub fn Read(file: &File) -> Archive {
-        let archive = Archive();
+        let mut archive = Archive();
         archive.Read(file);
         return archive;
     }
 
-    pub fn Write(&mut this, file: &File) {
+    pub fn Write(&this, file: &File) {
         file.WriteWord(this.objects.Size() as u32);
 
         for object in this.objects {

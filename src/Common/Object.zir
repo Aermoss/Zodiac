@@ -46,12 +46,12 @@ class Object {
     }
 
     pub fn Read(file: &File) -> Object {
-        let object = Object();
+        let mut object = Object();
         object.Read(file);
         return object;
     }
 
-    pub fn Write(&mut this, file: &File) {
+    pub fn Write(&this, file: &File) {
         for section in this.sections {
             file.WriteWord(section.Size() as u32);
             file.WriteWords(section.Data(), section.Size());

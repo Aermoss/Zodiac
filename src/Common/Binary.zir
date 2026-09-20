@@ -32,7 +32,7 @@ class Binary {
     }
 
     pub fn Write(&this, file: &File) {
-        let words = Vector<u32>();
+        let mut words = Vector<u32>();
 
         for word in this.words {
             words.PushBack(ByteSwap32(word));

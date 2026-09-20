@@ -24,17 +24,19 @@ enum NodeType: i32 {
     LITERAL, IDENTIFIER, ADDRESS,
 }
 
-fn ToString(_type: NodeType) -> String {
-    if _type == NodeType::ROOT { return "ROOT".ToString(); }
-    else if _type == NodeType::INSTRUCTION { return "INSTRUCTION".ToString(); }
-    else if _type == NodeType::LABEL { return "LABEL".ToString(); }
-    else if _type == NodeType::OPERAND { return "OPERAND".ToString(); }
-    else if _type == NodeType::BINARY_OPERATION { return "BINARY_OPERATION".ToString(); }
-    else if _type == NodeType::UNARY_OPERATION { return "UNARY_OPERATION".ToString(); }
-    else if _type == NodeType::LITERAL { return "LITERAL".ToString(); }
-    else if _type == NodeType::IDENTIFIER { return "IDENTIFIER".ToString(); }
-    else if _type == NodeType::ADDRESS { return "ADDRESS".ToString(); }
-    else { return "UNKNOWN".ToString(); }
+extend NodeType {
+    pub fn ToString(this) -> String {
+        if this == NodeType::ROOT { return "ROOT".ToString(); }
+        else if this == NodeType::INSTRUCTION { return "INSTRUCTION".ToString(); }
+        else if this == NodeType::LABEL { return "LABEL".ToString(); }
+        else if this == NodeType::OPERAND { return "OPERAND".ToString(); }
+        else if this == NodeType::BINARY_OPERATION { return "BINARY_OPERATION".ToString(); }
+        else if this == NodeType::UNARY_OPERATION { return "UNARY_OPERATION".ToString(); }
+        else if this == NodeType::LITERAL { return "LITERAL".ToString(); }
+        else if this == NodeType::IDENTIFIER { return "IDENTIFIER".ToString(); }
+        else if this == NodeType::ADDRESS { return "ADDRESS".ToString(); }
+        else { return "UNKNOWN".ToString(); }
+    }
 }
 
 class Node {

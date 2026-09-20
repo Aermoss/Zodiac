@@ -27,11 +27,13 @@ enum FileMode: u32 {
     Read, ReadBinary, Write, WriteBinary
 }
 
-fn ToString(mode: FileMode) -> *i8 {
-    if mode == FileMode::Read { return "r"; }
-    else if mode == FileMode::ReadBinary { return "rb"; }
-    else if mode == FileMode::Write { return "w"; }
-    else { return "wb"; }
+extend FileMode {
+    pub fn ToString(this) -> *i8 {
+        if this == FileMode::Read { return "r"; }
+        else if this == FileMode::ReadBinary { return "rb"; }
+        else if this == FileMode::Write { return "w"; }
+        else { return "wb"; }
+    }
 }
 
 class File {

@@ -34,6 +34,8 @@ class Relocation {
     pub _type: RelocationType,
     pub symbol: String;
 
+    Relocation(&mut this) {}
+
     Relocation(&mut this, section: SectionType, offset: u32, _type: RelocationType, symbol: &String) {
         (this.section, this.offset, this._type, this.symbol) = (section, offset, _type, symbol);
     }
@@ -46,12 +48,12 @@ class Relocation {
     }
 
     pub fn Read(file: &File) -> Relocation {
-        let relocation = Relocation();
+        let mut relocation = Relocation();
         relocation.Read(file);
         return relocation;
     }
 
-    pub fn Write(&mut this, file: &File) {
+    pub fn Write(&this, file: &File) {
         file.WriteWord(this.section as u32);
         file.WriteWord(this.offset);
         file.WriteWord(this._type as u32);

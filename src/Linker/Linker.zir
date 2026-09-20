@@ -92,7 +92,7 @@ class Linker {
 
         this.sections.Resize(SECTION_COUNT);
         this.section_bases.Resize(SECTION_COUNT);
-        let result = Binary();
+        let mut result = Binary();
 
         for object in this.objects {
             object.section_bases.Resize(SECTION_COUNT);

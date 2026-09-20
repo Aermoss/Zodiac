@@ -85,7 +85,7 @@ fn Main(args: &mut Vector<String>) -> i32 {
         let extension = SplitExtension(input).right;
 
         if extension == ".a" {
-            let file = File(input);
+            let mut file = File(input);
 
             if !file.Open(FileMode::ReadBinary) {
                 Logger::Log("Failed to open file '" + input + "'.", LogSeverity::Error);
@@ -101,7 +101,7 @@ fn Main(args: &mut Vector<String>) -> i32 {
                 return 1;
             }
         } else if extension == ".o" {
-            let file = File(input);
+            let mut file = File(input);
 
             if !file.Open(FileMode::ReadBinary) {
                 Logger::Log("Failed to open file '" + input + "'.", LogSeverity::Error);
@@ -117,7 +117,7 @@ fn Main(args: &mut Vector<String>) -> i32 {
                 return 1;
             }
         } else if extension == ".bin" {
-            let file = File(input);
+            let mut file = File(input);
 
             if !file.Open(FileMode::ReadBinary) {
                 Logger::Log("Failed to open file '" + input + "'.", LogSeverity::Error);
@@ -165,7 +165,7 @@ fn Main(args: &mut Vector<String>) -> i32 {
     if output.Empty() {
         WriteLine(result);
     } else {
-        let file = File(output);
+        let mut file = File(output);
 
         if !file.Open(FileMode::Write) {
             Logger::Log("Failed to open file '" + output + "'.", LogSeverity::Error);
