@@ -334,7 +334,7 @@ class Emulator {
     }
 
     pub fn Emulate(&mut this) {
-        let uart_thread = Thread(Emulator::UartThread as ThreadFunction, this);
+        let mut uart_thread = Thread(Emulator::UartThread as ThreadFunction, this);
         uart_thread.Detach();
 
         while !this.halted {
