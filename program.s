@@ -143,19 +143,19 @@ __LBB4_2:
 __z16WriteHexadecimalu32:
     addi x31, x31, -16
     sw x30, 12(x31)
-    sw x1, 0(x31)
-    la x1, .L__unnamed_1
+    sw x1, 8(x31)
+    la x1, .Lstring.0
     bl x30, __z5WritePi8
     addi x1, x0, 7
     sw x1, 4(x31)
     b __LBB5_1
 __LBB5_1:
-    lw x1, 4(x31)
-    slli x2, x1, 2
-    lw x1, 0(x31)
+    lw x1, 8(x31)
+    lw x2, 4(x31)
+    slli x2, x2, 2
     srl x1, x1, x2
     andi x1, x1, 15
-    sb x1, 11(x31)
+    sb x1, 3(x31)
     addi x2, x0, 10
     bltu x1, x2, __LBB5_3
     b __LBB5_4
@@ -164,12 +164,12 @@ __LBB5_2:
     addi x31, x31, 16
     br x30
 __LBB5_3:
-    lbu x1, 11(x31)
+    lbu x1, 3(x31)
     addi x1, x1, 48
     bl x30, __z14WriteCharacteri8
     b __LBB5_5
 __LBB5_4:
-    lbu x1, 11(x31)
+    lbu x1, 3(x31)
     addi x1, x1, 55
     bl x30, __z14WriteCharacteri8
     b __LBB5_5
@@ -202,46 +202,46 @@ __z9SetWS2812u8u8u8u8:
     add x5, x4, x0
     add x4, x1, x0
     andi x1, x5, 255
-    sb x4, 0(x31)
-    sb x2, 1(x31)
-    sb x3, 2(x31)
-    sb x5, 3(x31)
+    sb x4, 15(x31)
+    sb x2, 14(x31)
+    sb x3, 13(x31)
+    sb x5, 12(x31)
     andi x4, x4, 255
-    sw x4, 4(x31)
+    sw x4, 8(x31)
     andi x2, x2, 255
-    sw x2, 8(x31)
+    sw x2, 4(x31)
     andi x2, x3, 255
-    sw x2, 12(x31)
+    sw x2, 0(x31)
     addi x2, x0, 255
     beq x1, x2, __LBB7_2
     b __LBB7_1
 __LBB7_1:
-    lw x1, 4(x31)
-    lbu x3, 3(x31)
+    lw x1, 8(x31)
+    lbu x3, 12(x31)
     mul x1, x1, x3
     lui x2, 1052688
     ori x2, x2, 129
     mulhu x1, x1, x2
     srli x1, x1, 7
-    sw x1, 4(x31)
-    lw x1, 8(x31)
-    mul x1, x1, x3
-    mulhu x1, x1, x2
-    srli x1, x1, 7
     sw x1, 8(x31)
-    lw x1, 12(x31)
+    lw x1, 4(x31)
     mul x1, x1, x3
     mulhu x1, x1, x2
     srli x1, x1, 7
-    sw x1, 12(x31)
+    sw x1, 4(x31)
+    lw x1, 0(x31)
+    mul x1, x1, x3
+    mulhu x1, x1, x2
+    srli x1, x1, 7
+    sw x1, 0(x31)
     b __LBB7_2
 __LBB7_2:
-    lw x1, 8(x31)
+    lw x1, 4(x31)
     slli x1, x1, 16
-    lw x2, 4(x31)
+    lw x2, 8(x31)
     slli x2, x2, 8
     or x1, x1, x2
-    lw x2, 12(x31)
+    lw x2, 0(x31)
     or x1, x1, x2
     lui x2, 31
     ori x2, x2, 2016
@@ -300,15 +300,15 @@ __z7GetTime:
 __z5Sleepu32:
     addi x31, x31, -16
     sw x30, 12(x31)
-    sw x1, 4(x31)
-    bl x30, __z7GetTime
     sw x1, 8(x31)
+    bl x30, __z7GetTime
+    sw x1, 4(x31)
     b __LBB12_1
 __LBB12_1:
     bl x30, __z7GetTime
-    lw x2, 8(x31)
-    sub x1, x1, x2
     lw x2, 4(x31)
+    sub x1, x1, x2
+    lw x2, 8(x31)
     bgeu x1, x2, __LBB12_3
     b __LBB12_2
 __LBB12_2:
@@ -334,172 +334,175 @@ __z11SetBaudRateu32:
 
 	.global	Main
 Main:
-    addi x31, x31, -96
-    sw x30, 92(x31)
+    addi x31, x31, -104
+    sw x30, 100(x31)
     lui x1, 56
     ori x1, x1, 512
     bl x30, __z11SetBaudRateu32
     addi x1, x0, 1
     bl x30, __z5Sleepu32
-    la x1, .L__unnamed_2
+    la x1, .Lstring.1
     bl x30, __z9WriteLinePi8
-    la x1, .L__unnamed_3
+    la x1, .Lstring.2
     bl x30, __z9WriteLinePi8
-    la x1, .L__unnamed_4
+    la x1, .Lstring.3
     bl x30, __z9WriteLinePi8
     lui x1, 524288
     ori x1, x1, 0
-    sw x1, 44(x31)
+    sw x1, 96(x31)
     lui x1, 1824183
     ori x1, x1, 1775
-    sw x1, 48(x31)
-    la x1, .L__unnamed_5
+    sw x1, 92(x31)
+    la x1, .Lstring.4
     bl x30, __z9WriteLinePi8
-    lw x2, 44(x31)
-    lw x1, 48(x31)
+    lw x2, 96(x31)
+    lw x1, 92(x31)
     sw x1, 0(x2)
-    la x1, .L__unnamed_6
+    la x1, .Lstring.5
     bl x30, __z5WritePi8
-    lw x1, 48(x31)
+    lw x1, 92(x31)
     bl x30, __z16WriteHexadecimalu32
-    la x1, .L__unnamed_7
+    la x1, .Lstring.6
     bl x30, __z5WritePi8
-    lw x1, 44(x31)
+    lw x1, 96(x31)
     bl x30, __z16WriteHexadecimalu32
-    la x1, .L__unnamed_8
+    la x1, .Lstring.7
+    sw x1, 44(x31)
     bl x30, __z9WriteLinePi8
-    lw x1, 44(x31)
+    lw x1, 96(x31)
     lw x1, 0(x1)
-    sw x1, 52(x31)
-    la x1, .L__unnamed_9
+    sw x1, 88(x31)
+    la x1, .Lstring.8
     bl x30, __z5WritePi8
-    lw x1, 52(x31)
+    lw x1, 88(x31)
     bl x30, __z16WriteHexadecimalu32
-    la x1, .L__unnamed_10
+    la x1, .Lstring.9
     bl x30, __z5WritePi8
+    lw x1, 96(x31)
+    bl x30, __z16WriteHexadecimalu32
     lw x1, 44(x31)
-    bl x30, __z16WriteHexadecimalu32
-    la x1, .L__unnamed_11
     bl x30, __z9WriteLinePi8
-    lw x1, 52(x31)
-    lw x2, 48(x31)
+    lw x1, 88(x31)
+    lw x2, 92(x31)
     bne x1, x2, __LBB14_2
     b __LBB14_1
 __LBB14_1:
-    la x1, .L__unnamed_12
+    la x1, .Lstring.11
     bl x30, __z9WriteLinePi8
     b __LBB14_3
 __LBB14_2:
-    la x1, .L__unnamed_13
+    la x1, .Lstring.10
     bl x30, __z9WriteLinePi8
     b __LBB14_3
 __LBB14_3:
     lui x1, 1049088
     ori x1, x1, 0
-    sw x1, 44(x31)
+    sw x1, 96(x31)
     add x1, x0, x0
-    sw x1, 56(x31)
+    sw x1, 84(x31)
+    addi x1, x0, 16
+    sw x1, 80(x31)
     b __LBB14_4
 __LBB14_4:
-    lw x2, 56(x31)
-    addi x1, x0, 15
-    blt x1, x2, __LBB14_7
+    lw x1, 84(x31)
+    lw x2, 80(x31)
+    bge x1, x2, __LBB14_7
     b __LBB14_5
 __LBB14_5:
-    lw x1, 44(x31)
+    lw x1, 96(x31)
     lw x1, 0(x1)
-    sw x1, 52(x31)
-    la x1, .L__unnamed_14
+    sw x1, 88(x31)
+    la x1, .Lstring.8
     bl x30, __z5WritePi8
-    lw x1, 52(x31)
+    lw x1, 88(x31)
     bl x30, __z16WriteHexadecimalu32
-    la x1, .L__unnamed_15
+    la x1, .Lstring.9
     bl x30, __z5WritePi8
-    lw x1, 44(x31)
+    lw x1, 96(x31)
     bl x30, __z16WriteHexadecimalu32
-    la x1, .L__unnamed_16
+    la x1, .Lstring.7
     bl x30, __z9WriteLinePi8
-    lw x1, 44(x31)
+    lw x1, 96(x31)
     addi x1, x1, 4
-    sw x1, 44(x31)
+    sw x1, 96(x31)
     b __LBB14_6
 __LBB14_6:
-    lw x1, 56(x31)
+    lw x1, 84(x31)
     addi x1, x1, 1
-    sw x1, 56(x31)
+    sw x1, 84(x31)
     b __LBB14_4
 __LBB14_7:
     add x1, x0, x0
     sw x1, 40(x31)
-    sw x1, 60(x31)
+    sw x1, 76(x31)
     addi x2, x0, 255
-    sb x2, 64(x31)
-    sb x1, 65(x31)
-    sb x1, 66(x31)
+    sb x2, 75(x31)
+    sb x1, 74(x31)
+    sb x1, 73(x31)
     addi x1, x0, 63
-    sb x1, 67(x31)
+    sb x1, 72(x31)
     bl x30, __z7SetLEDsi8
     lw x1, 40(x31)
     sw x1, 68(x31)
     bl x30, __z13ButtonPressed
     xori x1, x1, -1
     andi x1, x1, 1
-    sb x1, 75(x31)
+    sb x1, 67(x31)
     bl x30, __z7GetTime
     addi x1, x1, 10
-    sw x1, 76(x31)
+    sw x1, 60(x31)
     addi x1, x0, 64
-    sb x1, 83(x31)
+    sb x1, 59(x31)
     b __LBB14_8
 __LBB14_8:
     bl x30, __z7GetTime
-    sw x1, 84(x31)
+    sw x1, 52(x31)
     bl x30, __z13ButtonPressed
     andi x1, x1, 1
     add x2, x0, x0
     beq x1, x2, __LBB14_10
     b __LBB14_9
 __LBB14_9:
-    lbu x1, 75(x31)
+    lbu x1, 67(x31)
     add x2, x0, x0
-    bne x1, x2, __LBB14_11
-    b __LBB14_12
+    bne x1, x2, __LBB14_12
+    b __LBB14_13
 __LBB14_10:
     addi x1, x0, 1
-    sb x1, 75(x31)
-    b __LBB14_15
+    sb x1, 67(x31)
+    b __LBB14_11
 __LBB14_11:
+    lw x1, 52(x31)
+    lw x2, 60(x31)
+    bgeu x1, x2, __LBB14_16
+    b __LBB14_17
+__LBB14_12:
     lw x1, 68(x31)
     addi x2, x1, 1
     sw x2, 68(x31)
     addi x1, x0, 4
-    blt x1, x2, __LBB14_13
-    b __LBB14_14
-__LBB14_12:
+    blt x1, x2, __LBB14_14
     b __LBB14_15
 __LBB14_13:
-    add x1, x0, x0
-    sw x1, 68(x31)
-    b __LBB14_14
+    b __LBB14_11
 __LBB14_14:
     add x1, x0, x0
-    sb x1, 75(x31)
-    la x1, .L__unnamed_17
+    sw x1, 68(x31)
+    b __LBB14_15
+__LBB14_15:
+    add x1, x0, x0
+    sb x1, 67(x31)
+    la x1, .Lstring.12
     bl x30, __z5WritePi8
     lw x1, 68(x31)
     bl x30, __z12WriteIntegeri32
-    la x1, .L__unnamed_18
+    la x1, .Lstring.13
     bl x30, __z5WritePi8
-    b __LBB14_12
-__LBB14_15:
-    lw x1, 84(x31)
-    lw x2, 76(x31)
-    bltu x1, x2, __LBB14_17
-    b __LBB14_16
+    b __LBB14_13
 __LBB14_16:
-    lw x1, 84(x31)
+    lw x1, 52(x31)
     addi x1, x1, 10
-    sw x1, 76(x31)
+    sw x1, 60(x31)
     lw x1, 68(x31)
     add x2, x0, x0
     beq x1, x2, __LBB14_18
@@ -511,203 +514,203 @@ __LBB14_17:
     bne x1, x2, __LBB14_60
     b __LBB14_61
 __LBB14_18:
-    lw x1, 60(x31)
+    lw x1, 76(x31)
     add x2, x0, x0
-    beq x1, x2, __LBB14_20
-    b __LBB14_21
+    beq x1, x2, __LBB14_30
+    b __LBB14_31
 __LBB14_19:
     lw x1, 68(x31)
     addi x2, x0, 1
-    beq x1, x2, __LBB14_51
-    b __LBB14_52
+    bne x1, x2, __LBB14_21
+    b __LBB14_20
 __LBB14_20:
-    lbu x1, 65(x31)
-    addi x2, x1, 5
-    andi x1, x2, 255
-    sb x2, 65(x31)
-    addi x2, x0, 255
-    beq x1, x2, __LBB14_22
-    b __LBB14_23
-__LBB14_21:
-    lw x1, 60(x31)
-    addi x2, x0, 1
-    beq x1, x2, __LBB14_25
-    b __LBB14_26
-__LBB14_22:
-    addi x1, x0, 1
-    sw x1, 60(x31)
-    addi x1, x0, 255
-    sb x1, 65(x31)
-    b __LBB14_23
-__LBB14_23:
-    b __LBB14_24
-__LBB14_24:
-    lbu x4, 83(x31)
-    lbu x3, 66(x31)
-    lbu x2, 65(x31)
-    lbu x1, 64(x31)
-    bl x30, __z9SetWS2812u8u8u8u8
-    b __LBB14_50
-__LBB14_25:
-    lbu x1, 64(x31)
-    addi x2, x0, 6
-    bltu x1, x2, __LBB14_27
-    b __LBB14_28
-__LBB14_26:
-    lw x1, 60(x31)
-    addi x2, x0, 2
-    beq x1, x2, __LBB14_31
-    b __LBB14_32
-__LBB14_27:
-    addi x1, x0, 2
-    sw x1, 60(x31)
-    add x1, x0, x0
-    sb x1, 64(x31)
-    b __LBB14_29
-__LBB14_28:
-    lbu x1, 64(x31)
-    addi x1, x1, -5
-    sb x1, 64(x31)
-    b __LBB14_29
-__LBB14_29:
-    b __LBB14_30
-__LBB14_30:
-    b __LBB14_24
-__LBB14_31:
-    lbu x1, 66(x31)
-    addi x2, x1, 5
-    andi x1, x2, 255
-    sb x2, 66(x31)
-    addi x2, x0, 255
-    beq x1, x2, __LBB14_33
-    b __LBB14_34
-__LBB14_32:
-    lw x1, 60(x31)
-    addi x2, x0, 3
-    beq x1, x2, __LBB14_36
-    b __LBB14_37
-__LBB14_33:
-    addi x1, x0, 3
-    sw x1, 60(x31)
-    addi x1, x0, 255
-    sb x1, 66(x31)
-    b __LBB14_34
-__LBB14_34:
-    b __LBB14_35
-__LBB14_35:
-    b __LBB14_30
-__LBB14_36:
-    lbu x1, 65(x31)
-    addi x2, x0, 6
-    bltu x1, x2, __LBB14_38
-    b __LBB14_39
-__LBB14_37:
-    lw x1, 60(x31)
-    addi x2, x0, 4
-    beq x1, x2, __LBB14_42
-    b __LBB14_43
-__LBB14_38:
-    addi x1, x0, 4
-    sw x1, 60(x31)
-    add x1, x0, x0
-    sb x1, 65(x31)
-    b __LBB14_40
-__LBB14_39:
-    lbu x1, 65(x31)
-    addi x1, x1, -5
-    sb x1, 65(x31)
-    b __LBB14_40
-__LBB14_40:
-    b __LBB14_41
-__LBB14_41:
-    b __LBB14_35
-__LBB14_42:
-    lbu x1, 64(x31)
-    addi x2, x1, 5
-    andi x1, x2, 255
-    sb x2, 64(x31)
-    addi x2, x0, 255
-    beq x1, x2, __LBB14_44
-    b __LBB14_45
-__LBB14_43:
-    lbu x1, 66(x31)
-    addi x2, x0, 6
-    bltu x1, x2, __LBB14_47
-    b __LBB14_48
-__LBB14_44:
-    addi x1, x0, 5
-    sw x1, 60(x31)
-    addi x1, x0, 255
-    sb x1, 64(x31)
-    b __LBB14_45
-__LBB14_45:
-    b __LBB14_46
-__LBB14_46:
-    b __LBB14_41
-__LBB14_47:
-    add x1, x0, x0
-    sw x1, 60(x31)
-    sb x1, 66(x31)
-    b __LBB14_49
-__LBB14_48:
-    lbu x1, 66(x31)
-    addi x1, x1, -5
-    sb x1, 66(x31)
-    b __LBB14_49
-__LBB14_49:
-    b __LBB14_46
-__LBB14_50:
-    b __LBB14_17
-__LBB14_51:
-    lbu x4, 83(x31)
+    lbu x4, 59(x31)
     addi x1, x0, 255
     add x3, x0, x0
     add x2, x3, x0
     bl x30, __z9SetWS2812u8u8u8u8
-    b __LBB14_53
-__LBB14_52:
+    b __LBB14_28
+__LBB14_21:
     lw x1, 68(x31)
     addi x2, x0, 2
-    beq x1, x2, __LBB14_54
-    b __LBB14_55
-__LBB14_53:
-    b __LBB14_50
-__LBB14_54:
-    lbu x4, 83(x31)
+    bne x1, x2, __LBB14_23
+    b __LBB14_22
+__LBB14_22:
+    lbu x4, 59(x31)
     addi x2, x0, 255
     add x3, x0, x0
     add x1, x3, x0
     bl x30, __z9SetWS2812u8u8u8u8
-    b __LBB14_56
-__LBB14_55:
+    b __LBB14_27
+__LBB14_23:
     lw x1, 68(x31)
     addi x2, x0, 3
-    beq x1, x2, __LBB14_57
-    b __LBB14_58
-__LBB14_56:
-    b __LBB14_53
-__LBB14_57:
-    lbu x4, 83(x31)
+    bne x1, x2, __LBB14_25
+    b __LBB14_24
+__LBB14_24:
+    lbu x4, 59(x31)
     add x2, x0, x0
     addi x3, x0, 255
     add x1, x2, x0
     bl x30, __z9SetWS2812u8u8u8u8
-    b __LBB14_59
-__LBB14_58:
-    lbu x4, 83(x31)
+    b __LBB14_26
+__LBB14_25:
+    lbu x4, 59(x31)
     add x3, x0, x0
     add x1, x3, x0
     add x2, x3, x0
     bl x30, __z9SetWS2812u8u8u8u8
+    b __LBB14_26
+__LBB14_26:
+    b __LBB14_27
+__LBB14_27:
+    b __LBB14_28
+__LBB14_28:
+    b __LBB14_29
+__LBB14_29:
+    b __LBB14_17
+__LBB14_30:
+    lbu x1, 74(x31)
+    addi x2, x1, 5
+    andi x1, x2, 255
+    sb x2, 74(x31)
+    addi x2, x0, 255
+    beq x1, x2, __LBB14_58
+    b __LBB14_59
+__LBB14_31:
+    lw x1, 76(x31)
+    addi x2, x0, 1
+    bne x1, x2, __LBB14_33
+    b __LBB14_32
+__LBB14_32:
+    lbu x1, 75(x31)
+    addi x2, x0, 6
+    bltu x1, x2, __LBB14_54
+    b __LBB14_55
+__LBB14_33:
+    lw x1, 76(x31)
+    addi x2, x0, 2
+    bne x1, x2, __LBB14_35
+    b __LBB14_34
+__LBB14_34:
+    lbu x1, 73(x31)
+    addi x2, x1, 5
+    andi x1, x2, 255
+    sb x2, 73(x31)
+    addi x2, x0, 255
+    beq x1, x2, __LBB14_51
+    b __LBB14_52
+__LBB14_35:
+    lw x1, 76(x31)
+    addi x2, x0, 3
+    bne x1, x2, __LBB14_37
+    b __LBB14_36
+__LBB14_36:
+    lbu x1, 74(x31)
+    addi x2, x0, 6
+    bltu x1, x2, __LBB14_47
+    b __LBB14_48
+__LBB14_37:
+    lw x1, 76(x31)
+    addi x2, x0, 4
+    bne x1, x2, __LBB14_39
+    b __LBB14_38
+__LBB14_38:
+    lbu x1, 75(x31)
+    addi x2, x1, 5
+    andi x1, x2, 255
+    sb x2, 75(x31)
+    addi x2, x0, 255
+    beq x1, x2, __LBB14_44
+    b __LBB14_45
+__LBB14_39:
+    lbu x2, 73(x31)
+    addi x1, x0, 5
+    bltu x1, x2, __LBB14_41
+    b __LBB14_40
+__LBB14_40:
+    add x1, x0, x0
+    sw x1, 76(x31)
+    sb x1, 73(x31)
+    b __LBB14_42
+__LBB14_41:
+    lbu x1, 73(x31)
+    addi x1, x1, -5
+    sb x1, 73(x31)
+    b __LBB14_42
+__LBB14_42:
+    b __LBB14_43
+__LBB14_43:
+    b __LBB14_46
+__LBB14_44:
+    addi x1, x0, 5
+    sw x1, 76(x31)
+    addi x1, x0, 255
+    sb x1, 75(x31)
+    b __LBB14_45
+__LBB14_45:
+    b __LBB14_43
+__LBB14_46:
+    b __LBB14_50
+__LBB14_47:
+    addi x1, x0, 4
+    sw x1, 76(x31)
+    add x1, x0, x0
+    sb x1, 74(x31)
+    b __LBB14_49
+__LBB14_48:
+    lbu x1, 74(x31)
+    addi x1, x1, -5
+    sb x1, 74(x31)
+    b __LBB14_49
+__LBB14_49:
+    b __LBB14_46
+__LBB14_50:
+    b __LBB14_53
+__LBB14_51:
+    addi x1, x0, 3
+    sw x1, 76(x31)
+    addi x1, x0, 255
+    sb x1, 73(x31)
+    b __LBB14_52
+__LBB14_52:
+    b __LBB14_50
+__LBB14_53:
+    b __LBB14_57
+__LBB14_54:
+    addi x1, x0, 2
+    sw x1, 76(x31)
+    add x1, x0, x0
+    sb x1, 75(x31)
+    b __LBB14_56
+__LBB14_55:
+    lbu x1, 75(x31)
+    addi x1, x1, -5
+    sb x1, 75(x31)
+    b __LBB14_56
+__LBB14_56:
+    b __LBB14_53
+__LBB14_57:
+    lbu x4, 59(x31)
+    lbu x3, 73(x31)
+    lbu x2, 74(x31)
+    lbu x1, 75(x31)
+    bl x30, __z9SetWS2812u8u8u8u8
+    b __LBB14_29
+__LBB14_58:
+    addi x1, x0, 1
+    sw x1, 76(x31)
+    addi x1, x0, 255
+    sb x1, 74(x31)
     b __LBB14_59
 __LBB14_59:
-    b __LBB14_56
+    b __LBB14_57
 __LBB14_60:
     bl x30, __z13ReadCharacter
     slli x2, x1, 24
     srai x2, x2, 24
     sw x2, 24(x31)
-    sb x1, 91(x31)
+    sb x1, 51(x31)
     addi x1, x0, 48
     sw x1, 28(x31)
     add x3, x0, x0
@@ -728,28 +731,12 @@ __LBB14_81:
     lw x2, 24(x31)
     lw x3, 20(x31)
     sw x3, 16(x31)
-    blt x1, x2, __LBB14_64
-    b __LBB14_65
+    blt x1, x2, __LBB14_62
+    b __LBB14_63
 __LBB14_61:
     b __LBB14_8
 __LBB14_62:
-    lbu x1, 91(x31)
-    addi x1, x1, -49
-    andi x2, x1, 255
-    addi x1, x0, 1
-    sll x2, x1, x2
-    lbu x1, 67(x31)
-    xor x1, x1, x2
-    sb x1, 67(x31)
-    bl x30, __z7SetLEDsi8
-    b __LBB14_66
-__LBB14_63:
-    lbu x1, 91(x31)
-    addi x2, x0, 43
-    beq x1, x2, __LBB14_67
-    b __LBB14_68
-__LBB14_64:
-    lb x1, 91(x31)
+    lb x1, 51(x31)
     addi x2, x0, 55
     add x3, x0, x0
     sw x3, 8(x31)
@@ -767,140 +754,139 @@ __LBB14_83:
 __LBB14_84:
     lw x1, 4(x31)
     sw x1, 16(x31)
-    b __LBB14_65
-__LBB14_65:
+    b __LBB14_63
+__LBB14_63:
     lw x1, 16(x31)
     andi x1, x1, 1
     add x2, x0, x0
-    bne x1, x2, __LBB14_62
-    b __LBB14_63
-__LBB14_66:
-    b __LBB14_61
-__LBB14_67:
-    lbu x2, 83(x31)
-    addi x1, x0, 246
-    bltu x1, x2, __LBB14_69
-    b __LBB14_70
-__LBB14_68:
-    lbu x1, 91(x31)
-    addi x2, x0, 45
-    beq x1, x2, __LBB14_73
-    b __LBB14_74
-__LBB14_69:
-    addi x1, x0, 255
-    sb x1, 83(x31)
-    b __LBB14_71
-__LBB14_70:
-    lbu x1, 83(x31)
-    addi x1, x1, 8
-    sb x1, 83(x31)
-    b __LBB14_71
-__LBB14_71:
-    la x1, .L__unnamed_19
-    bl x30, __z5WritePi8
-    lbu x1, 83(x31)
-    bl x30, __z12WriteIntegeru32
-    la x1, .L__unnamed_20
-    bl x30, __z5WritePi8
-    b __LBB14_72
-__LBB14_72:
+    beq x1, x2, __LBB14_65
+    b __LBB14_64
+__LBB14_64:
+    lbu x1, 72(x31)
+    lbu x2, 51(x31)
+    addi x2, x2, -49
+    andi x3, x2, 255
+    addi x2, x0, 1
+    sll x2, x2, x3
+    xor x1, x1, x2
+    sb x1, 72(x31)
+    bl x30, __z7SetLEDsi8
+    b __LBB14_78
+__LBB14_65:
+    lbu x1, 51(x31)
+    addi x2, x0, 43
+    bne x1, x2, __LBB14_67
     b __LBB14_66
-__LBB14_73:
-    lbu x1, 83(x31)
-    addi x2, x0, 9
+__LBB14_66:
+    lbu x2, 59(x31)
+    addi x1, x0, 246
     bltu x1, x2, __LBB14_75
     b __LBB14_76
-__LBB14_74:
-    lbu x1, 91(x31)
+__LBB14_67:
+    lbu x1, 51(x31)
+    addi x2, x0, 45
+    bne x1, x2, __LBB14_69
+    b __LBB14_68
+__LBB14_68:
+    lbu x1, 59(x31)
+    addi x2, x0, 9
+    bltu x1, x2, __LBB14_71
+    b __LBB14_72
+__LBB14_69:
+    lbu x1, 51(x31)
     bl x30, __z14WriteCharacteri8
+    b __LBB14_70
+__LBB14_70:
+    b __LBB14_74
+__LBB14_71:
+    add x1, x0, x0
+    sb x1, 59(x31)
+    b __LBB14_73
+__LBB14_72:
+    lbu x1, 59(x31)
+    addi x1, x1, -8
+    sb x1, 59(x31)
+    b __LBB14_73
+__LBB14_73:
+    la x1, .Lstring.14
+    bl x30, __z5WritePi8
+    lbu x1, 59(x31)
+    bl x30, __z12WriteIntegeru32
+    la x1, .Lstring.15
+    bl x30, __z5WritePi8
+    b __LBB14_70
+__LBB14_74:
     b __LBB14_78
 __LBB14_75:
-    add x1, x0, x0
-    sb x1, 83(x31)
+    addi x1, x0, 255
+    sb x1, 59(x31)
     b __LBB14_77
 __LBB14_76:
-    lbu x1, 83(x31)
-    addi x1, x1, -8
-    sb x1, 83(x31)
+    lbu x1, 59(x31)
+    addi x1, x1, 8
+    sb x1, 59(x31)
     b __LBB14_77
 __LBB14_77:
-    la x1, .L__unnamed_21
+    la x1, .Lstring.14
     bl x30, __z5WritePi8
-    lbu x1, 83(x31)
+    lbu x1, 59(x31)
     bl x30, __z12WriteIntegeru32
-    la x1, .L__unnamed_22
+    la x1, .Lstring.15
     bl x30, __z5WritePi8
-    b __LBB14_78
+    b __LBB14_74
 __LBB14_78:
-    b __LBB14_72
+    b __LBB14_61
 
 	.data
-.LCLK_FREQ:
+	.global	CLK_FREQ
+CLK_FREQ:
 	.word	33000000
 
-.L__unnamed_1:
+.Lstring.0:
 	.string	"0x"
 
-.L__unnamed_2:
+.Lstring.1:
 	.string	"Zodiac interactive terminal initialized!"
 
-.L__unnamed_3:
+.Lstring.2:
 	.string	"Type anything to echo, press 1-6 to toggle LEDs, or +/- to change RGB brightness."
 
-.L__unnamed_4:
+.Lstring.3:
 	.string	"Press the button on the board to cycle WS2812 animation modes."
 
-.L__unnamed_5:
+.Lstring.4:
 	.string	"Running SDRAM test..."
 
-.L__unnamed_6:
+.Lstring.5:
 	.string	"Written "
 
-.L__unnamed_7:
+.Lstring.6:
 	.string	" to "
 
-.L__unnamed_8:
+.Lstring.7:
 	.string	"."
 
-.L__unnamed_9:
+.Lstring.8:
 	.string	"Read "
 
-.L__unnamed_10:
+.Lstring.9:
 	.string	" from "
 
-.L__unnamed_11:
-	.string	"."
-
-.L__unnamed_12:
-	.string	"SDRAM test successful!"
-
-.L__unnamed_13:
+.Lstring.10:
 	.string	"SDRAM test failed!"
 
-.L__unnamed_14:
-	.string	"Read "
+.Lstring.11:
+	.string	"SDRAM test successful!"
 
-.L__unnamed_15:
-	.string	" from "
-
-.L__unnamed_16:
-	.string	"."
-
-.L__unnamed_17:
+.Lstring.12:
 	.string	"WS2812 Mode: "
 
-.L__unnamed_18:
+.Lstring.13:
 	.string	"\n"
 
-.L__unnamed_19:
+.Lstring.14:
 	.string	"Brightness: "
 
-.L__unnamed_20:
-	.string	"/255\n"
-
-.L__unnamed_21:
-	.string	"Brightness: "
-
-.L__unnamed_22:
+.Lstring.15:
 	.string	"/255\n"
 
