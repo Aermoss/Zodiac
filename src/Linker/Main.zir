@@ -35,7 +35,7 @@ fn PrintUsage(executable: String) {
 }
 
 fn Main(args: &mut Vector<String>) -> i32 {
-    let executable = SplitPath(args[0]).right;
+    let (_, executable) = SplitPath(args[0]);
     let mut logger = Logger(executable);
 
     if args.Size() < 2 {
@@ -129,7 +129,7 @@ fn Main(args: &mut Vector<String>) -> i32 {
     if Logger::HasError() { return 1; }
 
     if output.Empty() {
-        output = SplitExtension(inputs[0]).left + (binary ? ".bin" : ".hex");
+        output = SplitExtension(inputs[0]).0 + (binary ? ".bin" : ".hex");
     }
 
     let mut file = File(output);

@@ -7,6 +7,9 @@
 *.hex
 *.bin
 *.o
+*.hir
+*.mir
+*.lir
 
 !bin/zas.exe
 !bin/zda.exe

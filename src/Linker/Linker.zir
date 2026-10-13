@@ -155,10 +155,10 @@ class Linker {
                     return result;
                 }
  
-                let target: u32 = this.symbol_addresses[symbol_index as usize];
+                let target = this.symbol_addresses[symbol_index as usize];
                 let pc = object.section_bases[relocation.section as usize] + relocation.offset;
                 let index = ((pc - this.section_bases[relocation.section as usize]) / 4) as usize;
-                let mut word: u32 = this.sections[relocation.section as usize][index];
+                let mut word = this.sections[relocation.section as usize][index];
 
                 if relocation._type == RelocationType::AbsoluteUpper21 {
                     word = (word & !IMM21_MASK) | ((target >> 11) & IMM21_MASK);

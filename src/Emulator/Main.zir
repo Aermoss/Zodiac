@@ -32,7 +32,7 @@ fn PrintUsage(executable: String) {
 }
 
 fn Main(args: &mut Vector<String>) -> i32 {
-    let executable = SplitPath(args[0]).right;
+    let (_, executable) = SplitPath(args[0]);
     let mut logger = Logger(executable);
 
     if args.Size() < 2 {
@@ -66,7 +66,7 @@ fn Main(args: &mut Vector<String>) -> i32 {
     }
 
     let mut emulator = Emulator();
-    let extension = SplitExtension(input).right;
+    let (_, extension) = SplitExtension(input);
     let mut loaded = false;
 
     if extension == ".hex" {

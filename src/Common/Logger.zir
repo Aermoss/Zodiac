@@ -24,7 +24,7 @@
 class SYMBOL_INFO {
     pub SizeOfStruct: u32,
     pub TypeIndex: u32,
-    pub Reserved[2]: u64,
+    pub Reserved: [u64; 2],
     pub Index: u32,
     pub Size: u32,
     pub ModBase: u64,
@@ -36,7 +36,7 @@ class SYMBOL_INFO {
     pub Tag: u32,
     pub NameLen: u32,
     pub MaxNameLen: u32,
-    pub Name[256]: i8
+    pub Name: [i8; 256]
 }
 
 class IMAGEHLP_MODULE64 {
@@ -47,9 +47,9 @@ class IMAGEHLP_MODULE64 {
     pub CheckSum: u32,
     pub NumSyms: u32,
     pub SymType: i32,
-    pub ModuleName[32]: i8,
-    pub ImageName[256]: i8,
-    pub LoadedImageName[256]: i8
+    pub ModuleName: [i8; 32],
+    pub ImageName: [i8; 256],
+    pub LoadedImageName: [i8; 256]
 }
 
 extern "C" {
@@ -65,8 +65,8 @@ static mut sym_initialized: bool = false;
 
 fn StackDump() {
 #[if WINDOWS]
-    let mut backtrace[64]: *mut void;
-    let frames = RtlCaptureStackBackTrace(2, 62, backtrace, null);
+    let mut backtrace: [*mut void; 64];
+    let frames = RtlCaptureStackBackTrace(2, 62, &mut backtrace[0], null);
     let longest = String::FromInteger((frames - 1) as i64).Length();
     let process = GetCurrentProcess();
 
@@ -86,7 +86,7 @@ fn StackDump() {
 
     for i in 0..frames {
         let address = backtrace[i as usize] as u64;
-        let mut line: String;
+        let mut line = String();
 
         let index_string = String::FromInteger(i as u64);
         for j in 0..(longest - index_string.Length()) { line += " "; }
@@ -97,11 +97,11 @@ fn StackDump() {
         line += address_string;
 
         if SymFromAddr(process, address, null, &mut symbol) != 0 {
-            line += " " + symbol.Name.ToString();
+            line += " " + String(&symbol.Name[0] as *i8);
         }
 
         if SymGetModuleInfo64(process, address, &mut module) != 0 {
-            line += " (" + module.ImageName.ToString() + "+0x" + String::FromInteger(address - module.BaseOfImage, 16).ToLower() + ")";
+            line += " (" + String(&module.ImageName[0] as *i8) + "+0x" + String::FromInteger(address - module.BaseOfImage, 16).ToLower() + ")";
         }
 
         WriteLine(line);

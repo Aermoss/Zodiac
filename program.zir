@@ -173,7 +173,7 @@ fn Main() {
     }
 
     let mut color_state = 0;
-    let (mut r: u8, mut g: u8, mut b: u8) = (255, 0, 0);
+    let (mut r, mut g, mut b): (u8, u8, u8) = (255, 0, 0);
     let mut led_state: i8 = 0x3F;
     SetLEDs(led_state);
 
@@ -262,7 +262,7 @@ fn Main() {
             let c = ReadCharacter();
 
             if c >= '1' && c <= '6' {
-                led_state ^= 1 << (c - '1');
+                led_state ^= 1i8 << (c - '1');
                 SetLEDs(led_state);
             } else if c == '+' {
                 if brightness >= 247 { brightness = 255; }

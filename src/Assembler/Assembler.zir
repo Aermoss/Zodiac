@@ -364,7 +364,7 @@ class Assembler {
                     let immediate = this.AssembleExpression(operands[1]->expression);
 
                     if (immediate <= IMM16_SMAX) || (immediate >= IMM16_SMIN) {
-                        this.WriteWord(this.section, (Opcode::ADDI as u32 << OPCODE_SHIFT) | (register << REG0_SHIFT) | (0 << REG1_SHIFT) | (immediate & IMM16_MASK));
+                        this.WriteWord(this.section, (Opcode::ADDI as u32 << OPCODE_SHIFT) | (register << REG0_SHIFT) | (0u32 << REG1_SHIFT) | (immediate & IMM16_MASK));
                     } else if (immediate & IMM11_MASK) == 0 {
                         this.WriteWord(this.section, (Opcode::LUI as u32 << OPCODE_SHIFT) | (register << REG0_SHIFT) | ((immediate >> 11) & IMM21_MASK));
                     } else {
