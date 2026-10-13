@@ -44,7 +44,7 @@ program.o: program.s
 	bin/zas.exe $< -o $@
 
 program.bin: bin/zld.exe start.o program.o
-	$^ -o $@ --format=bin --origin=0x40000000
+	$^ -o $@ --format=bin
 
 program.hex: bin/zld.exe start.o program.o
 	$^ -o $@ --format=hex
@@ -74,5 +74,4 @@ count: bin/Count.exe
 	$<
 
 clean:
-	del /Q sim.out wave.fst boot.o boot.hex start.o program.o program.bin program.hex
-	del /Q bin\*
+	del /Q *.out *.fst *.o *.bin *.hex bin\*.exe *.hir *.mir *.lir

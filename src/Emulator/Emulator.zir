@@ -96,20 +96,32 @@ class Emulator {
         }
     }
 
-    fn ReadByte(&mut this, address: u32) -> u8 {
-        if address == 0xFFFC {
+    fn IsDevice(&this, address: u32) -> bool {
+        return address == 0xFFFF || address == 0xFFFC || address == 0xFFF4 || address == 0xFFEC;
+    }
+
+    fn ReadDevice(&mut this, address: u32) -> u32 {
+        if address == 0xFFFF {
+            this.uart_mutex.Lock();
+            let result = this.uart_rx_ready ? this.uart_rx as u32 : 0;
+            this.uart_rx_ready = false;
+            this.uart_mutex.Unlock();
+            return result * 0x01010101;
+        } else if address == 0xFFFC {
             this.uart_mutex.Lock();
             let ready = this.uart_rx_ready;
             this.uart_mutex.Unlock();
             return ready ? 1 : 0;
-        } else if address == 0xFFFF {
-            this.uart_mutex.Lock();
-            let result = this.uart_rx_ready ? this.uart_rx : 0;
-            this.uart_rx_ready = false;
-            this.uart_mutex.Unlock();
-            return result;
         } else if address == 0xFFF4 {
             return 1;
+        } else {
+            return this.ms_counter;
+        }
+    }
+
+    fn ReadByte(&mut this, address: u32) -> u8 {
+        if this.IsDevice(address) {
+            return ((this.ReadDevice(address) >> (8 * (address & 3))) & 0xFF) as u8;
         } else if (address & 0xC0000000) == 0x80000000 {
             return this.flash[(address & 0x7FFFFF) as usize];
         } else if (address & 0xC0000000) == 0x40000000 {
@@ -122,14 +134,18 @@ class Emulator {
     }
 
     fn ReadHalf(&mut this, address: u32) -> u16 {
-        let mut result = this.ReadByte(address) as u32;
-        result |= (this.ReadByte(address + 1) as u32 << 8);
-        return result as u16;
+        if this.IsDevice(address) {
+            return ((this.ReadDevice(address) >> (16 * ((address >> 1) & 1))) & 0xFFFF) as u16;
+        } else {
+            let mut result = this.ReadByte(address) as u32;
+            result |= (this.ReadByte(address + 1) as u32 << 8);
+            return result as u16;
+        }
     }
 
     fn ReadWord(&mut this, address: u32) -> u32 {
-        if address == 0xFFEC {
-            return this.ms_counter;
+        if this.IsDevice(address) {
+            return this.ReadDevice(address);
         } else {
             let mut result = this.ReadByte(address) as u32;
             result |= (this.ReadByte(address + 1) as u32 << 8);
