@@ -24,18 +24,18 @@ class Parser {
 
     fn Current(&this) -> Token {
         if this.index >= this.tokens.Size() {
-            return this.tokens[this.tokens.Size() - 1];
+            this.tokens[this.tokens.Size() - 1]
         } else {
-            return this.tokens[this.index];
+            this.tokens[this.index]
         }
     }
 
     fn Peek(&this, offset: usize) -> Token {
         let index = this.index + offset;
         if index >= this.tokens.Size() {
-            return this.tokens[this.tokens.Size() - 1];
+            this.tokens[this.tokens.Size() - 1]
         } else {
-            return this.tokens[index];
+            this.tokens[index]
         }
     }
 
@@ -43,15 +43,17 @@ class Parser {
         let token = this.Current();
         if this.index < this.tokens.Size() {
             this.index += 1;
-        } return token;
+        }
+
+        token
     }
 
     fn Match(&mut this, _type: TokenType) -> bool {
         if this.Current()._type == _type {
             this.Advance();
-            return true;
+            true
         } else {
-            return false;
+            false
         }
     }
 
@@ -66,7 +68,7 @@ class Parser {
 
         let mut error: Token;
         (error._type, error.row, error.column, error.file) = (TokenType::UNKNOWN, token.row, token.column, token.file);
-        return error;
+        error
     }
 
     fn Expect2(&mut this, _type: TokenType) -> bool {
@@ -78,53 +80,61 @@ class Parser {
         }
 
         Logger::Log("Expected '" + _type.ToString() + "' but got '" + token._type.ToString() + "'.", token, LogSeverity::Error);
-        return false;
+        false
     }
 
     fn GetBinaryOperatorPrecedence(&this, _type: TokenType) -> i32 {
-        if _type == TokenType::OR { return 1; }
-        else if _type == TokenType::XOR { return 2; }
-        else if _type == TokenType::AND { return 3; }
-        else if _type == TokenType::LSHIFT || _type == TokenType::RSHIFT { return 4; }
-        else if _type == TokenType::PLUS || _type == TokenType::MINUS { return 5; }
-        else if _type == TokenType::MUL || _type == TokenType::DIV || _type == TokenType::MOD { return 6; }
-        else { return -1; }
+        match _type {
+            TokenType::OR => 1,
+            TokenType::XOR => 2,
+            TokenType::AND => 3,
+            TokenType::LSHIFT | TokenType::RSHIFT => 4,
+            TokenType::PLUS | TokenType::MINUS => 5,
+            TokenType::MUL | TokenType::DIV | TokenType::MOD => 6,
+            _ => -1
+        }
     }
 
     fn IsBinaryOperator(&this, _type: TokenType) -> bool {
-        return this.GetBinaryOperatorPrecedence(_type) > 0;
+        this.GetBinaryOperatorPrecedence(_type) > 0
     }
 
     fn IsUnaryOperator(&this, _type: TokenType) -> bool {
-        return _type == TokenType::NOT || _type == TokenType::MINUS;
+        _type == TokenType::NOT || _type == TokenType::MINUS
     }
 
     fn ParsePrimary(&mut this) -> *Node {
         let token = this.Current();
 
-        if token._type == TokenType::IDENTIFIER {
-            this.Advance();
-            return this.arena.New<IdentifierNode>(token.value, token);
-        } else if token._type == TokenType::NUMBER || token._type == TokenType::STRING || token._type == TokenType::CHAR {
-            this.Advance();
-            return this.arena.New<LiteralNode>(token.value, token);
-        } else if token._type == TokenType::DOLLAR {
-            this.Advance();
-            return this.arena.New<AddressNode>(token);
-        } else if token._type == TokenType::LPAREN {
-            this.Advance();
-            let expression = this.ParseExpression();
-            if expression == null || !this.Expect2(TokenType::RPAREN) { return null; }
-            return expression;
-        } else {
-            this.Advance();
-            Logger::Log("Unexpected token '" + token.value + "'.", token, LogSeverity::Error);
-            return null;
+        match token._type {
+            TokenType::IDENTIFIER => {
+                this.Advance();
+                this.arena.New<IdentifierNode>(token.value, token)
+            },
+            TokenType::NUMBER | TokenType::STRING | TokenType::CHAR => {
+                this.Advance();
+                this.arena.New<LiteralNode>(token.value, token)
+            },
+            TokenType::DOLLAR => {
+                this.Advance();
+                this.arena.New<AddressNode>(token)
+            },
+            TokenType::LPAREN => {
+                this.Advance();
+                let expression = this.ParseExpression();
+                if expression == null || !this.Expect2(TokenType::RPAREN) { return null; }
+                expression
+            },
+            _ => {
+                this.Advance();
+                Logger::Log("Unexpected token '" + token.value + "'.", token, LogSeverity::Error);
+                null
+            }
         }
     }
 
     fn ParsePostfix(&mut this) -> *Node {
-        return this.ParsePrimary();
+        this.ParsePrimary()
     }
 
     fn ParseUnary(&mut this) -> *Node {
@@ -135,9 +145,9 @@ class Parser {
             this.Advance();
             let expression = this.ParseUnary();
             if expression == null { return null; }
-            return this.arena.New<UnaryOperationNode>(expression, token._type, token);
+            this.arena.New<UnaryOperationNode>(expression, token._type, token)
         } else {
-            return this.ParsePostfix();
+            this.ParsePostfix()
         }
     }
 
@@ -154,11 +164,13 @@ class Parser {
             let right = this.ParseBinary(precedence + 1);
             if right == null { return null; }
             left = this.arena.New<BinaryOperationNode>(left, right, token._type, token);
-        } return left;
+        }
+
+        left
     }
 
     fn ParseExpression(&mut this) -> *Node {
-        return this.ParseBinary(0);
+        this.ParseBinary(0)
     }
 
     fn ParseOperand(&mut this) -> *OperandNode {
@@ -172,7 +184,7 @@ class Parser {
             return this.arena.New<OperandNode>(reg, expr, token);
         }
 
-        return this.arena.New<OperandNode>(expr, null, token);
+        this.arena.New<OperandNode>(expr, null, token)
     }
 
     fn ParseInstruction(&mut this) -> *InstructionNode {
@@ -213,13 +225,15 @@ class Parser {
                     break;
                 }
             }
-        } return instruction;
+        }
+
+        instruction
     }
 
     fn ParseLabel(&mut this) -> *LabelNode {
         let token = this.Expect(TokenType::IDENTIFIER);
         if token._type == TokenType::UNKNOWN || !this.Expect2(TokenType::COLON) { return null; }
-        return this.arena.New<LabelNode>(token.value, token);
+        this.arena.New<LabelNode>(token.value, token)
     }
 
     pub fn Parse(&mut this, tokens: &Vector<Token>) -> *RootNode {
@@ -241,6 +255,8 @@ class Parser {
                 Logger::Log("Unexpected token '" + token.value + "'.", token, LogSeverity::Error);
                 this.Advance();
             }
-        } return root;
+        }
+
+        root
     }
 }

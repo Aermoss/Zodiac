@@ -30,7 +30,9 @@ fn GetLineCount(path: &String) -> usize {
 
     if content[content.Length() - 1] != '\n' {
         return lines + 1;
-    } return lines;
+    }
+
+    lines
 }
 
 fn ProcessDirectory(directory: &String, stats: &mut Stats) {
@@ -39,7 +41,7 @@ fn ProcessDirectory(directory: &String, stats: &mut Stats) {
     if find_handle == INVALID_HANDLE_VALUE { return; }
 
     loop {
-        let file_name = String(find_data.cFileName);
+        let file_name = String(&find_data.cFileName as *i8);
 
         if file_name != "." && file_name != ".." {
             let path = JoinPath(directory, file_name);
@@ -50,7 +52,7 @@ fn ProcessDirectory(directory: &String, stats: &mut Stats) {
                 let lines = GetLineCount(path);
 
                 if path.Contains("src") {
-                    let toolchain = SplitPath(path).left;
+                    let toolchain = SplitPath(path).0;
 
                     if stats.toolchain_counts.Has(toolchain) {
                         stats.toolchain_counts[toolchain] += lines;
@@ -89,7 +91,7 @@ fn PrintMap(title: *i8, map: Map<String, usize>) -> usize {
     }
 
     WriteLine("Subtotal: " + String::FromInteger(total as i64) + " lines\n");
-    return total;
+    total
 }
 
 fn Main(args: &mut Vector<String>) -> i32 {
@@ -103,5 +105,5 @@ fn Main(args: &mut Vector<String>) -> i32 {
     WriteLine("==========================================");
     WriteLine("TOTAL LINES:  " + String::FromInteger(total as i64) + " lines");
     WriteLine("==========================================");
-    return 0;
+    0
 }

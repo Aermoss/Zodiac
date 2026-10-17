@@ -26,16 +26,17 @@ enum NodeType: i32 {
 
 extend NodeType {
     pub fn ToString(this) -> String {
-        if this == NodeType::ROOT { return "ROOT".ToString(); }
-        else if this == NodeType::INSTRUCTION { return "INSTRUCTION".ToString(); }
-        else if this == NodeType::LABEL { return "LABEL".ToString(); }
-        else if this == NodeType::OPERAND { return "OPERAND".ToString(); }
-        else if this == NodeType::BINARY_OPERATION { return "BINARY_OPERATION".ToString(); }
-        else if this == NodeType::UNARY_OPERATION { return "UNARY_OPERATION".ToString(); }
-        else if this == NodeType::LITERAL { return "LITERAL".ToString(); }
-        else if this == NodeType::IDENTIFIER { return "IDENTIFIER".ToString(); }
-        else if this == NodeType::ADDRESS { return "ADDRESS".ToString(); }
-        else { return "UNKNOWN".ToString(); }
+        match this {
+            NodeType::ROOT => "ROOT",
+            NodeType::INSTRUCTION => "INSTRUCTION",
+            NodeType::LABEL => "LABEL",
+            NodeType::OPERAND => "OPERAND",
+            NodeType::BINARY_OPERATION => "BINARY_OPERATION",
+            NodeType::UNARY_OPERATION => "UNARY_OPERATION",
+            NodeType::LITERAL => "LITERAL",
+            NodeType::IDENTIFIER => "IDENTIFIER",
+            NodeType::ADDRESS => "ADDRESS"
+        }.ToString()
     }
 }
 

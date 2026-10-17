@@ -111,5 +111,5 @@ fn Main(args: &mut Vector<String>) -> i32 {
 
     file.WriteWord(OBJECT_MAGIC);
     object.Write(file);
-    return 0;
+    0
 }

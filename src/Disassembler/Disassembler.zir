@@ -25,11 +25,13 @@ class Disassembler {
             if relocation.section == section && relocation.offset == offset {
                 return relocation.symbol;
             }
-        } return "".ToString();
+        }
+
+        "".ToString()
     }
 
     fn DisassembleRegister(&this, register: u32) -> String {
-        return "x" + String::FromInteger(register as u64);
+        "x" + String::FromInteger(register as u64)
     }
 
     fn DisassembleInstruction(&this, word: u32, offset: u32, section: SectionType, object: &Object) -> String {
@@ -40,100 +42,98 @@ class Disassembler {
         let simm16 = (((imm16 as i32) ^ (1 << 15)) - (1 << 15)) as i64;
         let simm21 = (((imm21 as i32) ^ (1 << 20)) - (1 << 20)) as i64;
         let simm26 = (((imm26 as i32) ^ (1 << 25)) - (1 << 25)) as i64;
-        let mut mnemonic: String;
 
-        if opcode == Opcode::NOP { mnemonic = "nop"; }
-        else if opcode == Opcode::LB { mnemonic = "lb"; }
-        else if opcode == Opcode::LBU { mnemonic = "lbu"; }
-        else if opcode == Opcode::LH { mnemonic = "lh"; }
-        else if opcode == Opcode::LHU { mnemonic = "lhu"; }
-        else if opcode == Opcode::LW { mnemonic = "lw"; }
-        else if opcode == Opcode::LUI { mnemonic = "lui"; }
-        else if opcode == Opcode::AUIPC { mnemonic = "auipc"; }
-        else if opcode == Opcode::SB { mnemonic = "sb"; }
-        else if opcode == Opcode::SH { mnemonic = "sh"; }
-        else if opcode == Opcode::SW { mnemonic = "sw"; }
-        else if opcode == Opcode::B { mnemonic = "b"; }
-        else if opcode == Opcode::BR { mnemonic = "br"; }
-        else if opcode == Opcode::BL { mnemonic = "bl"; }
-        else if opcode == Opcode::BLR { mnemonic = "blr"; }
-        else if opcode == Opcode::BEQ { mnemonic = "beq"; }
-        else if opcode == Opcode::BNE { mnemonic = "bne"; }
-        else if opcode == Opcode::BLT { mnemonic = "blt"; }
-        else if opcode == Opcode::BLTU { mnemonic = "bltu"; }
-        else if opcode == Opcode::BGE { mnemonic = "bge"; }
-        else if opcode == Opcode::BGEU { mnemonic = "bgeu"; }
-        else if opcode == Opcode::SLT { mnemonic = "slt"; }
-        else if opcode == Opcode::SLTU { mnemonic = "sltu"; }
-        else if opcode == Opcode::SLTI { mnemonic = "slti"; }
-        else if opcode == Opcode::SLTIU { mnemonic = "sltiu"; }
-        else if opcode == Opcode::ADD { mnemonic = "add"; }
-        else if opcode == Opcode::ADDI { mnemonic = "addi"; }
-        else if opcode == Opcode::SUB { mnemonic = "sub"; }
-        else if opcode == Opcode::SUBI { mnemonic = "subi"; }
-        else if opcode == Opcode::MUL { mnemonic = "mul"; }
-        else if opcode == Opcode::MULH { mnemonic = "mulh"; }
-        else if opcode == Opcode::MULHSU { mnemonic = "mulhsu"; }
-        else if opcode == Opcode::MULHU { mnemonic = "mulhu"; }
-        else if opcode == Opcode::DIV { mnemonic = "div"; }
-        else if opcode == Opcode::DIVU { mnemonic = "divu"; }
-        else if opcode == Opcode::REM { mnemonic = "rem"; }
-        else if opcode == Opcode::REMU { mnemonic = "remu"; }
-        else if opcode == Opcode::AND { mnemonic = "and"; }
-        else if opcode == Opcode::ANDI { mnemonic = "andi"; }
-        else if opcode == Opcode::OR { mnemonic = "or"; }
-        else if opcode == Opcode::ORI { mnemonic = "ori"; }
-        else if opcode == Opcode::XOR { mnemonic = "xor"; }
-        else if opcode == Opcode::XORI { mnemonic = "xori"; }
-        else if opcode == Opcode::SLL { mnemonic = "sll"; }
-        else if opcode == Opcode::SLLI { mnemonic = "slli"; }
-        else if opcode == Opcode::SRL { mnemonic = "srl"; }
-        else if opcode == Opcode::SRLI { mnemonic = "srli"; }
-        else if opcode == Opcode::SRA { mnemonic = "sra"; }
-        else if opcode == Opcode::SRAI { mnemonic = "srai"; }
-        else if opcode == Opcode::HLT { mnemonic = "hlt"; }
-        else {
-            return ".word 0x" + String::FromInteger(word as u64, 16);
-        }
+        let mnemonic = match opcode {
+            Opcode::NOP => "nop",
+            Opcode::LB => "lb",
+            Opcode::LBU => "lbu",
+            Opcode::LH => "lh",
+            Opcode::LHU => "lhu",
+            Opcode::LW => "lw",
+            Opcode::LUI => "lui",
+            Opcode::AUIPC => "auipc",
+            Opcode::SB => "sb",
+            Opcode::SH => "sh",
+            Opcode::SW => "sw",
+            Opcode::B => "b",
+            Opcode::BR => "br",
+            Opcode::BL => "bl",
+            Opcode::BLR => "blr",
+            Opcode::BEQ => "beq",
+            Opcode::BNE => "bne",
+            Opcode::BLT => "blt",
+            Opcode::BLTU => "bltu",
+            Opcode::BGE => "bge",
+            Opcode::BGEU => "bgeu",
+            Opcode::SLT => "slt",
+            Opcode::SLTU => "sltu",
+            Opcode::SLTI => "slti",
+            Opcode::SLTIU => "sltiu",
+            Opcode::ADD => "add",
+            Opcode::ADDI => "addi",
+            Opcode::SUB => "sub",
+            Opcode::SUBI => "subi",
+            Opcode::MUL => "mul",
+            Opcode::MULH => "mulh",
+            Opcode::MULHSU => "mulhsu",
+            Opcode::MULHU => "mulhu",
+            Opcode::DIV => "div",
+            Opcode::DIVU => "divu",
+            Opcode::REM => "rem",
+            Opcode::REMU => "remu",
+            Opcode::AND => "and",
+            Opcode::ANDI => "andi",
+            Opcode::OR => "or",
+            Opcode::ORI => "ori",
+            Opcode::XOR => "xor",
+            Opcode::XORI => "xori",
+            Opcode::SLL => "sll",
+            Opcode::SLLI => "slli",
+            Opcode::SRL => "srl",
+            Opcode::SRLI => "srli",
+            Opcode::SRA => "sra",
+            Opcode::SRAI => "srai",
+            Opcode::HLT => "hlt"
+        }.ToString();
 
         if opcode >= Opcode::LB && opcode <= Opcode::SW {
             if opcode == Opcode::LUI || opcode == Opcode::AUIPC {
                 let relocation = this.GetRelocationSymbol(object, section, offset);
                 if !relocation.Empty() { return mnemonic + " " + this.DisassembleRegister(reg0) + ", " + relocation; }
-                return mnemonic + " " + this.DisassembleRegister(reg0) + ", " + String::FromInteger(simm21);
+                mnemonic + " " + this.DisassembleRegister(reg0) + ", " + String::FromInteger(simm21)
             } else {
-                return mnemonic + " " + this.DisassembleRegister(reg0) + ", " + String::FromInteger(simm16) + "(" + this.DisassembleRegister(reg1) + ")";
+                mnemonic + " " + this.DisassembleRegister(reg0) + ", " + String::FromInteger(simm16) + "(" + this.DisassembleRegister(reg1) + ")"
             }
         } else if opcode == Opcode::B {
             let relocation = this.GetRelocationSymbol(object, section, offset);
             if !relocation.Empty() { return mnemonic + " " + relocation; }
-            return mnemonic + " " + String::FromInteger(simm26);
+            mnemonic + " " + String::FromInteger(simm26)
         } else if opcode == Opcode::BL {
             let relocation = this.GetRelocationSymbol(object, section, offset);
             if !relocation.Empty() { return mnemonic + " " + this.DisassembleRegister(reg0) + ", " + relocation; }
-            return mnemonic + " " + this.DisassembleRegister(reg0) + ", " + String::FromInteger(simm21);
+            mnemonic + " " + this.DisassembleRegister(reg0) + ", " + String::FromInteger(simm21)
         } else if opcode == Opcode::BR {
-            return mnemonic + " " + this.DisassembleRegister(reg0);
+            mnemonic + " " + this.DisassembleRegister(reg0)
         } else if opcode == Opcode::BLR {
-            return mnemonic + " " + this.DisassembleRegister(reg0) + ", " + this.DisassembleRegister(reg1);
+            mnemonic + " " + this.DisassembleRegister(reg0) + ", " + this.DisassembleRegister(reg1)
         } else if opcode >= Opcode::BEQ && opcode <= Opcode::BGEU {
             let relocation = this.GetRelocationSymbol(object, section, offset);
             if !relocation.Empty() { return mnemonic + " " + this.DisassembleRegister(reg0) + ", " + this.DisassembleRegister(reg1) + ", " + relocation; }
-            return mnemonic + " " + this.DisassembleRegister(reg0) + ", " + this.DisassembleRegister(reg1) + ", " + String::FromInteger(simm16);
+            mnemonic + " " + this.DisassembleRegister(reg0) + ", " + this.DisassembleRegister(reg1) + ", " + String::FromInteger(simm16)
         } else if opcode >= Opcode::SLT && opcode <= Opcode::SLTIU {
             if opcode == Opcode::SLT || opcode == Opcode::SLTU {
-                return mnemonic + " " + this.DisassembleRegister(reg0) + ", " + this.DisassembleRegister(reg1) + ", " + this.DisassembleRegister(reg2);
+                mnemonic + " " + this.DisassembleRegister(reg0) + ", " + this.DisassembleRegister(reg1) + ", " + this.DisassembleRegister(reg2)
             } else {
-                return mnemonic + " " + this.DisassembleRegister(reg0) + ", " + this.DisassembleRegister(reg1) + ", " + String::FromInteger(simm16);
+                mnemonic + " " + this.DisassembleRegister(reg0) + ", " + this.DisassembleRegister(reg1) + ", " + String::FromInteger(simm16)
             }
         } else if opcode >= Opcode::ADD && opcode <= Opcode::SRAI {
             if (Opcode::ADD as u32 % 2 == opcode as u32 % 2) {
-                return mnemonic + " " + this.DisassembleRegister(reg0) + ", " + this.DisassembleRegister(reg1) + ", " + this.DisassembleRegister(reg2);
+                mnemonic + " " + this.DisassembleRegister(reg0) + ", " + this.DisassembleRegister(reg1) + ", " + this.DisassembleRegister(reg2)
             } else {
-                return mnemonic + " " + this.DisassembleRegister(reg0) + ", " + this.DisassembleRegister(reg1) + ", " + String::FromInteger(simm16);
+                mnemonic + " " + this.DisassembleRegister(reg0) + ", " + this.DisassembleRegister(reg1) + ", " + String::FromInteger(simm16)
             }
         } else {
-            return mnemonic;
+            mnemonic
         }
     }
 
@@ -141,26 +141,28 @@ class Disassembler {
         let mut hex = String::FromInteger(word as u64, 16);
         while hex.Length() < 8 { hex = "0" + hex; }
 
-        return hex.SubString(0, 2) + " " + hex.SubString(2, 2) + " "
-            + hex.SubString(4, 2) + " " + hex.SubString(6, 2);
+        hex.SubString(0, 2) + " " + hex.SubString(2, 2) + " "
+            + hex.SubString(4, 2) + " " + hex.SubString(6, 2)
     }
 
     fn FormatHexAddress(&this, address: u32) -> String {
         let mut hex = String::FromInteger(address as u64, 16);
         while hex.Length() < 8 { hex = "0" + hex; }
-        return hex;
+        hex
     }
 
     fn FormatRelocation(&this, _type: RelocationType) -> String {
-        if _type == RelocationType::AbsoluteUpper21 { return "R_ABS_HI21".ToString(); }
-        else if _type == RelocationType::AbsoluteLower11 { return "R_ABS_LO11".ToString(); }
-        else if _type == RelocationType::PcRelativeUpper21 { return "R_PCREL_HI21".ToString(); }
-        else if _type == RelocationType::PcRelativeLower11 { return "R_PCREL_LO11".ToString(); }
-        else if _type == RelocationType::Branch16 { return "R_BR16".ToString(); }
-        else if _type == RelocationType::Branch21 { return "R_BR21".ToString(); }
-        else if _type == RelocationType::Branch26 { return "R_BR26".ToString(); }
-        else if _type == RelocationType::Absolute32 { return "R_ABS32".ToString(); }
-        else { return "R_UNKNOWN".ToString(); }
+        match _type {
+            RelocationType::AbsoluteUpper21 => "R_ABS_HI21",
+            RelocationType::AbsoluteLower11 => "R_ABS_LO11",
+            RelocationType::PcRelativeUpper21 => "R_PCREL_HI21",
+            RelocationType::PcRelativeLower11 => "R_PCREL_LO11",
+            RelocationType::Branch16 => "R_BR16",
+            RelocationType::Branch21 => "R_BR21",
+            RelocationType::Branch26 => "R_BR26",
+            RelocationType::Absolute32 => "R_ABS32",
+            _ => "R_UNKNOWN"
+        }.ToString()
     }
 
     pub fn Disassemble(&mut this, format: bool) -> String {
@@ -223,6 +225,8 @@ class Disassembler {
                     } offset += 4;
                 } result += '\n';
             }
-        } return result;
+        }
+
+        result
     }
 }

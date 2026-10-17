@@ -134,5 +134,7 @@ fn Main(args: &mut Vector<String>) -> i32 {
                 }
             }
         }
-    } return 0;
+    }
+
+    0
 }

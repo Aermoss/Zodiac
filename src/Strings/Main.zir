@@ -107,5 +107,7 @@ fn Main(args: &mut Vector<String>) -> i32 {
         if result.Length() >= 4 {
             WriteLine(result);
         }
-    } return 0;
+    }
+
+    0
 }

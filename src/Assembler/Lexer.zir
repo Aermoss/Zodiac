@@ -22,38 +22,38 @@ class Lexer {
     length: usize, index: usize;
 
     fn IsDigit(&this, character: i8) -> bool {
-        return character >= '0' && character <= '9';
+        character >= '0' && character <= '9'
     }
 
     fn IsHexDigit(&this, character: i8) -> bool {
-        return (character >= '0' && character <= '9') || (character >= 'a' && character <= 'f') || (character >= 'A' && character <= 'F');
+        (character >= '0' && character <= '9') || (character >= 'a' && character <= 'f') || (character >= 'A' && character <= 'F')
     }
 
     fn IsBinDigit(&this, character: i8) -> bool {
-        return character == '0' || character == '1';
+        character == '0' || character == '1'
     }
 
     fn IsOctDigit(&this, character: i8) -> bool {
-        return character >= '0' && character <= '7';
+        character >= '0' && character <= '7'
     }
 
     fn IsAlpha(&this, character: i8) -> bool {
-        return (character >= 'a' && character <= 'z') || (character >= 'A' && character <= 'Z') || character == '_' || character == '.';
+        (character >= 'a' && character <= 'z') || (character >= 'A' && character <= 'Z') || character == '_' || character == '.'
     }
 
     fn IsAlphaNum(&this, character: i8) -> bool {
-        return this.IsAlpha(character) || this.IsDigit(character);
+        this.IsAlpha(character) || this.IsDigit(character)
     }
 
     fn CurrentChar(&this) -> i8 {
         if this.index >= this.length { return '\0'; }
-        return this.text.Data()[this.index];
+        this.text.Data()[this.index]
     }
 
     fn PeekChar(&this, offset: usize) -> i8 {
         let peek_index = this.index + offset;
         if peek_index >= this.length { return '\0'; }
-        return this.text.Data()[peek_index];
+        this.text.Data()[peek_index]
     }
 
     fn Advance(&mut this, count: usize) {
@@ -80,7 +80,9 @@ class Lexer {
             while this.CurrentChar() != '\n' && this.CurrentChar() != '\0' {
                 this.Advance(1);
             } return true;
-        } return false;
+        }
+
+        false
     }
 
     fn LexString(&mut this) -> Token {
@@ -97,61 +99,75 @@ class Lexer {
                 if this.CurrentChar() != '\0' {
                     let escaped = this.CurrentChar();
 
-                    if escaped == '\'' {
-                        token.value += "'";
-                    } else if escaped == '"' {
-                        token.value += "\"";
-                    } else if escaped == '?' {
-                        token.value += "\?";
-                    } else if escaped == '\\' {
-                        token.value += "\\";
-                    } else if escaped == 'a' {
-                        token.value += "\a";
-                    } else if escaped == 'b' {
-                        token.value += "\b";
-                    } else if escaped == 'f' {
-                        token.value += "\f";
-                    } else if escaped == 'n' {
-                        token.value += "\n";
-                    } else if escaped == 'r' {
-                        token.value += "\r";
-                    } else if escaped == 't' {
-                        token.value += "\t";
-                    } else if escaped == 'v' {
-                        token.value += "\v";
-                    } else if escaped == 'x' {
-                        this.Advance(1);
-                        let mut value: String;
-
-                        while this.IsHexDigit(this.CurrentChar()) {
-                            value += this.CurrentChar();
+                    match escaped {
+                        '\'' => {
+                            token.value += "'";
+                        },
+                        '"' => {
+                            token.value += "\"";
+                        },
+                        '?' => {
+                            token.value += "\?";
+                        },
+                        '\\' => {
+                            token.value += "\\";
+                        },
+                        'a' => {
+                            token.value += "\a";
+                        },
+                        'b' => {
+                            token.value += "\b";
+                        },
+                        'f' => {
+                            token.value += "\f";
+                        },
+                        'n' => {
+                            token.value += "\n";
+                        },
+                        'r' => {
+                            token.value += "\r";
+                        },
+                        't' => {
+                            token.value += "\t";
+                        },
+                        'v' => {
+                            token.value += "\v";
+                        },
+                        'x' => {
                             this.Advance(1);
-                        } else {
-                            Logger::Log("Invalid hexadecimal escape sequence.", token, LogSeverity::Error);
+                            let mut value: String;
+
+                            while this.IsHexDigit(this.CurrentChar()) {
+                                value += this.CurrentChar();
+                                this.Advance(1);
+                            } else {
+                                Logger::Log("Invalid hexadecimal escape sequence.", token, LogSeverity::Error);
+                            }
+
+                            if value.Size() > 3 {
+                                Logger::Log("Hexadecimal escape sequence too long.", token, LogSeverity::Error);
+                            }
+
+                            token.value += value.ToInteger(16) as i8;
+                            this.index -= 1;
+                        },
+                        _ => {
+                            let mut value: String;
+
+                            while this.IsOctDigit(this.CurrentChar()) {
+                                value += this.CurrentChar();
+                                this.Advance(1);
+                            } else {
+                                Logger::Log("Invalid octal escape sequence.", token, LogSeverity::Error);
+                            }
+
+                            if value.Size() > 4 {
+                                Logger::Log("Octal escape sequence too long.", token, LogSeverity::Error);
+                            }
+
+                            token.value += value.ToInteger(8) as i8;
+                            this.index -= 1;
                         }
-
-                        if value.Size() > 3 {
-                            Logger::Log("Hexadecimal escape sequence too long.", token, LogSeverity::Error);
-                        }
-
-                        token.value += value.ToInteger(16) as i8;
-                        this.index -= 1;
-                    } else {
-                        let mut value: String;
-
-                        while this.IsOctDigit(this.CurrentChar()) {
-                            value += this.CurrentChar();
-                            this.Advance(1);
-                        } else {
-                            Logger::Log("Invalid octal escape sequence.", token, LogSeverity::Error);
-                        }
-
-                        if value.Size() > 4 {
-                            Logger::Log("Octal escape sequence too long.", token, LogSeverity::Error);
-                        }
-
-                        token.value += value.ToInteger(8) as i8;
-                        this.index -= 1;
                     } this.Advance(1);
                 }
             } else {
@@ -164,7 +180,9 @@ class Lexer {
             this.Advance(1);
         } else {
             Logger::Log("Unterminated string literal.", token, LogSeverity::Error);
-        } return token;
+        }
+
+        token
     }
 
     fn LexNumber(&mut this) -> Token {
@@ -211,7 +229,9 @@ class Lexer {
                 token.value += this.CurrentChar();
                 this.Advance(1);
             }
-        } return token;
+        }
+
+        token
     }
 
     fn LexIdentifier(&mut this) -> Token {
@@ -246,7 +266,9 @@ class Lexer {
                     break;
                 }
             }
-        } return token;
+        }
+
+        token
     }
 
     fn LexSymbol(&mut this) -> Token {
@@ -256,72 +278,96 @@ class Lexer {
         let next = this.PeekChar(1);
         token.value += current;
 
-        if current == '+' {
-            token._type = TokenType::PLUS;
-            this.Advance(1);
-        } else if current == '-' {
-            token._type = TokenType::MINUS;
-            this.Advance(1);
-        } else if current == '*' {
-            token._type = TokenType::MUL;
-            this.Advance(1);
-        } else if current == '/' {
-            token._type = TokenType::DIV;
-            this.Advance(1);
-        } else if current == '%' {
-            token._type = TokenType::MOD;
-            this.Advance(1);
-        } else if current == '&' {
-            token._type = TokenType::AND;
-            this.Advance(1);
-        } else if current == '|' {
-            token._type = TokenType::OR;
-            this.Advance(1);
-        } else if current == '^' {
-            token._type = TokenType::XOR;
-            this.Advance(1);
-        } else if current == '!' {
-            token._type = TokenType::NOT;
-            this.Advance(1);
-        } else if current == '<' && next == '<' {
-            token.value += next;
-            token._type = TokenType::LSHIFT;
-            this.Advance(2);
-        } else if current == '>' && next == '>' {
-            token.value += next;
-            token._type = TokenType::RSHIFT;
-            this.Advance(2);
-        } else if current == '(' {
-            token._type = TokenType::LPAREN;
-            this.Advance(1);
-        } else if current == ')' {
-            token._type = TokenType::RPAREN;
-            this.Advance(1);
-        } else if current == '[' {
-            token._type = TokenType::LBRACKET;
-            this.Advance(1);
-        } else if current == ']' {
-            token._type = TokenType::RBRACKET;
-            this.Advance(1);
-        } else if current == '{' {
-            token._type = TokenType::LBRACE;
-            this.Advance(1);
-        } else if current == '}' {
-            token._type = TokenType::RBRACE;
-            this.Advance(1);
-        } else if current == ',' {
-            token._type = TokenType::COMMA;
-            this.Advance(1);
-        } else if current == ':' {
-            token._type = TokenType::COLON;
-            this.Advance(1);
-        } else if current == '$' {
-            token._type = TokenType::DOLLAR;
-            this.Advance(1);
-        } else {
-            Logger::Log("Invalid symbol '" + current.ToString() + "'.", token, LogSeverity::Error);
-            this.Advance(1);
-        } return token;
+        match current {
+            '+' => {
+                token._type = TokenType::PLUS;
+                this.Advance(1);
+            },
+            '-' => {
+                token._type = TokenType::MINUS;
+                this.Advance(1);
+            },
+            '*' => {
+                token._type = TokenType::MUL;
+                this.Advance(1);
+            },
+            '/' => {
+                token._type = TokenType::DIV;
+                this.Advance(1);
+            },
+            '%' => {
+                token._type = TokenType::MOD;
+                this.Advance(1);
+            },
+            '&' => {
+                token._type = TokenType::AND;
+                this.Advance(1);
+            },
+            '|' => {
+                token._type = TokenType::OR;
+                this.Advance(1);
+            },
+            '^' => {
+                token._type = TokenType::XOR;
+                this.Advance(1);
+            },
+            '!' => {
+                token._type = TokenType::NOT;
+                this.Advance(1);
+            },
+            '<' if next == '<' => {
+                token.value += next;
+                token._type = TokenType::LSHIFT;
+                this.Advance(2);
+            },
+            '>' if next == '>' => {
+                token.value += next;
+                token._type = TokenType::RSHIFT;
+                this.Advance(2);
+            },
+            '(' => {
+                token._type = TokenType::LPAREN;
+                this.Advance(1);
+            },
+            ')' => {
+                token._type = TokenType::RPAREN;
+                this.Advance(1);
+            },
+            '[' => {
+                token._type = TokenType::LBRACKET;
+                this.Advance(1);
+            },
+            ']' => {
+                token._type = TokenType::RBRACKET;
+                this.Advance(1);
+            },
+            '{' => {
+                token._type = TokenType::LBRACE;
+                this.Advance(1);
+            },
+            '}' => {
+                token._type = TokenType::RBRACE;
+                this.Advance(1);
+            },
+            ',' => {
+                token._type = TokenType::COMMA;
+                this.Advance(1);
+            },
+            ':' => {
+                token._type = TokenType::COLON;
+                this.Advance(1);
+            },
+            '$' => {
+                token._type = TokenType::DOLLAR;
+                this.Advance(1);
+            },
+            _ => {
+                Logger::Log("Invalid symbol '" + current.ToString() + "'.", token, LogSeverity::Error);
+                this.Advance(1);
+            }
+        }
+
+        token
     }
 
     pub fn Lex(&mut this, text: String, file: String) -> Vector<Token> {
@@ -365,6 +411,6 @@ class Lexer {
         let mut eof: Token;
         (eof._type, eof.row, eof.column, eof.file) = (TokenType::EOF, this.row, this.column, this.file);
         tokens.PushBack(eof);
-        return tokens;
+        tokens
     }
 }

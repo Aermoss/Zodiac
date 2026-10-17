@@ -173,5 +173,7 @@ fn Main(args: &mut Vector<String>) -> i32 {
         }
 
         file.WriteBytes(result.Data() as *u8, result.Length());
-    } return 0;
+    }
+
+    0
 }

@@ -74,19 +74,19 @@ fn SetWS2812(_r: u8, _g: u8, _b: u8, brightness: u8) {
 }
 
 fn HasCharacter() -> bool {
-    return (*(0xFFFC as *u32) & 1) != 0;
+    (*(0xFFFC as *u32) & 1) != 0
 }
 
 fn ReadCharacter() -> i8 {
-    return *(0xFFFF as *u32) as i8;
+    *(0xFFFF as *u32) as i8
 }
 
 fn ButtonPressed() -> bool {
-    return (*(0xFFF4 as *u32) & 1) == 0;
+    (*(0xFFF4 as *u32) & 1) == 0
 }
 
 fn GetTime() -> u32 {
-    return *(0xFFEC as *u32);
+    *(0xFFEC as *u32)
 }
 
 fn Sleep(ms: u32) {
@@ -110,7 +110,9 @@ fn SoftwareDivide(dividend: u32, divisor: u32) -> DivisionResult {
     while result.remainder >= divisor {
         result.remainder -= divisor;
         result.quotient += 1;
-    } return result;
+    }
+
+    result
 } */
 
 @nomangle
@@ -201,83 +203,99 @@ fn Main() {
         if now >= next_tick {
             next_tick = now + 10;
 
-            if mode == 0 {
-                if color_state == 0 {
-                    g += 5;
+            match mode {
+                0 => {
+                    match color_state {
+                        0 => {
+                            g += 5;
 
-                    if g >= 255 {
-                        color_state = 1;
-                        g = 255;
-                    }
-                } else if color_state == 1 {
-                    if r <= 5 {
-                        color_state = 2;
-                        r = 0;
-                    } else {
-                        r -= 5;
-                    }
-                } else if color_state == 2 {
-                    b += 5;
+                            if g >= 255 {
+                                color_state = 1;
+                                g = 255;
+                            }
+                        },
+                        1 => {
+                            if r <= 5 {
+                                color_state = 2;
+                                r = 0;
+                            } else {
+                                r -= 5;
+                            }
+                        },
+                        2 => {
+                            b += 5;
 
-                    if b >= 255 {
-                        color_state = 3;
-                        b = 255;
-                    }
-                } else if color_state == 3 {
-                    if g <= 5 {
-                        color_state = 4;
-                        g = 0;
-                    } else {
-                        g -= 5;
-                    }
-                } else if color_state == 4 {
-                    r += 5;
+                            if b >= 255 {
+                                color_state = 3;
+                                b = 255;
+                            }
+                        },
+                        3 => {
+                            if g <= 5 {
+                                color_state = 4;
+                                g = 0;
+                            } else {
+                                g -= 5;
+                            }
+                        },
+                        4 => {
+                            r += 5;
 
-                    if r >= 255 {
-                        color_state = 5;
-                        r = 255;
+                            if r >= 255 {
+                                color_state = 5;
+                                r = 255;
+                            }
+                        },
+                        _ => {
+                            if b <= 5 {
+                                color_state = 0;
+                                b = 0;
+                            } else {
+                                b -= 5;
+                            }
+                        }
                     }
-                } else {
-                    if b <= 5 {
-                        color_state = 0;
-                        b = 0;
-                    } else {
-                        b -= 5;
-                    }
+
+                    SetWS2812(r, g, b, brightness);
+                },
+                1 => {
+                    SetWS2812(255, 0, 0, brightness);
+                },
+                2 => {
+                    SetWS2812(0, 255, 0, brightness);
+                },
+                3 => {
+                    SetWS2812(0, 0, 255, brightness);
+                },
+                _ => {
+                    SetWS2812(0, 0, 0, brightness);
                 }
-
-                SetWS2812(r, g, b, brightness);
-            } else if mode == 1 {
-                SetWS2812(255, 0, 0, brightness);
-            } else if mode == 2 {
-                SetWS2812(0, 255, 0, brightness);
-            } else if mode == 3 {
-                SetWS2812(0, 0, 255, brightness);
-            } else {
-                SetWS2812(0, 0, 0, brightness);
             }
         }
 
         if HasCharacter() {
-            let c = ReadCharacter();
+            let character = ReadCharacter();
 
-            if c >= '1' && c <= '6' {
-                led_state ^= 1i8 << (c - '1');
-                SetLEDs(led_state);
-            } else if c == '+' {
-                if brightness >= 247 { brightness = 255; }
-                else { brightness += 8; }
-                Write("Brightness: ");
-                WriteInteger(brightness as u32);
-                Write("/255\n");
-            } else if c == '-' {
-                if brightness <= 8 { brightness = 0; }
-                else { brightness -= 8; }
-                Write("Brightness: ");
-                WriteInteger(brightness as u32);
-                Write("/255\n");
-            } else {
-                WriteCharacter(c);
+            match character {
+                '1'..='6' => {
+                    led_state ^= 1i8 << (character - '1');
+                    SetLEDs(led_state);
+                },
+                '+' => {
+                    brightness = if brightness >= 247 { 255 } else { brightness + 8 };
+                    Write("Brightness: ");
+                    WriteInteger(brightness as u32);
+                    Write("/255\n");
+                },
+                '-' => {
+                    brightness = if brightness <= 8 { 0 } else { brightness - 8 };
+                    Write("Brightness: ");
+                    WriteInteger(brightness as u32);
+                    Write("/255\n");
+                },
+                _ => {
+                    WriteCharacter(character);
+                }
             }
         }
     }

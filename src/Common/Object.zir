@@ -48,7 +48,7 @@ class Object {
     pub fn Read(file: &File) -> Object {
         let mut object = Object();
         object.Read(file);
-        return object;
+        object
     }
 
     pub fn Write(&this, file: &File) {

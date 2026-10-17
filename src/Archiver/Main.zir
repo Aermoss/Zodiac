@@ -112,5 +112,5 @@ fn Main(args: &mut Vector<String>) -> i32 {
 
     file.WriteWord(ARCHIVE_MAGIC);
     archive.Write(file);
-    return 0;
+    0
 }

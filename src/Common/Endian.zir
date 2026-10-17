@@ -15,5 +15,5 @@
  */
 
 fn ByteSwap32(word: u32) -> u32 {
-    return (word << 24) | ((word << 8) & 0x00FF0000) | ((word >> 8) & 0x0000FF00) | (word >> 24);
+    (word << 24) | ((word << 8) & 0x00FF0000) | ((word >> 8) & 0x0000FF00) | (word >> 24)
 }

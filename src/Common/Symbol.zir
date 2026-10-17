@@ -42,7 +42,7 @@ class Symbol {
     pub fn Read(file: &File) -> Symbol {
         let mut symbol = Symbol();
         symbol.Read(file);
-        return symbol;
+        symbol
     }
 
     pub fn Write(&this, file: &File) {

@@ -127,12 +127,15 @@ class Linker {
                 this.symbol_addresses.PushBack(object.section_bases[symbol.section as usize] + symbol.offset);
                 let mut name = symbol.name;
 
-                if symbol.binding == BindingType::Local {
-                    name = String::FromInteger(i as u64) + ":" + name;
-                } else if symbol.binding == BindingType::Global {
-                    if this.symbol_names.Contains(name) {
-                        Logger::Log("Duplicate global symbol definition '" + name + "'.", LogSeverity::Error);
-                        return result;
+                match symbol.binding {
+                    BindingType::Local => {
+                        name = String::FromInteger(i as u64) + ":" + name;
+                    },
+                    BindingType::Global => {
+                        if this.symbol_names.Contains(name) {
+                            Logger::Log("Duplicate global symbol definition '" + name + "'.", LogSeverity::Error);
+                            return result;
+                        }
                     }
                 }
 
@@ -160,25 +163,35 @@ class Linker {
                 let index = ((pc - this.section_bases[relocation.section as usize]) / 4) as usize;
                 let mut word = this.sections[relocation.section as usize][index];
 
-                if relocation._type == RelocationType::AbsoluteUpper21 {
-                    word = (word & !IMM21_MASK) | ((target >> 11) & IMM21_MASK);
-                } else if relocation._type == RelocationType::AbsoluteLower11 {
-                    word = (word & !IMM11_MASK) | (target & IMM11_MASK);
-                } else if relocation._type == RelocationType::PcRelativeUpper21 {
-                    word = (word & !IMM21_MASK) | (((target - pc) >> 11) & IMM21_MASK);
-                } else if relocation._type == RelocationType::PcRelativeLower11 {
-                    word = (word & !IMM16_MASK) | (((target - (pc - 4)) & IMM11_MASK) & IMM16_MASK);
-                } else if relocation._type == RelocationType::Branch16 {
-                    word = (word & !IMM16_MASK) | (((target - pc) >> 2) & IMM16_MASK);
-                } else if relocation._type == RelocationType::Branch21 {
-                    word = (word & !IMM21_MASK) | (((target - pc) >> 2) & IMM21_MASK);
-                } else if relocation._type == RelocationType::Branch26 {
-                    word = (word & !IMM26_MASK) | (((target - pc) >> 2) & IMM26_MASK);
-                } else if relocation._type == RelocationType::Absolute32 {
-                    word = target;
-                } else {
-                    Logger::Log("Unknown relocation type.", LogSeverity::Error);
-                    return result;
+                match relocation._type {
+                    RelocationType::AbsoluteUpper21 => {
+                        word = (word & !IMM21_MASK) | ((target >> 11) & IMM21_MASK);
+                    },
+                    RelocationType::AbsoluteLower11 => {
+                        word = (word & !IMM11_MASK) | (target & IMM11_MASK);
+                    },
+                    RelocationType::PcRelativeUpper21 => {
+                        word = (word & !IMM21_MASK) | (((target - pc) >> 11) & IMM21_MASK);
+                    },
+                    RelocationType::PcRelativeLower11 => {
+                        word = (word & !IMM16_MASK) | (((target - (pc - 4)) & IMM11_MASK) & IMM16_MASK);
+                    },
+                    RelocationType::Branch16 => {
+                        word = (word & !IMM16_MASK) | (((target - pc) >> 2) & IMM16_MASK);
+                    },
+                    RelocationType::Branch21 => {
+                        word = (word & !IMM21_MASK) | (((target - pc) >> 2) & IMM21_MASK);
+                    },
+                    RelocationType::Branch26 => {
+                        word = (word & !IMM26_MASK) | (((target - pc) >> 2) & IMM26_MASK);
+                    },
+                    RelocationType::Absolute32 => {
+                        word = target;
+                    },
+                    _ => {
+                        Logger::Log("Unknown relocation type.", LogSeverity::Error);
+                        return result;
+                    }
                 }
 
                 this.sections[relocation.section as usize][index] = word;
@@ -194,6 +207,6 @@ class Linker {
         }
 
         this.sections.Clear();
-        return result;
+        result
     }
 }

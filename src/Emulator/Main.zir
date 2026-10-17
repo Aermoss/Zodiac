@@ -67,16 +67,15 @@ fn Main(args: &mut Vector<String>) -> i32 {
 
     let mut emulator = Emulator();
     let (_, extension) = SplitExtension(input);
-    let mut loaded = false;
 
-    if extension == ".hex" {
-        loaded = emulator.LoadHexadecimal(input);
+    let loaded: bool = if extension == ".hex" {
+        emulator.LoadHexadecimal(input)
     } else if extension == ".bin" {
-        loaded = emulator.LoadBinary(input);
+        emulator.LoadBinary(input)
     } else {
         Logger::Log("Invalid input file '" + input + "'.", LogSeverity::Error);
         return 1;
-    }
+    };
 
     if !loaded {
         Logger::Log("Failed to load program '" + input + "'.", LogSeverity::Error);
@@ -84,5 +83,5 @@ fn Main(args: &mut Vector<String>) -> i32 {
     }
 
     emulator.Emulate();
-    return 0;
+    0
 }

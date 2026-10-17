@@ -50,7 +50,7 @@ class Relocation {
     pub fn Read(file: &File) -> Relocation {
         let mut relocation = Relocation();
         relocation.Read(file);
-        return relocation;
+        relocation
     }
 
     pub fn Write(&this, file: &File) {

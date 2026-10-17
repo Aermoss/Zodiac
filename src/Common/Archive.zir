@@ -34,7 +34,7 @@ class Archive {
     pub fn Read(file: &File) -> Archive {
         let mut archive = Archive();
         archive.Read(file);
-        return archive;
+        archive
     }
 
     pub fn Write(&this, file: &File) {

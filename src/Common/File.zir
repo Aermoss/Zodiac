@@ -29,10 +29,12 @@ enum FileMode: u32 {
 
 extend FileMode {
     pub fn ToString(this) -> *i8 {
-        if this == FileMode::Read { return "r"; }
-        else if this == FileMode::ReadBinary { return "rb"; }
-        else if this == FileMode::Write { return "w"; }
-        else { return "wb"; }
+        match this {
+            FileMode::Read => "r",
+            FileMode::ReadBinary => "rb",
+            FileMode::Write => "w",
+            FileMode::WriteBinary => "wb"
+        }
     }
 }
 
@@ -51,7 +53,7 @@ class File {
     pub fn Open(&mut this, mode: FileMode) -> bool {
         if this.handle != null { fclose(this.handle); }
         this.handle = fopen(this.path.Data(), mode.ToString());
-        return this.handle != null;
+        this.handle != null
     }
 
     pub fn Close(&mut this) {
@@ -62,15 +64,15 @@ class File {
     }
 
     pub fn ReadBytes(&this, pointer: *mut u8, count: usize) -> bool {
-        return fread(pointer, 1, count, this.handle) == count;
+        fread(pointer, 1, count, this.handle) == count
     }
 
     pub fn ReadHalves(&this, pointer: *mut u16, count: usize) -> bool {
-        return fread(pointer, 2, count, this.handle) == count;
+        fread(pointer, 2, count, this.handle) == count
     }
 
     pub fn ReadWords(&this, pointer: *mut u32, count: usize) -> bool {
-        return fread(pointer, 4, count, this.handle) == count;
+        fread(pointer, 4, count, this.handle) == count
     }
 
     pub fn ReadByte(&this) -> u8 {
@@ -78,7 +80,9 @@ class File {
 
         if !this.ReadBytes(&mut result, 1) {
             result = 0;
-        } return result;
+        }
+
+        result
     }
 
     pub fn ReadHalf(&this) -> u16 {
@@ -86,7 +90,9 @@ class File {
 
         if !this.ReadHalves(&mut result, 1) {
             result = 0;
-        } return result;
+        }
+
+        result
     }
 
     pub fn ReadWord(&this) -> u32 {
@@ -94,31 +100,33 @@ class File {
 
         if !this.ReadWords(&mut result, 1) {
             result = 0;
-        } return result;
+        }
+
+        result
     }
 
     pub fn WriteBytes(&this, pointer: *u8, count: usize) -> bool {
-        return fwrite(pointer, 1, count, this.handle) == count;
+        fwrite(pointer, 1, count, this.handle) == count
     }
 
     pub fn WriteHalves(&this, pointer: *u16, count: usize) -> bool {
-        return fwrite(pointer, 2, count, this.handle) == count;
+        fwrite(pointer, 2, count, this.handle) == count
     }
 
     pub fn WriteWords(&this, pointer: *u32, count: usize) -> bool {
-        return fwrite(pointer, 4, count, this.handle) == count;
+        fwrite(pointer, 4, count, this.handle) == count
     }
 
     pub fn WriteByte(&this, value: u8) -> bool {
-        return this.WriteBytes(&value, 1);
+        this.WriteBytes(&value, 1)
     }
 
     pub fn WriteHalf(&this, value: u16) -> bool {
-        return this.WriteHalves(&value, 1);
+        this.WriteHalves(&value, 1)
     }
 
     pub fn WriteWord(&this, value: u32) -> bool {
-        return this.WriteWords(&value, 1);
+        this.WriteWords(&value, 1)
     }
 
     pub fn ReadString(&this) -> String {
@@ -128,7 +136,7 @@ class File {
         buffer[length] = 0;
         let string = String(buffer as *i8);
         delete[] buffer;
-        return string;
+        string
     }
 
     pub fn WriteString(&this, value: &String) {

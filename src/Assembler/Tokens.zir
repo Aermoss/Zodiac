@@ -28,33 +28,35 @@ enum TokenType: i32 {
 
 extend TokenType {
     pub fn ToString(this) -> String {
-        if this == TokenType::EOF { return "EOF".ToString(); }
-        else if this == TokenType::NEWLINE { return "NEWLINE".ToString(); }
-        else if this == TokenType::IDENTIFIER { return "IDENTIFIER".ToString(); }
-        else if this == TokenType::NUMBER { return "NUMBER".ToString(); }
-        else if this == TokenType::STRING { return "STRING".ToString(); }
-        else if this == TokenType::CHAR { return "CHAR".ToString(); }
-        else if this == TokenType::PLUS { return "PLUS".ToString(); }
-        else if this == TokenType::MINUS { return "MINUS".ToString(); }
-        else if this == TokenType::MUL { return "MUL".ToString(); }
-        else if this == TokenType::DIV { return "DIV".ToString(); }
-        else if this == TokenType::MOD { return "MOD".ToString(); }
-        else if this == TokenType::AND { return "AND".ToString(); }
-        else if this == TokenType::OR { return "OR".ToString(); }
-        else if this == TokenType::XOR { return "XOR".ToString(); }
-        else if this == TokenType::NOT { return "NOT".ToString(); }
-        else if this == TokenType::LSHIFT { return "LSHIFT".ToString(); }
-        else if this == TokenType::RSHIFT { return "RSHIFT".ToString(); }
-        else if this == TokenType::LPAREN { return "LPAREN".ToString(); }
-        else if this == TokenType::RPAREN { return "RPAREN".ToString(); }
-        else if this == TokenType::LBRACE { return "LBRACE".ToString(); }
-        else if this == TokenType::RBRACE { return "RBRACE".ToString(); }
-        else if this == TokenType::LBRACKET { return "LBRACKET".ToString(); }
-        else if this == TokenType::RBRACKET { return "RBRACKET".ToString(); }
-        else if this == TokenType::COMMA { return "COMMA".ToString(); }
-        else if this == TokenType::COLON { return "COLON".ToString(); }
-        else if this == TokenType::DOLLAR { return "DOLLAR".ToString(); }
-        else { return "UNKNOWN".ToString(); }
+        match this {
+            TokenType::EOF => "EOF",
+            TokenType::NEWLINE => "NEWLINE",
+            TokenType::IDENTIFIER => "IDENTIFIER",
+            TokenType::NUMBER => "NUMBER",
+            TokenType::STRING => "STRING",
+            TokenType::CHAR => "CHAR",
+            TokenType::PLUS => "PLUS",
+            TokenType::MINUS => "MINUS",
+            TokenType::MUL => "MUL",
+            TokenType::DIV => "DIV",
+            TokenType::MOD => "MOD",
+            TokenType::AND => "AND",
+            TokenType::OR => "OR",
+            TokenType::XOR => "XOR",
+            TokenType::NOT => "NOT",
+            TokenType::LSHIFT => "LSHIFT",
+            TokenType::RSHIFT => "RSHIFT",
+            TokenType::LPAREN => "LPAREN",
+            TokenType::RPAREN => "RPAREN",
+            TokenType::LBRACE => "LBRACE",
+            TokenType::RBRACE => "RBRACE",
+            TokenType::LBRACKET => "LBRACKET",
+            TokenType::RBRACKET => "RBRACKET",
+            TokenType::COMMA => "COMMA",
+            TokenType::COLON => "COLON",
+            TokenType::DOLLAR => "DOLLAR",
+            _ => "UNKNOWN"
+        }.ToString()
     }
 }
 

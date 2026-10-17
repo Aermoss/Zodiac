@@ -42,12 +42,12 @@ class Assembler {
     }
 
     fn GetSectionSize(&mut this, section: SectionType) -> u32 {
-        return this.sections[section as usize].Size() as u32;
+        this.sections[section as usize].Size() as u32
     }
 
     fn IsRegister(&mut this, value: &String) -> bool {
         if value == "zero" || value == "ra" || value == "sp" || value == "gp" || value == "tp" || value == "fp" {
-            return true;
+            true
         } else if value.StartsWith('x') || value.StartsWith('s') || value.StartsWith('t') || value.StartsWith('a') {
             let rest = value.SubString(1);
 
@@ -58,94 +58,108 @@ class Assembler {
             }
 
             let index = rest.ToInteger(10);
-            return index >= 0 && index <= (value.StartsWith('x') ? 31 : value.StartsWith('s') ? 11 : value.StartsWith('t') ? 6 : 7);
+            index >= 0 && index <= (value.StartsWith('x') ? 31 : value.StartsWith('s') ? 11 : value.StartsWith('t') ? 6 : 7)
         } else {
-            return false;
+            false
         }
     }
 
     fn GetRegisterIndex(&mut this, value: &String) -> u32 {
-        if value == "zero" { return 0; }
-        else if value == "ra" { return 1; }
-        else if value == "sp" { return 2; }
-        else if value == "gp" { return 3; }
-        else if value == "tp" { return 4; }
-        else if value == "fp" { return 5; }
+        if value == "zero" { 0 }
+        else if value == "ra" { 1 }
+        else if value == "sp" { 2 }
+        else if value == "gp" { 3 }
+        else if value == "tp" { 4 }
+        else if value == "fp" { 5 }
         else if value.StartsWith('x') || value.StartsWith('s') || value.StartsWith('t') || value.StartsWith('a') {
-            return value.SubString(1).ToInteger(10) as u32 + (value.StartsWith('x') ? 0 : value.StartsWith('s') ? 5 : value.StartsWith('t') ? 17 : 24);
+            value.SubString(1).ToInteger(10) as u32 + (value.StartsWith('x') ? 0 : value.StartsWith('s') ? 5 : value.StartsWith('t') ? 17 : 24)
         } else {
-            return 0;
+            0
         }
     }
 
     fn IsRelocatable(&mut this, node: *Node) -> bool {
-        if node->_type == NodeType::IDENTIFIER {
-            return !this.IsRegister((node as *IdentifierNode)->value);
-        } else if node->_type == NodeType::BINARY_OPERATION {
-            let binary = node as *BinaryOperationNode;
-            return this.IsRelocatable(binary->left) || this.IsRelocatable(binary->right);
-        } else if node->_type == NodeType::UNARY_OPERATION {
-            let unary = node as *UnaryOperationNode;
-            return this.IsRelocatable(unary->operand);
-        } else {
-            return false;
+        match node->_type {
+            NodeType::IDENTIFIER => !this.IsRegister((node as *IdentifierNode)->value),
+            NodeType::BINARY_OPERATION => {
+                let binary = node as *BinaryOperationNode;
+                this.IsRelocatable(binary->left) || this.IsRelocatable(binary->right)
+            },
+            NodeType::UNARY_OPERATION => {
+                let unary = node as *UnaryOperationNode;
+                this.IsRelocatable(unary->operand)
+            },
+            _ => false
         }
     }
 
     fn AssembleExpression(&mut this, node: *Node) -> u32 {
-        if node->_type == NodeType::ADDRESS {
-            return this.GetSectionSize(this.section);
-        } else if node->_type == NodeType::LITERAL {
-            let value = (node as *LiteralNode)->value;
-            if value.StartsWith("0x") { return value.SubString(2).ToInteger(16) as u32; }
-            else if value.StartsWith("0b") { return value.SubString(2).ToInteger(2) as u32; }
-            else if value.StartsWith("0o") { return value.SubString(2).ToInteger(8) as u32; }
-            else { return value.ToInteger(10) as u32; }
-        } else if node->_type == NodeType::IDENTIFIER {
-            let value = (node as *IdentifierNode)->value;
+        match node->_type {
+            NodeType::ADDRESS => this.GetSectionSize(this.section),
+            NodeType::LITERAL => {
+                let value = (node as *LiteralNode)->value;
+                if value.StartsWith("0x") { value.SubString(2).ToInteger(16) as u32 }
+                else if value.StartsWith("0b") { value.SubString(2).ToInteger(2) as u32 }
+                else if value.StartsWith("0o") { value.SubString(2).ToInteger(8) as u32 }
+                else { value.ToInteger(10) as u32 }
+            },
+            NodeType::IDENTIFIER => {
+                let value = (node as *IdentifierNode)->value;
 
-            if this.IsRegister(value) {
-                return this.GetRegisterIndex(value);
-            }
-
-            for symbol in this.symbols {
-                if symbol.name == value {
-                    return symbol.offset;
+                if this.IsRegister(value) {
+                    return this.GetRegisterIndex(value);
                 }
-            }
 
-            if !this.externs.Contains(value) {
-                Logger::Log("Unknown identifier: '" + value + "'.", node, LogSeverity::Error);
-            } return 0;
-        } else if node->_type == NodeType::BINARY_OPERATION {
-            let binary = node as *BinaryOperationNode;
-            let left = this.AssembleExpression(binary->left);
-            let right = this.AssembleExpression(binary->right);
-            if binary->_operator == TokenType::PLUS { return left + right; }
-            else if binary->_operator == TokenType::MINUS { return left - right; }
-            else if binary->_operator == TokenType::MUL { return left * right; }
-            else if binary->_operator == TokenType::DIV { return left / right; }
-            else if binary->_operator == TokenType::LSHIFT { return left << right; }
-            else if binary->_operator == TokenType::RSHIFT { return left >> right; }
-            else if binary->_operator == TokenType::AND { return left & right; }
-            else if binary->_operator == TokenType::OR { return left | right; }
-            else if binary->_operator == TokenType::XOR { return left ^ right; }
-            else {
-                Logger::Log("Unknown binary operation: '" + binary->_operator.ToString() + "'.", binary, LogSeverity::Error);
-                return 0;
+                for symbol in this.symbols {
+                    if symbol.name == value {
+                        return symbol.offset;
+                    }
+                }
+
+                if !this.externs.Contains(value) {
+                    Logger::Log("Unknown identifier: '" + value + "'.", node, LogSeverity::Error);
+                }
+
+                0
+            },
+            NodeType::BINARY_OPERATION => {
+                let binary = node as *BinaryOperationNode;
+                let left = this.AssembleExpression(binary->left);
+                let right = this.AssembleExpression(binary->right);
+
+                match binary->_operator {
+                    TokenType::PLUS => left + right,
+                    TokenType::MINUS => left - right,
+                    TokenType::MUL => left * right,
+                    TokenType::DIV => left / right,
+                    TokenType::LSHIFT => left << right,
+                    TokenType::RSHIFT => left >> right,
+                    TokenType::AND => left & right,
+                    TokenType::OR => left | right,
+                    TokenType::XOR => left ^ right,
+                    _ => {
+                        Logger::Log("Unknown binary operation: '" + binary->_operator.ToString() + "'.", binary, LogSeverity::Error);
+                        0
+                    }
+                }
+            },
+            NodeType::UNARY_OPERATION => {
+                let unary = node as *UnaryOperationNode;
+                let operand = this.AssembleExpression(unary->operand);
+
+                match unary->_operator {
+                    TokenType::MINUS => 0 - operand,
+                    TokenType::NOT => !operand,
+                    _ => {
+                        Logger::Log("Unknown unary operation: '" + unary->_operator.ToString() + "'.", unary, LogSeverity::Error);
+                        0
+                    }
+                }
+            },
+            _ => {
+                Logger::Log("Unknown expression: '" + node->_type.ToString() + "'.", node, LogSeverity::Error);
+                0
             }
-        } else if node->_type == NodeType::UNARY_OPERATION {
-            let unary = node as *UnaryOperationNode;
-            let operand = this.AssembleExpression(unary->operand);
-            if unary->_operator == TokenType::MINUS { return 0 - operand; }
-            else if unary->_operator == TokenType::NOT { return !operand; }
-            else {
-                Logger::Log("Unknown unary operation: '" + unary->_operator.ToString() + "'.", unary, LogSeverity::Error);
-                return 0;
-            }
-        } else {
-            Logger::Log("Unknown expression: '" + node->_type.ToString() + "'.", node, LogSeverity::Error);
-            return 0;
         }
     }
 
@@ -161,113 +175,117 @@ class Assembler {
         }
  
         for node in root->declarations {
-            if node->_type == NodeType::LABEL {
-                let name = (node as *LabelNode)->name;
-                let mut found = false;
+            match node->_type {
+                NodeType::LABEL => {
+                    let name = (node as *LabelNode)->name;
+                    let mut found = false;
 
-                for symbol in this.symbols {
-                    if symbol.name == name {
-                        Logger::Log("Duplicate symbol: '" + name + "'.", node, LogSeverity::Error);
-                        found = true;
-                        break;
+                    for symbol in this.symbols {
+                        if symbol.name == name {
+                            Logger::Log("Duplicate symbol: '" + name + "'.", node, LogSeverity::Error);
+                            found = true;
+                            break;
+                        }
                     }
-                }
 
-                if !found {
-                    let binding = this.globals.Contains(name) ? BindingType::Global : BindingType::Local;
-                    this.symbols.PushBack(Symbol(name, this.section, section_sizes[this.section as usize], binding));
-                }
-            } else if node->_type == NodeType::INSTRUCTION {
-                let instruction = node as *InstructionNode;
-                let (mnemonic, operands) = (instruction->mnemonic, instruction->operands);
-                let directive = mnemonic.StartsWith(".");
+                    if !found {
+                        let binding = this.globals.Contains(name) ? BindingType::Global : BindingType::Local;
+                        this.symbols.PushBack(Symbol(name, this.section, section_sizes[this.section as usize], binding));
+                    }
+                },
+                NodeType::INSTRUCTION => {
+                    let instruction = node as *InstructionNode;
+                    let (mnemonic, operands) = (instruction->mnemonic, instruction->operands);
+                    let directive = mnemonic.StartsWith(".");
  
-                if directive {
-                    if mnemonic == ".text" {
-                        this.section = SectionType::Text;
-                    } else if mnemonic == ".data" {
-                        this.section = SectionType::Data;
-                    } else if mnemonic == ".byte" {
-                        section_sizes[this.section as usize] += operands.Size() as u32;
-                    } else if mnemonic == ".half" {
-                        section_sizes[this.section as usize] += (operands.Size() * 2) as u32;
-                    } else if mnemonic == ".word" {
-                        section_sizes[this.section as usize] += (operands.Size() * 4) as u32;
-                    } else if mnemonic == ".string" {
-                        for operand in operands {
-                            let literal = operand->expression as *LiteralNode;
-                            section_sizes[this.section as usize] += (literal->value.Length() + 1) as u32;
-                        }
-                    } else if mnemonic == ".align" {
-                        let align = this.AssembleExpression(operands[0]->expression);
-                        let remainder = section_sizes[this.section as usize] % align;
+                    if directive {
+                        if mnemonic == ".text" {
+                            this.section = SectionType::Text;
+                        } else if mnemonic == ".data" {
+                            this.section = SectionType::Data;
+                        } else if mnemonic == ".byte" {
+                            section_sizes[this.section as usize] += operands.Size() as u32;
+                        } else if mnemonic == ".half" {
+                            section_sizes[this.section as usize] += (operands.Size() * 2) as u32;
+                        } else if mnemonic == ".word" {
+                            section_sizes[this.section as usize] += (operands.Size() * 4) as u32;
+                        } else if mnemonic == ".string" {
+                            for operand in operands {
+                                let literal = operand->expression as *LiteralNode;
+                                section_sizes[this.section as usize] += (literal->value.Length() + 1) as u32;
+                            }
+                        } else if mnemonic == ".align" {
+                            let align = this.AssembleExpression(operands[0]->expression);
+                            let remainder = section_sizes[this.section as usize] % align;
 
-                        if remainder != 0 {
-                            section_sizes[this.section as usize] += align - remainder;
-                        }
-                    } else if mnemonic == ".space" {
-                        section_sizes[this.section as usize] += this.AssembleExpression(operands[0]->expression);
-                    } else if mnemonic == ".global" {
-                        for operand in operands {
-                            if operand->expression->_type == NodeType::IDENTIFIER {
-                                let value = (operand->expression as *IdentifierNode)->value;
+                            if remainder != 0 {
+                                section_sizes[this.section as usize] += align - remainder;
+                            }
+                        } else if mnemonic == ".space" {
+                            section_sizes[this.section as usize] += this.AssembleExpression(operands[0]->expression);
+                        } else if mnemonic == ".global" {
+                            for operand in operands {
+                                if operand->expression->_type == NodeType::IDENTIFIER {
+                                    let value = (operand->expression as *IdentifierNode)->value;
 
-                                if !this.globals.Contains(value) {
-                                    this.globals.PushBack(value);
+                                    if !this.globals.Contains(value) {
+                                        this.globals.PushBack(value);
 
-                                    for symbol in this.symbols {
-                                        if symbol.name == value {
-                                            symbol.binding = BindingType::Global;
-                                            break;
+                                        for symbol in this.symbols {
+                                            if symbol.name == value {
+                                                symbol.binding = BindingType::Global;
+                                                break;
+                                            }
                                         }
                                     }
                                 }
                             }
-                        }
-                    } else if mnemonic == ".extern" {
-                        for operand in operands {
-                            if operand->expression->_type == NodeType::IDENTIFIER {
-                                let value = (operand->expression as *IdentifierNode)->value;
+                        } else if mnemonic == ".extern" {
+                            for operand in operands {
+                                if operand->expression->_type == NodeType::IDENTIFIER {
+                                    let value = (operand->expression as *IdentifierNode)->value;
 
-                                if !this.externs.Contains(value) {
-                                    this.externs.PushBack(value);
+                                    if !this.externs.Contains(value) {
+                                        this.externs.PushBack(value);
+                                    }
                                 }
                             }
-                        }
-                    } else {
-                        Logger::Log("Unknown directive: '" + mnemonic + "'.", instruction, LogSeverity::Error);
-                    } continue;
-                }
+                        } else {
+                            Logger::Log("Unknown directive: '" + mnemonic + "'.", instruction, LogSeverity::Error);
+                        } continue;
+                    }
  
-                let remainder = section_sizes[this.section as usize] % 4;
+                    let remainder = section_sizes[this.section as usize] % 4;
 
-                if remainder != 0 {
-                    section_sizes[this.section as usize] += (4 - remainder);
-                }
+                    if remainder != 0 {
+                        section_sizes[this.section as usize] += (4 - remainder);
+                    }
  
-                let mut size: u32 = 4;
+                    let mut size: u32 = 4;
 
-                if mnemonic == "li" {
-                    if operands.Size() >= 2 {
-                        if !this.IsRelocatable(operands[1]->expression) {
-                            let immediate = this.AssembleExpression(operands[1]->expression);
+                    if mnemonic == "li" {
+                        if operands.Size() >= 2 {
+                            if !this.IsRelocatable(operands[1]->expression) {
+                                let immediate = this.AssembleExpression(operands[1]->expression);
 
-                            if (immediate <= IMM16_SMAX) || (immediate >= IMM16_SMIN) {
-                                size = 4;
-                            } else if (immediate & IMM11_MASK) == 0 {
-                                size = 4;
+                                if (immediate <= IMM16_SMAX) || (immediate >= IMM16_SMIN) {
+                                    size = 4;
+                                } else if (immediate & IMM11_MASK) == 0 {
+                                    size = 4;
+                                } else {
+                                    size = 8;
+                                }
                             } else {
                                 size = 8;
                             }
-                        } else {
-                            size = 8;
                         }
+                    } else if mnemonic == "la" {
+                        size = 8;
                     }
-                } else if mnemonic == "la" {
-                    size = 8;
-                }
 
-                section_sizes[this.section as usize] += size;
+                    section_sizes[this.section as usize] += size;
+                },
+                _ => {}
             }
         }
 
@@ -574,6 +592,6 @@ class Assembler {
         object.relocations.Swap(this.relocations);
         this.globals.Clear();
         this.externs.Clear();
-        return object;
+        object
     }
 }

@@ -61,7 +61,9 @@ class Emulator {
             let word = line.ToInteger(16) as u32;
             this.WriteWord(offset, word);
             offset += 4;
-        } return true;
+        }
+
+        true
     }
 
     pub fn LoadBinary(&mut this, path: &String) -> bool {
@@ -74,7 +76,9 @@ class Emulator {
             if !file.ReadWords(&mut word, 1) { break; }
             this.WriteWord(offset, ByteSwap32(word));
             offset += 4;
-        } return true;
+        }
+
+        true
     }
 
     pub fn Reset(&mut this) {
@@ -87,7 +91,7 @@ class Emulator {
     }
 
     fn GetRegister(&this, index: u32) -> u32 {
-        return this.registers[index as usize];
+        this.registers[index as usize]
     }
 
     fn SetRegister(&mut this, index: u32, value: u32) {
@@ -97,61 +101,62 @@ class Emulator {
     }
 
     fn IsDevice(&this, address: u32) -> bool {
-        return address == 0xFFFF || address == 0xFFFC || address == 0xFFF4 || address == 0xFFEC;
+        address == 0xFFFF || address == 0xFFFC || address == 0xFFF4 || address == 0xFFEC
     }
 
     fn ReadDevice(&mut this, address: u32) -> u32 {
-        if address == 0xFFFF {
-            this.uart_mutex.Lock();
-            let result = this.uart_rx_ready ? this.uart_rx as u32 : 0;
-            this.uart_rx_ready = false;
-            this.uart_mutex.Unlock();
-            return result * 0x01010101;
-        } else if address == 0xFFFC {
-            this.uart_mutex.Lock();
-            let ready = this.uart_rx_ready;
-            this.uart_mutex.Unlock();
-            return ready ? 1 : 0;
-        } else if address == 0xFFF4 {
-            return 1;
-        } else {
-            return this.ms_counter;
+        match address {
+            0xFFFF => {
+                this.uart_mutex.Lock();
+                let result = this.uart_rx_ready ? this.uart_rx as u32 : 0;
+                this.uart_rx_ready = false;
+                this.uart_mutex.Unlock();
+                result * 0x01010101
+            },
+            0xFFFC => {
+                this.uart_mutex.Lock();
+                let ready = this.uart_rx_ready;
+                this.uart_mutex.Unlock();
+                ready ? 1 : 0
+            },
+            0xFFF4 => 1,
+            _ => this.ms_counter
         }
     }
 
     fn ReadByte(&mut this, address: u32) -> u8 {
         if this.IsDevice(address) {
-            return ((this.ReadDevice(address) >> (8 * (address & 3))) & 0xFF) as u8;
+            ((this.ReadDevice(address) >> (8 * (address & 3))) & 0xFF) as u8
         } else if (address & 0xC0000000) == 0x80000000 {
-            return this.flash[(address & 0x7FFFFF) as usize];
+            this.flash[(address & 0x7FFFFF) as usize]
         } else if (address & 0xC0000000) == 0x40000000 {
-            return this.sdram[(address & 0x7FFFFF) as usize];
+            this.sdram[(address & 0x7FFFFF) as usize]
         } else if address < 16384 {
-            return this.bram[address as usize];
+            this.bram[address as usize]
         } else {
-            return 0;
+            0
         }
     }
 
     fn ReadHalf(&mut this, address: u32) -> u16 {
         if this.IsDevice(address) {
-            return ((this.ReadDevice(address) >> (16 * ((address >> 1) & 1))) & 0xFFFF) as u16;
+            ((this.ReadDevice(address) >> (16 * ((address >> 1) & 1))) & 0xFFFF) as u16
         } else {
             let mut result = this.ReadByte(address) as u32;
             result |= (this.ReadByte(address + 1) as u32 << 8);
-            return result as u16;
+            result as u16
         }
     }
 
     fn ReadWord(&mut this, address: u32) -> u32 {
         if this.IsDevice(address) {
-            return this.ReadDevice(address);
+            this.ReadDevice(address)
         } else {
             let mut result = this.ReadByte(address) as u32;
             result |= (this.ReadByte(address + 1) as u32 << 8);
             result |= (this.ReadByte(address + 2) as u32 << 16);
             result |= (this.ReadByte(address + 3) as u32 << 24);
-            return result;
+            result
         }
     }
 
@@ -175,15 +180,19 @@ class Emulator {
     }
 
     fn WriteWord(&mut this, address: u32, value: u32) {
-        if address == 0xFFE0 {
-            WriteLine("[WS2812: RGB(0x" + String::FromInteger(value as u64, 16) + ")]");
-        } else if address == 0xFFF8 {
-            WriteLine("[UART Baud Rate: ~" + String::FromInteger((CLK_FREQ / value) as u64, 10) + ']');
-        } else {
-            this.WriteByte(address, (value & 0xFF) as u8);
-            this.WriteByte(address + 1, ((value >> 8) & 0xFF) as u8);
-            this.WriteByte(address + 2, ((value >> 16) & 0xFF) as u8);
-            this.WriteByte(address + 3, ((value >> 24) & 0xFF) as u8);
+        match address {
+            0xFFE0 => {
+                WriteLine("[WS2812: RGB(0x" + String::FromInteger(value as u64, 16) + ")]");
+            },
+            0xFFF8 => {
+                WriteLine("[UART Baud Rate: ~" + String::FromInteger((CLK_FREQ / value) as u64, 10) + ']');
+            },
+            _ => {
+                this.WriteByte(address, (value & 0xFF) as u8);
+                this.WriteByte(address + 1, ((value >> 8) & 0xFF) as u8);
+                this.WriteByte(address + 2, ((value >> 16) & 0xFF) as u8);
+                this.WriteByte(address + 3, ((value >> 24) & 0xFF) as u8);
+            }
         }
     }
 
@@ -198,133 +207,184 @@ class Emulator {
         let simm26 = (((imm26 as i32) ^ (1 << 25)) - (1 << 25));
         let mut next_pc = this.pc + 4;
 
-        if opcode == Opcode::LB {
-            let address = (this.GetRegister(reg1) as i32 + simm16) as u32;
-            this.SetRegister(reg0, this.ReadByte(address) as i8 as u32);
-        } else if opcode == Opcode::LBU {
-            let address = (this.GetRegister(reg1) as i32 + simm16) as u32;
-            this.SetRegister(reg0, this.ReadByte(address) as u32);
-        } else if opcode == Opcode::LH {
-            let address = (this.GetRegister(reg1) as i32 + simm16) as u32;
-            this.SetRegister(reg0, this.ReadHalf(address) as i16 as u32);
-        } else if opcode == Opcode::LHU {
-            let address = (this.GetRegister(reg1) as i32 + simm16) as u32;
-            this.SetRegister(reg0, this.ReadHalf(address) as u32);
-        } else if opcode == Opcode::LW {
-            let address = (this.GetRegister(reg1) as i32 + simm16) as u32;
-            this.SetRegister(reg0, this.ReadWord(address));
-        } else if opcode == Opcode::LUI {
-            this.SetRegister(reg0, imm21 << 11);
-        } else if opcode == Opcode::AUIPC {
-            this.SetRegister(reg0, this.pc + (imm21 << 11));
-        } else if opcode == Opcode::SB {
-            let address = (this.GetRegister(reg1) as i32 + simm16) as u32;
-            this.WriteByte(address, (this.GetRegister(reg0) & 0xFF) as u8);
-        } else if opcode == Opcode::SH {
-            let address = (this.GetRegister(reg1) as i32 + simm16) as u32;
-            this.WriteHalf(address, (this.GetRegister(reg0) & 0xFFFF) as u16);
-        } else if opcode == Opcode::SW {
-            let address = (this.GetRegister(reg1) as i32 + simm16) as u32;
-            this.WriteWord(address, this.GetRegister(reg0));
-        } else if opcode == Opcode::B {
-            next_pc = (this.pc as i32 + (simm26 << 2)) as u32;
-        } else if opcode == Opcode::BR {
-            next_pc = this.GetRegister(reg0);
-        } else if opcode == Opcode::BL {
-            this.SetRegister(reg0, this.pc + 4);
-            next_pc = (this.pc as i32 + (simm21 << 2)) as u32;
-        } else if opcode == Opcode::BLR {
-            this.SetRegister(reg0, this.pc + 4);
-            next_pc = this.GetRegister(reg1);
-        } else if opcode == Opcode::BEQ {
-            if this.GetRegister(reg0) == this.GetRegister(reg1) {
-                next_pc = (this.pc as i32 + (simm16 << 2)) as u32;
-            }
-        } else if opcode == Opcode::BNE {
-            if this.GetRegister(reg0) != this.GetRegister(reg1) {
-                next_pc = (this.pc as i32 + (simm16 << 2)) as u32;
-            }
-        } else if opcode == Opcode::BLT {
-            if (this.GetRegister(reg0) as i32) < (this.GetRegister(reg1) as i32) {
-                next_pc = (this.pc as i32 + (simm16 << 2)) as u32;
-            }
-        } else if opcode == Opcode::BLTU {
-            if this.GetRegister(reg0) < this.GetRegister(reg1) {
-                next_pc = (this.pc as i32 + (simm16 << 2)) as u32;
-            }
-        } else if opcode == Opcode::BGE {
-            if (this.GetRegister(reg0) as i32) >= (this.GetRegister(reg1) as i32) {
-                next_pc = (this.pc as i32 + (simm16 << 2)) as u32;
-            }
-        } else if opcode == Opcode::BGEU {
-            if this.GetRegister(reg0) >= this.GetRegister(reg1) {
-                next_pc = (this.pc as i32 + (simm16 << 2)) as u32;
-            }
-        } else if opcode == Opcode::SLT {
-            this.SetRegister(reg0, (this.GetRegister(reg1) as i32 < this.GetRegister(reg2) as i32) ? 1 : 0);
-        } else if opcode == Opcode::SLTU {
-            this.SetRegister(reg0, (this.GetRegister(reg1) < this.GetRegister(reg2)) ? 1 : 0);
-        } else if opcode == Opcode::SLTI {
-            this.SetRegister(reg0, (this.GetRegister(reg1) as i32 < simm16) ? 1 : 0);
-        } else if opcode == Opcode::SLTIU {
-            this.SetRegister(reg0, (this.GetRegister(reg1) < imm16) ? 1 : 0);
-        } else if opcode == Opcode::ADD {
-            this.SetRegister(reg0, this.GetRegister(reg1) + this.GetRegister(reg2));
-        } else if opcode == Opcode::ADDI {
-            this.SetRegister(reg0, this.GetRegister(reg1) + simm16 as u32);
-        } else if opcode == Opcode::SUB {
-            this.SetRegister(reg0, this.GetRegister(reg1) - this.GetRegister(reg2));
-        } else if opcode == Opcode::SUBI {
-            this.SetRegister(reg0, this.GetRegister(reg1) - simm16 as u32);
-        } else if opcode == Opcode::MUL {
-            this.SetRegister(reg0, this.GetRegister(reg1) * this.GetRegister(reg2));
-        } else if opcode == Opcode::MULH {
-            let product = (this.GetRegister(reg1) as i32 as i64) * (this.GetRegister(reg2) as i32 as i64);
-            this.SetRegister(reg0, (product >> 32) as u32);
-        } else if opcode == Opcode::MULHSU {
-            let product = (this.GetRegister(reg1) as i32 as i64) * (this.GetRegister(reg2) as i64);
-            this.SetRegister(reg0, (product >> 32) as u32);
-        } else if opcode == Opcode::MULHU {
-            let product = (this.GetRegister(reg1) as i64) * (this.GetRegister(reg2) as i64);
-            this.SetRegister(reg0, (product >> 32) as u32);
-        } else if opcode == Opcode::DIV {
-            let (dividend, divisor) = (this.GetRegister(reg1) as i32, this.GetRegister(reg2) as i32);
-            this.SetRegister(reg0, (divisor == 0) ? 0xFFFFFFFF : (dividend / divisor) as u32);
-        } else if opcode == Opcode::DIVU {
-            let (dividend, divisor) = (this.GetRegister(reg1), this.GetRegister(reg2));
-            this.SetRegister(reg0, (divisor == 0) ? 0xFFFFFFFF : (dividend / divisor));
-        } else if opcode == Opcode::REM {
-            let (dividend, divisor) = (this.GetRegister(reg1) as i32, this.GetRegister(reg2) as i32);
-            this.SetRegister(reg0, (divisor == 0) ? dividend as u32 : (dividend % divisor) as u32);
-        } else if opcode == Opcode::REMU {
-            let (dividend, divisor) = (this.GetRegister(reg1), this.GetRegister(reg2));
-            this.SetRegister(reg0, (divisor == 0) ? dividend : (dividend % divisor));
-        } else if opcode == Opcode::AND {
-            this.SetRegister(reg0, this.GetRegister(reg1) & this.GetRegister(reg2));
-        } else if opcode == Opcode::ANDI {
-            this.SetRegister(reg0, this.GetRegister(reg1) & imm16);
-        } else if opcode == Opcode::OR {
-            this.SetRegister(reg0, this.GetRegister(reg1) | this.GetRegister(reg2));
-        } else if opcode == Opcode::ORI {
-            this.SetRegister(reg0, this.GetRegister(reg1) | imm16);
-        } else if opcode == Opcode::XOR {
-            this.SetRegister(reg0, this.GetRegister(reg1) ^ this.GetRegister(reg2));
-        } else if opcode == Opcode::XORI {
-            this.SetRegister(reg0, this.GetRegister(reg1) ^ imm16);
-        } else if opcode == Opcode::SLL {
-            this.SetRegister(reg0, this.GetRegister(reg1) << (this.GetRegister(reg2) & 0x1F));
-        } else if opcode == Opcode::SLLI {
-            this.SetRegister(reg0, this.GetRegister(reg1) << (imm16 & 0x1F));
-        } else if opcode == Opcode::SRL {
-            this.SetRegister(reg0, this.GetRegister(reg1) >> (this.GetRegister(reg2) & 0x1F));
-        } else if opcode == Opcode::SRLI {
-            this.SetRegister(reg0, this.GetRegister(reg1) >> (imm16 & 0x1F));
-        } else if opcode == Opcode::SRA {
-            this.SetRegister(reg0, ((this.GetRegister(reg1) as i32) >> ((this.GetRegister(reg2) & 0x1F) as i32)) as u32);
-        } else if opcode == Opcode::SRAI {
-            this.SetRegister(reg0, ((this.GetRegister(reg1) as i32) >> ((imm16 & 0x1F) as i32)) as u32);
-        } else if opcode == Opcode::HLT {
-            this.halted = true;
+        match opcode {
+            Opcode::LB => {
+                let address = (this.GetRegister(reg1) as i32 + simm16) as u32;
+                this.SetRegister(reg0, this.ReadByte(address) as i8 as u32);
+            },
+            Opcode::LBU => {
+                let address = (this.GetRegister(reg1) as i32 + simm16) as u32;
+                this.SetRegister(reg0, this.ReadByte(address) as u32);
+            },
+            Opcode::LH => {
+                let address = (this.GetRegister(reg1) as i32 + simm16) as u32;
+                this.SetRegister(reg0, this.ReadHalf(address) as i16 as u32);
+            },
+            Opcode::LHU => {
+                let address = (this.GetRegister(reg1) as i32 + simm16) as u32;
+                this.SetRegister(reg0, this.ReadHalf(address) as u32);
+            },
+            Opcode::LW => {
+                let address = (this.GetRegister(reg1) as i32 + simm16) as u32;
+                this.SetRegister(reg0, this.ReadWord(address));
+            },
+            Opcode::LUI => {
+                this.SetRegister(reg0, imm21 << 11);
+            },
+            Opcode::AUIPC => {
+                this.SetRegister(reg0, this.pc + (imm21 << 11));
+            },
+            Opcode::SB => {
+                let address = (this.GetRegister(reg1) as i32 + simm16) as u32;
+                this.WriteByte(address, (this.GetRegister(reg0) & 0xFF) as u8);
+            },
+            Opcode::SH => {
+                let address = (this.GetRegister(reg1) as i32 + simm16) as u32;
+                this.WriteHalf(address, (this.GetRegister(reg0) & 0xFFFF) as u16);
+            },
+            Opcode::SW => {
+                let address = (this.GetRegister(reg1) as i32 + simm16) as u32;
+                this.WriteWord(address, this.GetRegister(reg0));
+            },
+            Opcode::B => {
+                next_pc = (this.pc as i32 + (simm26 << 2)) as u32;
+            },
+            Opcode::BR => {
+                next_pc = this.GetRegister(reg0);
+            },
+            Opcode::BL => {
+                this.SetRegister(reg0, this.pc + 4);
+                next_pc = (this.pc as i32 + (simm21 << 2)) as u32;
+            },
+            Opcode::BLR => {
+                this.SetRegister(reg0, this.pc + 4);
+                next_pc = this.GetRegister(reg1);
+            },
+            Opcode::BEQ => {
+                if this.GetRegister(reg0) == this.GetRegister(reg1) {
+                    next_pc = (this.pc as i32 + (simm16 << 2)) as u32;
+                }
+            },
+            Opcode::BNE => {
+                if this.GetRegister(reg0) != this.GetRegister(reg1) {
+                    next_pc = (this.pc as i32 + (simm16 << 2)) as u32;
+                }
+            },
+            Opcode::BLT => {
+                if (this.GetRegister(reg0) as i32) < (this.GetRegister(reg1) as i32) {
+                    next_pc = (this.pc as i32 + (simm16 << 2)) as u32;
+                }
+            },
+            Opcode::BLTU => {
+                if this.GetRegister(reg0) < this.GetRegister(reg1) {
+                    next_pc = (this.pc as i32 + (simm16 << 2)) as u32;
+                }
+            },
+            Opcode::BGE => {
+                if (this.GetRegister(reg0) as i32) >= (this.GetRegister(reg1) as i32) {
+                    next_pc = (this.pc as i32 + (simm16 << 2)) as u32;
+                }
+            },
+            Opcode::BGEU => {
+                if this.GetRegister(reg0) >= this.GetRegister(reg1) {
+                    next_pc = (this.pc as i32 + (simm16 << 2)) as u32;
+                }
+            },
+            Opcode::SLT => {
+                this.SetRegister(reg0, (this.GetRegister(reg1) as i32 < this.GetRegister(reg2) as i32) ? 1 : 0);
+            },
+            Opcode::SLTU => {
+                this.SetRegister(reg0, (this.GetRegister(reg1) < this.GetRegister(reg2)) ? 1 : 0);
+            },
+            Opcode::SLTI => {
+                this.SetRegister(reg0, (this.GetRegister(reg1) as i32 < simm16) ? 1 : 0);
+            },
+            Opcode::SLTIU => {
+                this.SetRegister(reg0, (this.GetRegister(reg1) < imm16) ? 1 : 0);
+            },
+            Opcode::ADD => {
+                this.SetRegister(reg0, this.GetRegister(reg1) + this.GetRegister(reg2));
+            },
+            Opcode::ADDI => {
+                this.SetRegister(reg0, this.GetRegister(reg1) + simm16 as u32);
+            },
+            Opcode::SUB => {
+                this.SetRegister(reg0, this.GetRegister(reg1) - this.GetRegister(reg2));
+            },
+            Opcode::SUBI => {
+                this.SetRegister(reg0, this.GetRegister(reg1) - simm16 as u32);
+            },
+            Opcode::MUL => {
+                this.SetRegister(reg0, this.GetRegister(reg1) * this.GetRegister(reg2));
+            },
+            Opcode::MULH => {
+                let product = (this.GetRegister(reg1) as i32 as i64) * (this.GetRegister(reg2) as i32 as i64);
+                this.SetRegister(reg0, (product >> 32) as u32);
+            },
+            Opcode::MULHSU => {
+                let product = (this.GetRegister(reg1) as i32 as i64) * (this.GetRegister(reg2) as i64);
+                this.SetRegister(reg0, (product >> 32) as u32);
+            },
+            Opcode::MULHU => {
+                let product = (this.GetRegister(reg1) as i64) * (this.GetRegister(reg2) as i64);
+                this.SetRegister(reg0, (product >> 32) as u32);
+            },
+            Opcode::DIV => {
+                let (dividend, divisor) = (this.GetRegister(reg1) as i32, this.GetRegister(reg2) as i32);
+                this.SetRegister(reg0, (divisor == 0) ? 0xFFFFFFFF : (dividend / divisor) as u32);
+            },
+            Opcode::DIVU => {
+                let (dividend, divisor) = (this.GetRegister(reg1), this.GetRegister(reg2));
+                this.SetRegister(reg0, (divisor == 0) ? 0xFFFFFFFF : (dividend / divisor));
+            },
+            Opcode::REM => {
+                let (dividend, divisor) = (this.GetRegister(reg1) as i32, this.GetRegister(reg2) as i32);
+                this.SetRegister(reg0, (divisor == 0) ? dividend as u32 : (dividend % divisor) as u32);
+            },
+            Opcode::REMU => {
+                let (dividend, divisor) = (this.GetRegister(reg1), this.GetRegister(reg2));
+                this.SetRegister(reg0, (divisor == 0) ? dividend : (dividend % divisor));
+            },
+            Opcode::AND => {
+                this.SetRegister(reg0, this.GetRegister(reg1) & this.GetRegister(reg2));
+            },
+            Opcode::ANDI => {
+                this.SetRegister(reg0, this.GetRegister(reg1) & imm16);
+            },
+            Opcode::OR => {
+                this.SetRegister(reg0, this.GetRegister(reg1) | this.GetRegister(reg2));
+            },
+            Opcode::ORI => {
+                this.SetRegister(reg0, this.GetRegister(reg1) | imm16);
+            },
+            Opcode::XOR => {
+                this.SetRegister(reg0, this.GetRegister(reg1) ^ this.GetRegister(reg2));
+            },
+            Opcode::XORI => {
+                this.SetRegister(reg0, this.GetRegister(reg1) ^ imm16);
+            },
+            Opcode::SLL => {
+                this.SetRegister(reg0, this.GetRegister(reg1) << (this.GetRegister(reg2) & 0x1F));
+            },
+            Opcode::SLLI => {
+                this.SetRegister(reg0, this.GetRegister(reg1) << (imm16 & 0x1F));
+            },
+            Opcode::SRL => {
+                this.SetRegister(reg0, this.GetRegister(reg1) >> (this.GetRegister(reg2) & 0x1F));
+            },
+            Opcode::SRLI => {
+                this.SetRegister(reg0, this.GetRegister(reg1) >> (imm16 & 0x1F));
+            },
+            Opcode::SRA => {
+                this.SetRegister(reg0, ((this.GetRegister(reg1) as i32) >> ((this.GetRegister(reg2) & 0x1F) as i32)) as u32);
+            },
+            Opcode::SRAI => {
+                this.SetRegister(reg0, ((this.GetRegister(reg1) as i32) >> ((imm16 & 0x1F) as i32)) as u32);
+            },
+            Opcode::HLT => {
+                this.halted = true;
+            },
+            _ => {}
         }
 
         this.pc = next_pc;
