@@ -38,6 +38,6 @@ class Binary {
             words.PushBack(ByteSwap32(word));
         }
 
-        file.WriteWords(words.Data(), words.Size());
+        file.WriteWords(words.Data(), words.Length());
     }
 }

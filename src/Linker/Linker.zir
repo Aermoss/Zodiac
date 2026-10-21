@@ -97,8 +97,8 @@ class Linker {
         for object in this.objects {
             object.section_bases.Resize(SECTION_COUNT);
 
-            for i in 0..object.sections.Size() {
-                object.section_bases[i] = (this.sections[i].Size() as u32) * 4;
+            for i in 0..object.sections.Length() {
+                object.section_bases[i] = (this.sections[i].Length() as u32) * 4;
 
                 for word in object.sections[i] {
                     this.sections[i].PushBack(word);
@@ -108,7 +108,7 @@ class Linker {
 
         let mut offset = this.origin;
 
-        for i in 0..this.sections.Size() {
+        for i in 0..this.sections.Length() {
             this.section_bases[i] = offset;
 
             if offset != 0 {
@@ -117,10 +117,10 @@ class Linker {
                 }
             }
 
-            offset += this.sections[i].Size() as u32 * 4;
+            offset += this.sections[i].Length() as u32 * 4;
         }
 
-        for i in 0..this.objects.Size() {
+        for i in 0..this.objects.Length() {
             let object = this.objects[i];
 
             for symbol in object.symbols {
@@ -143,22 +143,22 @@ class Linker {
             }
         }
 
-        for i in 0..this.objects.Size() {
+        for i in 0..this.objects.Length() {
             let object = this.objects[i];
 
             for relocation in object.relocations {
                 let mut symbol_index = this.symbol_names.Index(String::FromInteger(i as u64) + ":" + relocation.symbol);
 
-                if symbol_index == -1 {
+                if symbol_index.IsNone() {
                     symbol_index = this.symbol_names.Index(relocation.symbol);
                 }
  
-                if symbol_index == -1 {
+                if symbol_index.IsNone() {
                     Logger::Log("Undefined symbol '" + relocation.symbol + "' referenced in " + object.path + ".", LogSeverity::Error);
                     return result;
                 }
  
-                let target = this.symbol_addresses[symbol_index as usize];
+                let target = this.symbol_addresses[symbol_index.Unwrap()];
                 let pc = object.section_bases[relocation.section as usize] + relocation.offset;
                 let index = ((pc - this.section_bases[relocation.section as usize]) / 4) as usize;
                 let mut word = this.sections[relocation.section as usize][index];

@@ -48,6 +48,8 @@ class Node {
     Node(&mut this, _type: NodeType, start: Token) {
         (this._type, this.start) = (_type, start);
     }
+
+    virtual ~Node(&mut this) {}
 }
 
 class LiteralNode : Node {

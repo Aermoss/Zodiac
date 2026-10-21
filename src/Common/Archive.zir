@@ -38,7 +38,7 @@ class Archive {
     }
 
     pub fn Write(&this, file: &File) {
-        file.WriteWord(this.objects.Size() as u32);
+        file.WriteWord(this.objects.Length() as u32);
 
         for object in this.objects {
             object.Write(file);

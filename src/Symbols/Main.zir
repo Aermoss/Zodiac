@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#[include "std/io", "std/str", "std/vec", "std/pair", "std/file", "src/Common/File.zir",
+#[include "std/io", "std/str", "std/vec", "std/file", "src/Common/File.zir",
     "src/Common/Object.zir", "src/Common/Archive.zir", "src/Common/Symbol.zir", "src/Common/Logger.zir" : *]
 
 fn PrintVersion(executable: String) {
@@ -36,7 +36,7 @@ fn Main(args: &mut Vector<String>) -> i32 {
     let (_, executable) = SplitPath(args[0]);
     let mut logger = Logger(executable);
 
-    if args.Size() < 2 {
+    if args.Length() < 2 {
         PrintUsage(executable);
         return 1;
     }
@@ -44,7 +44,7 @@ fn Main(args: &mut Vector<String>) -> i32 {
     let mut inputs: Vector<String>;
     let mut i: usize = 1;
 
-    while i < args.Size() {
+    while i < args.Length() {
         let arg = args[i];
 
         if arg == "--help" || arg == "-h" {
@@ -97,7 +97,7 @@ fn Main(args: &mut Vector<String>) -> i32 {
             Write("\n");
         }
 
-        if !object.path.Empty() && inputs.Size() > 1 {
+        if !object.path.Empty() && inputs.Length() > 1 {
             WriteLine(object.path + ':');
         }
 
@@ -105,9 +105,9 @@ fn Main(args: &mut Vector<String>) -> i32 {
             let mut character = '?';
             
             if symbol.section == SectionType::Text {
-                character = symbol.binding == BindingType::Global ? 'T' : 't';
+                character = if symbol.binding == BindingType::Global { 'T' } else { 't' };
             } else {
-                character = symbol.binding == BindingType::Global ? 'D' : 'd';
+                character = if symbol.binding == BindingType::Global { 'D' } else { 'd' };
             }
 
             let mut address = String::FromInteger(symbol.offset as u64, 16);

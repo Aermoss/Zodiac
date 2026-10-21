@@ -35,7 +35,7 @@ fn Main(args: &mut Vector<String>) -> i32 {
     let (_, executable) = SplitPath(args[0]);
     let mut logger = Logger(executable);
 
-    if args.Size() < 2 {
+    if args.Length() < 2 {
         PrintUsage(executable);
         return 1;
     }
@@ -43,7 +43,7 @@ fn Main(args: &mut Vector<String>) -> i32 {
     let mut input = String();
     let mut i: usize = 1;
 
-    while i < args.Size() {
+    while i < args.Length() {
         let arg = args[i];
 
         if arg == "--help" || arg == "-h" {

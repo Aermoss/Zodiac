@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#[include "std/io", "std/str", "std/vec", "std/pair", "std/file", "src/Linker/Linker.zir",
+#[include "std/io", "std/str", "std/vec", "std/file", "src/Linker/Linker.zir",
     "src/Common/File.zir", "src/Common/Object.zir", "src/Common/Archive.zir", "src/Common/Logger.zir" : *]
 
 fn PrintVersion(executable: String) {
@@ -38,7 +38,7 @@ fn Main(args: &mut Vector<String>) -> i32 {
     let (_, executable) = SplitPath(args[0]);
     let mut logger = Logger(executable);
 
-    if args.Size() < 2 {
+    if args.Length() < 2 {
         PrintUsage(executable);
         return 1;
     }
@@ -49,7 +49,7 @@ fn Main(args: &mut Vector<String>) -> i32 {
     let mut output = String();
     let mut i: usize = 1;
 
-    while i < args.Size() {
+    while i < args.Length() {
         let arg = args[i];
 
         if arg == "--help" || arg == "-h" {
@@ -73,18 +73,18 @@ fn Main(args: &mut Vector<String>) -> i32 {
             let origin = arg.SubString(9);
 
             if origin.StartsWith("0x") {
-                linker.origin = String::ToInteger(origin.SubString(2), 16) as u32;
+                linker.origin = String::ToInteger(origin.SubString(2), 16).Unwrap() as u32;
             } else if origin.StartsWith("0o") {
-                linker.origin = String::ToInteger(origin.SubString(2), 8) as u32;
+                linker.origin = String::ToInteger(origin.SubString(2), 8).Unwrap() as u32;
             } else if origin.StartsWith("0b") {
-                linker.origin = String::ToInteger(origin.SubString(2), 2) as u32;
+                linker.origin = String::ToInteger(origin.SubString(2), 2).Unwrap() as u32;
             } else {
-                linker.origin = String::ToInteger(origin, 10) as u32;
+                linker.origin = String::ToInteger(origin, 10).Unwrap() as u32;
             }
         } else if arg == "-o" {
             i += 1;
 
-            if i < args.Size() {
+            if i < args.Length() {
                 output = args[i];
             } else {
                 Logger::Log("Missing argument to '-o'.", LogSeverity::Error);
@@ -129,12 +129,12 @@ fn Main(args: &mut Vector<String>) -> i32 {
     if Logger::HasError() { return 1; }
 
     if output.Empty() {
-        output = SplitExtension(inputs[0]).0 + (binary ? ".bin" : ".hex");
+        output = SplitExtension(inputs[0]).0 + (if binary { ".bin" } else { ".hex" });
     }
 
     let mut file = File(output);
 
-    if !file.Open(binary ? FileMode::WriteBinary : FileMode::Write) {
+    if !file.Open(if binary { FileMode::WriteBinary } else { FileMode::Write }) {
         Logger::Log("Failed to open file '" + output + "'.", LogSeverity::Error);
         return 1;
     }

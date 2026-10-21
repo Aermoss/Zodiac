@@ -177,9 +177,9 @@ class Disassembler {
                 }
             }
 
-            for index in 0..object.sections.Size() {
+            for index in 0..object.sections.Length() {
                 let section_type = index as SectionType;
-                let section_name = section_type == SectionType::Text ? ".text" : ".data";
+                let section_name = if section_type == SectionType::Text { ".text" } else { ".data" };
                 let section = object.sections[index];
                 if section.Empty() { continue; }
 

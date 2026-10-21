@@ -24,7 +24,7 @@ class Stats {
 }
 
 fn GetLineCount(path: &String) -> usize {
-    let content = _ReadFile(path);
+    let content = _ReadFile(path).Unwrap();
     if content.Empty() { return 0; }
     let lines = content.Count('\n');
 
@@ -85,9 +85,9 @@ fn PrintMap(title: *i8, map: Map<String, usize>) -> usize {
     let mut total: usize = 0;
     WriteLine("--- " + title.ToString() + " ---");
 
-    for pair in map {
-        WriteLine(pair.left + ": " + String::FromInteger(pair.right as i64) + " lines");
-        total += pair.right;
+    for (name, lines) in map {
+        WriteLine(name + ": " + String::FromInteger(lines as i64) + " lines");
+        total += lines;
     }
 
     WriteLine("Subtotal: " + String::FromInteger(total as i64) + " lines\n");

@@ -53,17 +53,17 @@ class Object {
 
     pub fn Write(&this, file: &File) {
         for section in this.sections {
-            file.WriteWord(section.Size() as u32);
-            file.WriteWords(section.Data(), section.Size());
+            file.WriteWord(section.Length() as u32);
+            file.WriteWords(section.Data(), section.Length());
         }
 
-        file.WriteWord(this.symbols.Size() as u32);
+        file.WriteWord(this.symbols.Length() as u32);
 
         for symbol in this.symbols {
             symbol.Write(file);
         }
  
-        file.WriteWord(this.relocations.Size() as u32);
+        file.WriteWord(this.relocations.Length() as u32);
 
         for relocation in this.relocations {
             relocation.Write(file);

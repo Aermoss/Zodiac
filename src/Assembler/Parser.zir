@@ -23,8 +23,8 @@ class Parser {
     index: usize;
 
     fn Current(&this) -> Token {
-        if this.index >= this.tokens.Size() {
-            this.tokens[this.tokens.Size() - 1]
+        if this.index >= this.tokens.Length() {
+            this.tokens[this.tokens.Length() - 1]
         } else {
             this.tokens[this.index]
         }
@@ -32,8 +32,9 @@ class Parser {
 
     fn Peek(&this, offset: usize) -> Token {
         let index = this.index + offset;
-        if index >= this.tokens.Size() {
-            this.tokens[this.tokens.Size() - 1]
+
+        if index >= this.tokens.Length() {
+            this.tokens[this.tokens.Length() - 1]
         } else {
             this.tokens[index]
         }
@@ -41,7 +42,8 @@ class Parser {
 
     fn Advance(&mut this) -> Token {
         let token = this.Current();
-        if this.index < this.tokens.Size() {
+
+        if this.index < this.tokens.Length() {
             this.index += 1;
         }
 
