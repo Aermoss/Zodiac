@@ -28,23 +28,14 @@ bin/zym.exe: $(wildcard src/Symbols/*.zir) $(wildcard src/Common/*.zir)
 bin/ztr.exe: $(wildcard src/Strings/*.zir) $(wildcard src/Common/*.zir)
 	$(COMPILER) src/Strings/Main.zir -o $@ -I$(INCLUDE) -lDbgHelp -lucrt -DSTRINGS
 
-boot.o: bin/zas.exe boot.s
+%.o: bin/zas.exe %.s
 	$^ -o $@
 
 boot.hex: bin/zld.exe boot.o
 	$^ -o $@ --format=hex
 
-start.o: bin/zas.exe start.s
-	$^ -o $@
-
-end.o: bin/zas.exe end.s
-	$^ -o $@
-
 program.s: program.zir
 	$(COMPILER) $< -o $@ -S -target zodiac -emit-hir -emit-mir -emit-lir
-
-program.o: program.s
-	bin/zas.exe $< -o $@
 
 program.bin: bin/zld.exe start.o program.o end.o
 	$^ -o $@ --format=bin --origin=0x40000000
