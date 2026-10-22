@@ -186,7 +186,7 @@ module cpu #(
         .ready(alu_ready)
     );
 
-    logic is_div_op, div_active, div_stall;
+    logic is_div_op, div_active, div_stall, div_stalled;
     assign is_div_op = (ex_opcode == OP_DIV) || (ex_opcode == OP_DIVU) || (ex_opcode == OP_REM) || (ex_opcode == OP_REMU);
     assign div_start = is_div_op && !div_active;
     assign div_stall = is_div_op && !alu_ready;
@@ -197,7 +197,7 @@ module cpu #(
         end else begin
             if (div_start) begin
                 div_active <= 1'b1;
-            end else if (alu_ready) begin
+            end else if (alu_ready && !bus_stall) begin
                 div_active <= 1'b0;
             end
         end
@@ -421,6 +421,21 @@ module cpu #(
         end
     end
 
+    logic [31:0] cycle_counter;
+    logic [31:0] instret_counter;
+
+    always_ff @(posedge clk or posedge rst) begin
+        if (rst) begin
+            cycle_counter <= 0;
+            instret_counter <= 0;
+        end else begin
+            cycle_counter <= cycle_counter + 32'd1;
+
+            if (!bus_stall && wb_instr != 0)
+                instret_counter <= instret_counter + 32'd1;
+        end
+    end
+
     logic button_sync0, button_sync1;
 
     always_ff @(posedge clk or posedge rst) begin
@@ -457,7 +472,7 @@ module cpu #(
 
         if (mem_addr == 32'hFFFF)
             uart_we = mem_we;
-        else if (mem_addr != 32'hFFF0 && mem_addr != 32'hFFE0 && mem_addr != 32'hFFEC && mem_addr != 32'hFFF4 && mem_addr != 32'hFFF8)
+        else if (mem_addr != 32'hFFF0 && mem_addr != 32'hFFE0 && mem_addr != 32'hFFEC && mem_addr != 32'hFFF4 && mem_addr != 32'hFFF8 && mem_addr != 32'hFFE8 && mem_addr != 32'hFFE4)
             actual_mem_we = mem_we;
     end
 
@@ -568,6 +583,10 @@ module cpu #(
             wb_read_word = ms_counter;
         else if (wb_addr == 32'hFFF4)
             wb_read_word = {31'b0, button_sync1};
+        else if (wb_addr == 32'hFFE8)
+            wb_read_word = cycle_counter;
+        else if (wb_addr == 32'hFFE4)
+            wb_read_word = instret_counter;
         else
             wb_read_word = mem_read;
     end
@@ -629,7 +648,8 @@ module cpu #(
             ex_simm26 <= 0;
 
             halted <= 0;
-            branch_taken <= 0;
+            branch_taken <= 1;
+            div_stalled <= 0;
 
             mem_pc <= 0;
             mem_instr <= 0;
@@ -648,7 +668,7 @@ module cpu #(
             wb_addr <= 0;
             wb_opcode <= OP_NOP;
             wb_reg_addr <= 0;
-        end else begin
+        end else if (!bus_stall) begin
             if (reg_we && reg_addr != 0)
                 regs[reg_addr] <= reg_write;
 
@@ -658,7 +678,7 @@ module cpu #(
             end else if (should_take_branch) begin
                 if_pc <= branch_target;
                 if_pc_current <= branch_target;
-            end else if (hazard_stall || mem_op_in_mem || div_stall || bus_stall) begin
+            end else if (hazard_stall || mem_op_in_mem || div_stall) begin
                 if_pc <= if_pc_current;
                 if_pc_current <= if_pc_current;
             end else begin
@@ -669,10 +689,10 @@ module cpu #(
             if (should_take_branch || branch_taken || halted) begin
                 id_pc <= 0;
                 id_instr <= 0;
-            end else if (hazard_stall || div_stall || bus_stall) begin
+            end else if (hazard_stall || div_stall) begin
                 id_pc <= id_pc;
                 id_instr <= id_instr;
-            end else if (mem_op_in_mem || mem_op_in_wb) begin
+            end else if (mem_op_in_mem || mem_op_in_wb || div_stalled) begin
                 id_pc <= if_pc_current;
                 id_instr <= 0;
             end else begin
@@ -680,7 +700,7 @@ module cpu #(
                 id_instr <= if_instr;
             end
 
-            if (!div_stall && !bus_stall) begin
+            if (!div_stall) begin
                 if (should_take_branch || hazard_stall || halted) begin
                     ex_pc <= 0;
                     ex_instr <= 0;
@@ -716,38 +736,35 @@ module cpu #(
                 halted <= 1;
 
             branch_taken <= should_take_branch;
+            div_stalled <= div_stall;
 
-            if (!bus_stall) begin
-                if (div_stall) begin
-                    mem_pc <= 0;
-                    mem_instr <= 0;
-                    mem_result <= 0;
-                    stage_mem_addr <= 0;
-                    mem_opcode <= OP_NOP;
-                    mem_reg_addr <= 0;
-                    mem_reg0 <= 0;
-                    mem_op_in_mem <= 0;
-                end else begin
-                    mem_pc <= ex_pc;
-                    mem_instr <= ex_instr;
-                    mem_result <= ex_result;
-                    stage_mem_addr <= ex_addr;
-                    mem_opcode <= ex_opcode;
-                    mem_reg_addr <= ex_reg_addr;
-                    mem_reg0 <= ex_reg0_fwd;
-                    mem_op_in_mem <= is_mem_op(ex_opcode);
-                end
+            if (div_stall) begin
+                mem_pc <= 0;
+                mem_instr <= 0;
+                mem_result <= 0;
+                stage_mem_addr <= 0;
+                mem_opcode <= OP_NOP;
+                mem_reg_addr <= 0;
+                mem_reg0 <= 0;
+                mem_op_in_mem <= 0;
+            end else begin
+                mem_pc <= ex_pc;
+                mem_instr <= ex_instr;
+                mem_result <= ex_result;
+                stage_mem_addr <= ex_addr;
+                mem_opcode <= ex_opcode;
+                mem_reg_addr <= ex_reg_addr;
+                mem_reg0 <= ex_reg0_fwd;
+                mem_op_in_mem <= is_mem_op(ex_opcode);
             end
 
-            if (!bus_stall) begin
-                mem_op_in_wb <= mem_op_in_mem;
-                wb_pc <= mem_pc;
-                wb_instr <= mem_instr;
-                wb_result <= mem_result;
-                wb_addr <= stage_mem_addr;
-                wb_opcode <= mem_opcode;
-                wb_reg_addr <= mem_reg_addr;
-            end
+            mem_op_in_wb <= mem_op_in_mem;
+            wb_pc <= mem_pc;
+            wb_instr <= mem_instr;
+            wb_result <= mem_result;
+            wb_addr <= stage_mem_addr;
+            wb_opcode <= mem_opcode;
+            wb_reg_addr <= mem_reg_addr;
 
             if (halted && id_instr == 0 && ex_instr == 0 && mem_instr == 0 && wb_instr == 0)
                 $finish;

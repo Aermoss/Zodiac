@@ -70,6 +70,10 @@ module bus (
     logic [31:0] flash_read_reg;
     logic flash_read_active;
 
+    logic [31:0] read_data;
+    logic [31:0] read_hold;
+    logic read_held;
+
     logic [20:0] r_sdrc_addr;
     logic [31:0] r_sdrc_data_w;
     logic [2:0] r_sdrc_cmd;
@@ -98,10 +102,19 @@ module bus (
             flash_addr <= 24'b0;
             flash_read_reg <= 32'b0;
             flash_read_active <= 1'b0;
+            read_hold <= 32'b0;
+            read_held <= 1'b0;
         end else begin
             sdram_read_active <= 1'b0;
             flash_read_active <= 1'b0;
             flash_req <= 1'b0;
+
+            if (!cpu_stall) begin
+                read_held <= 1'b0;
+            end else if (!read_held) begin
+                read_hold <= read_data;
+                read_held <= 1'b1;
+            end
 
             case (state)
                 S_IDLE: begin
@@ -197,12 +210,14 @@ module bus (
         if (cpu_mem_access && !is_sdram_addr && !is_flash_addr && state == S_IDLE)
             bram_we = cpu_mem_we;
 
-        if (state == S_SDRAM_DONE || sdram_read_active)
-            cpu_mem_read = sdram_read_reg;
-        else if (state == S_FLASH_DONE || flash_read_active)
-            cpu_mem_read = flash_read_reg;
+        if (sdram_read_active)
+            read_data = sdram_read_reg;
+        else if (flash_read_active)
+            read_data = flash_read_reg;
         else
-            cpu_mem_read = bram_read;
+            read_data = bram_read;
+
+        cpu_mem_read = read_held ? read_hold : read_data;
 
         if (state == S_IDLE)
             cpu_stall = is_sdram_addr || is_flash_addr;
