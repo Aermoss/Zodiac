@@ -21,7 +21,10 @@ module bram #(
     input logic [3:0] we,
     input logic [31:0] addr,
     input logic [31:0] write,
-    output logic [31:0] read
+    output logic [31:0] read,
+
+    input logic [31:0] fetch_addr,
+    output logic [31:0] fetch_read
 );
     localparam WORD_DEPTH = BYTE_DEPTH / 4;
     logic [31:0] mem [0:WORD_DEPTH - 1];
@@ -29,18 +32,43 @@ module bram #(
     wire [$clog2(WORD_DEPTH) - 1:0] word_addr;
     assign word_addr = addr[2 + $clog2(WORD_DEPTH) - 1:2];
 
+    wire [$clog2(WORD_DEPTH) - 1:0] fetch_word_addr;
+    assign fetch_word_addr = fetch_addr[2 + $clog2(WORD_DEPTH) - 1:2];
+
     initial begin
         $readmemh("C:\\Users\\rencb\\Documents\\GitHub\\Zodiac\\boot.hex", mem);
     end
 
     always_ff @(posedge clk) begin
-        if (word_addr < WORD_DEPTH) begin
-            read <= mem[word_addr];
+        if (we[0]) begin
+            mem[word_addr][7:0] <= write[7:0];
+            read[7:0] <= write[7:0];
+        end else begin
+            read[7:0] <= mem[word_addr][7:0];
+        end
 
-            if (we[0]) mem[word_addr][7:0] <= write[7:0];
-            if (we[1]) mem[word_addr][15:8] <= write[15:8];
-            if (we[2]) mem[word_addr][23:16] <= write[23:16];
-            if (we[3]) mem[word_addr][31:24] <= write[31:24];
+        if (we[1]) begin
+            mem[word_addr][15:8] <= write[15:8];
+            read[15:8] <= write[15:8];
+        end else begin
+            read[15:8] <= mem[word_addr][15:8];
+        end
+
+        if (we[2]) begin
+            mem[word_addr][23:16] <= write[23:16];
+            read[23:16] <= write[23:16];
+        end else begin
+            read[23:16] <= mem[word_addr][23:16];
+        end
+
+        if (we[3]) begin
+            mem[word_addr][31:24] <= write[31:24];
+            read[31:24] <= write[31:24];
+        end else begin
+            read[31:24] <= mem[word_addr][31:24];
         end
     end
+
+    always_ff @(posedge clk)
+        fetch_read <= mem[fetch_word_addr];
 endmodule

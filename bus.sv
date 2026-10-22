@@ -14,9 +14,14 @@
  * limitations under the License.
  */
 
-module bus (
+module bus #(
+    parameter int CLK_FREQ = 54000000
+) (
     input logic clk,
     input logic rst,
+
+    input logic [31:0] cpu_fetch_addr,
+    output logic [31:0] cpu_fetch_read,
 
     input logic cpu_mem_access,
     input logic [3:0] cpu_mem_we,
@@ -29,6 +34,8 @@ module bus (
     output logic [31:0] bram_addr,
     output logic [31:0] bram_write,
     input logic [31:0] bram_read,
+    output logic [31:0] bram_fetch_addr,
+    input logic [31:0] bram_fetch_read,
 
     output logic sdrc_cmd_en,
     output logic [2:0] sdrc_cmd,
@@ -44,12 +51,13 @@ module bus (
     input logic [31:0] flash_rdata,
     input logic flash_ready
 );
-    wire is_sdram_addr = (cpu_mem_addr[31:30] == 2'b01);
-    wire is_flash_addr = (cpu_mem_addr[31:30] == 2'b10);
-    wire is_sdram_fetch = is_sdram_addr && !cpu_mem_access;
-    wire is_sdram_data = is_sdram_addr && cpu_mem_access;
+    wire is_sdram_fetch = (cpu_fetch_addr[31:30] == 2'b01);
+    wire is_sdram_data = cpu_mem_access && (cpu_mem_addr[31:30] == 2'b01);
+    wire is_flash_data = cpu_mem_access && (cpu_mem_addr[31:30] == 2'b10) && (cpu_mem_we == 4'b0000);
+    wire is_bram_data = cpu_mem_access && (cpu_mem_addr[31:30] != 2'b01) && (cpu_mem_addr[31:30] != 2'b10);
 
     wire [20:0] sdram_word_addr = {cpu_mem_addr[22:21], cpu_mem_addr[20:10], cpu_mem_addr[9:2]};
+    wire [20:0] fetch_word_addr = {cpu_fetch_addr[22:21], cpu_fetch_addr[20:10], cpu_fetch_addr[9:2]};
     wire [23:0] flash_byte_addr = cpu_mem_addr[23:0];
 
     localparam int CACHE_LINES = 256;
@@ -58,9 +66,12 @@ module bus (
     localparam int INDEX_BITS = $clog2(CACHE_LINES);
     localparam int TAG_BITS = 21 - INDEX_BITS - OFFSET_BITS;
 
-    wire [OFFSET_BITS - 1:0] line_offset = sdram_word_addr[OFFSET_BITS - 1:0];
-    wire [INDEX_BITS - 1:0] line_index = sdram_word_addr[OFFSET_BITS +: INDEX_BITS];
-    wire [TAG_BITS - 1:0] line_tag = sdram_word_addr[20 -: TAG_BITS];
+    wire [OFFSET_BITS - 1:0] fetch_offset = fetch_word_addr[OFFSET_BITS - 1:0];
+    wire [INDEX_BITS - 1:0] fetch_index = fetch_word_addr[OFFSET_BITS +: INDEX_BITS];
+    wire [TAG_BITS - 1:0] fetch_tag = fetch_word_addr[20 -: TAG_BITS];
+    wire [INDEX_BITS - 1:0] data_index = sdram_word_addr[OFFSET_BITS +: INDEX_BITS];
+
+    localparam int REFRESH_CYCLES = CLK_FREQ / 1000000 * 15;
 
     typedef enum logic [3:0] {
         S_IDLE,
@@ -71,7 +82,8 @@ module bus (
         S_SDRAM_DONE,
         S_FLASH_WAIT,
         S_FLASH_DONE,
-        S_FILL
+        S_FILL,
+        S_REFRESH
     } state_t;
 
     state_t state;
@@ -83,9 +95,16 @@ module bus (
     logic [31:0] flash_read_reg;
     logic flash_read_active;
 
+    logic [$clog2(REFRESH_CYCLES) - 1:0] refresh_counter;
+    logic refresh_pending;
+
     logic [31:0] read_data;
     logic [31:0] read_hold;
     logic read_held;
+
+    logic [31:0] fetch_data;
+    logic [31:0] fetch_hold;
+    logic fetch_held;
 
     logic [20:0] r_sdrc_addr;
     logic [31:0] r_sdrc_data_w;
@@ -108,6 +127,7 @@ module bus (
     logic [OFFSET_BITS - 1:0] lookup_offset;
     logic [INDEX_BITS - 1:0] lookup_index;
     logic [TAG_BITS - 1:0] lookup_tag;
+    logic miss_pending;
     logic filling;
     logic [OFFSET_BITS - 1:0] fill_offset;
 
@@ -122,8 +142,8 @@ module bus (
                 cache_tags[lookup_index] <= lookup_tag;
         end
 
-        cache_read <= cache_data[{line_index, line_offset}];
-        cache_read_tag <= cache_tags[line_index];
+        cache_read <= cache_data[{fetch_index, fetch_offset}];
+        cache_read_tag <= cache_tags[fetch_index];
     end
 
     always_ff @(posedge clk or posedge rst) begin
@@ -143,13 +163,18 @@ module bus (
             flash_addr <= 24'b0;
             flash_read_reg <= 32'b0;
             flash_read_active <= 1'b0;
+            refresh_counter <= '0;
+            refresh_pending <= 1'b0;
             read_hold <= 32'b0;
             read_held <= 1'b0;
+            fetch_hold <= 32'b0;
+            fetch_held <= 1'b0;
             cache_valid <= '0;
             lookup <= 1'b0;
             lookup_offset <= '0;
             lookup_index <= '0;
             lookup_tag <= '0;
+            miss_pending <= 1'b0;
             filling <= 1'b0;
             fill_offset <= '0;
         end else begin
@@ -159,26 +184,52 @@ module bus (
 
             if (!cpu_stall) begin
                 read_held <= 1'b0;
-            end else if (!read_held) begin
-                read_hold <= read_data;
-                read_held <= 1'b1;
+                fetch_held <= 1'b0;
+            end else begin
+                if (!read_held) begin
+                    read_hold <= read_data;
+                    read_held <= 1'b1;
+                end
+
+                if (!fetch_held) begin
+                    fetch_hold <= fetch_data;
+                    fetch_held <= 1'b1;
+                end
             end
 
             if (!cpu_stall) begin
                 lookup <= is_sdram_fetch;
-                lookup_offset <= line_offset;
-                lookup_index <= line_index;
-                lookup_tag <= line_tag;
+                lookup_offset <= fetch_offset;
+                lookup_index <= fetch_index;
+                lookup_tag <= fetch_tag;
             end else begin
                 lookup <= 1'b0;
             end
 
+            if (cache_miss && state != S_IDLE)
+                miss_pending <= 1'b1;
+
+            if (sdrc_init_done) begin
+                if (refresh_counter == REFRESH_CYCLES - 1) begin
+                    refresh_counter <= '0;
+                    refresh_pending <= 1'b1;
+                end else begin
+                    refresh_counter <= refresh_counter + 1'b1;
+                end
+            end
+
             case (state)
                 S_IDLE: begin
-                    if (cache_miss) begin
+                    if (cache_miss || miss_pending) begin
+                        miss_pending <= 1'b0;
                         filling <= 1'b1;
                         fill_offset <= '0;
                         state <= S_FILL;
+                    end else if (refresh_pending) begin
+                        refresh_pending <= 1'b0;
+                        sdrc_cmd_en <= 1'b1;
+                        r_sdrc_cmd <= 3'b001;
+                        state <= S_REFRESH;
                     end else if (is_sdram_data && sdrc_init_done) begin
                         sdrc_cmd_en <= 1'b1;
                         r_sdrc_addr <= sdram_word_addr;
@@ -189,8 +240,8 @@ module bus (
                         state <= S_ACTIVATE_WAIT;
 
                         if (cpu_mem_we != 4'b0000)
-                            cache_valid[line_index] <= 1'b0;
-                    end else if (is_flash_addr && cpu_mem_access && (cpu_mem_we == 4'b0000)) begin
+                            cache_valid[data_index] <= 1'b0;
+                    end else if (is_flash_data) begin
                         flash_req <= 1'b1;
                         flash_addr <= flash_byte_addr;
                         state <= S_FLASH_WAIT;
@@ -206,6 +257,13 @@ module bus (
                         r_sdrc_cmd <= 3'b011;
                         state <= S_ACTIVATE_WAIT;
                     end
+                end
+
+                S_REFRESH: begin
+                    sdrc_cmd_en <= 1'b0;
+
+                    if (sdrc_cmd_ack)
+                        state <= S_IDLE;
                 end
 
                 S_ACTIVATE_WAIT: begin
@@ -242,7 +300,7 @@ module bus (
                         read_delay_counter <= read_delay_counter - 3'd1;
                     end else if (filling) begin
                         if (fill_offset == lookup_offset)
-                            read_hold <= sdrc_data_r;
+                            fetch_hold <= sdrc_data_r;
 
                         if (fill_offset == {OFFSET_BITS{1'b1}}) begin
                             cache_valid[lookup_index] <= 1'b1;
@@ -290,8 +348,8 @@ module bus (
     end
 
     always_comb begin
-        if (state == S_IDLE)
-            cpu_stall = cache_miss || is_sdram_data || is_flash_addr;
+        if (state == S_IDLE || state == S_REFRESH)
+            cpu_stall = cache_miss || miss_pending || is_sdram_data || is_flash_data;
         else if (state == S_SDRAM_DONE || state == S_FLASH_DONE)
             cpu_stall = 1'b0;
         else
@@ -299,20 +357,21 @@ module bus (
 
         bram_addr = cpu_mem_addr;
         bram_write = cpu_mem_write;
+        bram_fetch_addr = cpu_fetch_addr;
         bram_we = 4'b0000;
 
-        if (cpu_mem_access && !is_sdram_addr && !is_flash_addr && !cpu_stall)
+        if (is_bram_data && !cpu_stall)
             bram_we = cpu_mem_we;
 
         if (sdram_read_active)
             read_data = sdram_read_reg;
         else if (flash_read_active)
             read_data = flash_read_reg;
-        else if (lookup)
-            read_data = cache_read;
         else
             read_data = bram_read;
 
+        fetch_data = lookup ? cache_read : bram_fetch_read;
         cpu_mem_read = read_held ? read_hold : read_data;
+        cpu_fetch_read = fetch_held ? fetch_hold : fetch_data;
     end
 endmodule

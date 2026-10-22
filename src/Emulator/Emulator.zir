@@ -21,7 +21,7 @@ extern "C" {
     fn _getch() -> i32;
 }
 
-const CLK_FREQ: u32 = 45000000;
+const CLK_FREQ: u32 = 54000000;
 
 class Emulator {
     pc: u32,

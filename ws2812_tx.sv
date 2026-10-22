@@ -15,7 +15,7 @@
  */
 
 module ws2812_tx #(
-    parameter int CLK_FREQ = 45000000
+    parameter int CLK_FREQ = 54000000
 ) (
     input logic clk,
     input logic rst,

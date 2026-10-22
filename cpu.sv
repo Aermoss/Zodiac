@@ -16,7 +16,7 @@
 
 module cpu #(
     parameter bit SIMULATION = 1'b1,
-    parameter int CLK_FREQ = 45000000
+    parameter int CLK_FREQ = 54000000
 ) (
     input logic clk,
     input logic rst,
@@ -27,6 +27,9 @@ module cpu #(
     input logic button,
     output logic [5:0] leds,
     output logic ws2812,
+
+    output logic [31:0] fetch_addr,
+    input logic [31:0] fetch_read,
 
     output logic mem_access,
     output logic [3:0] actual_mem_we,
@@ -99,7 +102,7 @@ module cpu #(
     logic [31:0] if_pc_current;
     wire [31:0] if_instr;
 
-    assign if_instr = mem_read;
+    assign if_instr = fetch_read;
 
     logic [31:0] id_pc;
     logic [31:0] id_instr;
@@ -158,9 +161,6 @@ module cpu #(
     logic [4:0] mem_reg_addr;
     logic [31:0] mem_reg0;
 
-    logic mem_op_in_mem;
-    logic mem_op_in_wb;
-
     logic [31:0] wb_pc;
     logic [31:0] wb_instr;
     logic [31:0] wb_result;
@@ -186,7 +186,7 @@ module cpu #(
         .ready(alu_ready)
     );
 
-    logic is_multicycle_op, alu_active, alu_stall, alu_stalled;
+    logic is_multicycle_op, alu_active, alu_stall;
     assign is_multicycle_op = (ex_opcode == OP_MUL) || (ex_opcode == OP_MULH) || (ex_opcode == OP_MULHSU) || (ex_opcode == OP_MULHU) ||
         (ex_opcode == OP_DIV) || (ex_opcode == OP_DIVU) || (ex_opcode == OP_REM) || (ex_opcode == OP_REMU);
     assign alu_start = is_multicycle_op && !alu_active;
@@ -207,14 +207,6 @@ module cpu #(
     function automatic logic is_load_op(opcode_t opcode);
         case (opcode)
             OP_LB, OP_LBU, OP_LH, OP_LHU, OP_LW: return 1;
-            default: return 0;
-        endcase
-    endfunction
-
-    function automatic logic is_mem_op(opcode_t opcode);
-        case (opcode)
-            OP_LB, OP_LBU, OP_LH, OP_LHU, OP_LW,
-            OP_SB, OP_SH, OP_SW: return 1;
             default: return 0;
         endcase
     endfunction
@@ -267,44 +259,29 @@ module cpu #(
         return (reads_reg0(opcode) && instr[25:21] == register) || (reads_reg1(opcode) && instr[20:16] == register) || (reads_reg2(opcode) && instr[15:11] == register);
     endfunction
 
+    function automatic logic [2:0] source_matches(logic [31:0] instr, logic [4:0] register);
+        return (register == 0) ? 3'b000 : {instr[15:11] == register, instr[20:16] == register, instr[25:21] == register};
+    endfunction
+
     logic mem_writes_reg;
-    logic wb_writes_reg;
 
     assign mem_writes_reg = writes_result(mem_opcode);
-    assign wb_writes_reg = writes_result(wb_opcode);
+
+    logic [2:0] id_fwd_mem;
+    logic [2:0] id_fwd_wb;
+    logic [2:0] ex_fwd_mem;
+    logic [2:0] ex_fwd_wb;
+
+    assign id_fwd_mem = writes_result(ex_opcode) ? source_matches(id_instr, ex_reg_addr) : 3'b000;
+    assign id_fwd_wb = mem_writes_reg ? source_matches(id_instr, mem_reg_addr) : 3'b000;
 
     logic [31:0] ex_reg0_fwd;
     logic [31:0] ex_reg1_fwd;
     logic [31:0] ex_reg2_fwd;
 
-    always_comb begin
-        if (ex_instr[25:21] == 0)
-            ex_reg0_fwd = 0;
-        else if (mem_writes_reg && mem_reg_addr == ex_instr[25:21])
-            ex_reg0_fwd = mem_result;
-        else if (wb_writes_reg && wb_reg_addr == ex_instr[25:21])
-            ex_reg0_fwd = wb_result;
-        else
-            ex_reg0_fwd = ex_reg0;
-
-        if (ex_instr[20:16] == 0)
-            ex_reg1_fwd = 0;
-        else if (mem_writes_reg && mem_reg_addr == ex_instr[20:16])
-            ex_reg1_fwd = mem_result;
-        else if (wb_writes_reg && wb_reg_addr == ex_instr[20:16])
-            ex_reg1_fwd = wb_result;
-        else
-            ex_reg1_fwd = ex_reg1;
-
-        if (ex_instr[15:11] == 0)
-            ex_reg2_fwd = 0;
-        else if (mem_writes_reg && mem_reg_addr == ex_instr[15:11])
-            ex_reg2_fwd = mem_result;
-        else if (wb_writes_reg && wb_reg_addr == ex_instr[15:11])
-            ex_reg2_fwd = wb_result;
-        else
-            ex_reg2_fwd = ex_reg2;
-    end
+    assign ex_reg0_fwd = ex_fwd_mem[0] ? mem_result : (ex_fwd_wb[0] ? wb_result : ex_reg0);
+    assign ex_reg1_fwd = ex_fwd_mem[1] ? mem_result : (ex_fwd_wb[1] ? wb_result : ex_reg1);
+    assign ex_reg2_fwd = ex_fwd_mem[2] ? mem_result : (ex_fwd_wb[2] ? wb_result : ex_reg2);
 
     logic hazard_stall;
 
@@ -546,12 +523,8 @@ module cpu #(
         endcase
     end
 
-    always_comb begin
-        if (mem_access)
-            mem_addr = stage_mem_addr;
-        else
-            mem_addr = if_pc;
-    end
+    assign mem_addr = stage_mem_addr;
+    assign fetch_addr = (hazard_stall || alu_stall) ? if_pc_current : if_pc;
 
     always_comb begin
         mem_write = 0;
@@ -658,10 +631,11 @@ module cpu #(
             ex_simm16 <= 0;
             ex_simm21 <= 0;
             ex_simm26 <= 0;
+            ex_fwd_mem <= 0;
+            ex_fwd_wb <= 0;
 
             halted <= 0;
             branch_taken <= 1;
-            alu_stalled <= 0;
 
             mem_pc <= 0;
             mem_instr <= 0;
@@ -670,9 +644,6 @@ module cpu #(
             mem_opcode <= OP_NOP;
             mem_reg_addr <= 0;
             mem_reg0 <= 0;
-
-            mem_op_in_mem <= 0;
-            mem_op_in_wb <= 0;
 
             wb_pc <= 0;
             wb_instr <= 0;
@@ -690,8 +661,8 @@ module cpu #(
             end else if (should_take_branch) begin
                 if_pc <= branch_target;
                 if_pc_current <= branch_target;
-            end else if (hazard_stall || mem_op_in_mem || alu_stall) begin
-                if_pc <= if_pc_current;
+            end else if (hazard_stall || alu_stall) begin
+                if_pc <= if_pc;
                 if_pc_current <= if_pc_current;
             end else begin
                 if_pc <= if_pc + 4;
@@ -699,48 +670,37 @@ module cpu #(
             end
 
             if (should_take_branch || branch_taken || halted) begin
-                id_pc <= 0;
                 id_instr <= 0;
             end else if (hazard_stall || alu_stall) begin
                 id_pc <= id_pc;
                 id_instr <= id_instr;
-            end else if (mem_op_in_mem || mem_op_in_wb || alu_stalled) begin
-                id_pc <= if_pc_current;
-                id_instr <= 0;
             end else begin
                 id_pc <= if_pc_current;
                 id_instr <= if_instr;
             end
 
             if (!alu_stall) begin
+                ex_pc <= id_pc;
+                ex_reg0 <= id_reg0;
+                ex_reg1 <= id_reg1;
+                ex_reg2 <= id_reg2;
+                ex_imm16 <= id_imm16;
+                ex_imm21 <= id_imm21;
+                ex_imm26 <= id_imm26;
+                ex_simm16 <= id_simm16;
+                ex_simm21 <= id_simm21;
+                ex_simm26 <= id_simm26;
+                ex_fwd_mem <= id_fwd_mem;
+                ex_fwd_wb <= id_fwd_wb;
+
                 if (should_take_branch || hazard_stall || halted) begin
-                    ex_pc <= 0;
                     ex_instr <= 0;
                     ex_opcode <= OP_NOP;
                     ex_reg_addr <= 0;
-                    ex_reg0 <= 0;
-                    ex_reg1 <= 0;
-                    ex_reg2 <= 0;
-                    ex_imm16 <= 0;
-                    ex_imm21 <= 0;
-                    ex_imm26 <= 0;
-                    ex_simm16 <= 0;
-                    ex_simm21 <= 0;
-                    ex_simm26 <= 0;
                 end else begin
-                    ex_pc <= id_pc;
                     ex_instr <= id_instr;
                     ex_opcode <= id_opcode;
                     ex_reg_addr <= id_reg_addr;
-                    ex_reg0 <= id_reg0;
-                    ex_reg1 <= id_reg1;
-                    ex_reg2 <= id_reg2;
-                    ex_imm16 <= id_imm16;
-                    ex_imm21 <= id_imm21;
-                    ex_imm26 <= id_imm26;
-                    ex_simm16 <= id_simm16;
-                    ex_simm21 <= id_simm21;
-                    ex_simm26 <= id_simm26;
                 end
             end
 
@@ -748,7 +708,6 @@ module cpu #(
                 halted <= 1;
 
             branch_taken <= should_take_branch;
-            alu_stalled <= alu_stall;
 
             if (alu_stall) begin
                 mem_pc <= 0;
@@ -758,7 +717,6 @@ module cpu #(
                 mem_opcode <= OP_NOP;
                 mem_reg_addr <= 0;
                 mem_reg0 <= 0;
-                mem_op_in_mem <= 0;
             end else begin
                 mem_pc <= ex_pc;
                 mem_instr <= ex_instr;
@@ -767,10 +725,8 @@ module cpu #(
                 mem_opcode <= ex_opcode;
                 mem_reg_addr <= ex_reg_addr;
                 mem_reg0 <= ex_reg0_fwd;
-                mem_op_in_mem <= is_mem_op(ex_opcode);
             end
 
-            mem_op_in_wb <= mem_op_in_mem;
             wb_pc <= mem_pc;
             wb_instr <= mem_instr;
             wb_result <= mem_result;

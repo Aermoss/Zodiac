@@ -25,10 +25,12 @@ module tb;
     logic [31:0] mem_addr;
     logic [31:0] mem_write;
     logic [31:0] mem_read;
+    logic [31:0] fetch_addr;
+    logic [31:0] fetch_read;
 
     cpu #(
         .SIMULATION(1'b1),
-        .CLK_FREQ(45000000)
+        .CLK_FREQ(54000000)
     ) cpu0 (
         .clk(clk),
         .rst(rst),
@@ -39,6 +41,9 @@ module tb;
         .button(),
         .leds(),
         .ws2812(),
+
+        .fetch_addr(fetch_addr),
+        .fetch_read(fetch_read),
 
         .mem_access(),
         .actual_mem_we(mem_we),
@@ -53,7 +58,9 @@ module tb;
         .we(mem_we),
         .addr(mem_addr),
         .write(mem_write),
-        .read(mem_read)
+        .read(mem_read),
+        .fetch_addr(fetch_addr),
+        .fetch_read(fetch_read)
     );
 
     always #3 clk = ~clk;

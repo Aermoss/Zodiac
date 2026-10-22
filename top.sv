@@ -68,6 +68,10 @@ module top (
         end
     end
 
+    localparam int CLK_FREQ = 54000000;
+
+    logic [31:0] cpu_fetch_addr;
+    logic [31:0] cpu_fetch_read;
     logic cpu_mem_access;
     logic [3:0] cpu_mem_we;
     logic [31:0] cpu_mem_addr;
@@ -77,7 +81,7 @@ module top (
 
     cpu #(
         .SIMULATION(1'b0),
-        .CLK_FREQ(45000000)
+        .CLK_FREQ(CLK_FREQ)
     ) cpu0 (
         .clk(sys_clk),
         .rst(rst_reg),
@@ -88,6 +92,9 @@ module top (
         .button(button),
         .leds(leds),
         .ws2812(ws2812),
+
+        .fetch_addr(cpu_fetch_addr),
+        .fetch_read(cpu_fetch_read),
 
         .mem_access(cpu_mem_access),
         .actual_mem_we(cpu_mem_we),
@@ -101,13 +108,17 @@ module top (
     logic [31:0] bram_addr;
     logic [31:0] bram_write;
     logic [31:0] bram_read;
+    logic [31:0] bram_fetch_addr;
+    logic [31:0] bram_fetch_read;
 
     bram bram0 (
         .clk(sys_clk),
         .we(bram_we),
         .addr(bram_addr),
         .write(bram_write),
-        .read(bram_read)
+        .read(bram_read),
+        .fetch_addr(bram_fetch_addr),
+        .fetch_read(bram_fetch_read)
     );
 
     logic sdrc_cmd_en;
@@ -166,9 +177,14 @@ module top (
         .flash_miso(spi_miso_pin)
     );
 
-    bus bus0 (
+    bus #(
+        .CLK_FREQ(CLK_FREQ)
+    ) bus0 (
         .clk(sys_clk),
         .rst(rst_reg),
+
+        .cpu_fetch_addr(cpu_fetch_addr),
+        .cpu_fetch_read(cpu_fetch_read),
 
         .cpu_mem_access(cpu_mem_access),
         .cpu_mem_we(cpu_mem_we),
@@ -181,6 +197,8 @@ module top (
         .bram_addr(bram_addr),
         .bram_write(bram_write),
         .bram_read(bram_read),
+        .bram_fetch_addr(bram_fetch_addr),
+        .bram_fetch_read(bram_fetch_read),
 
         .sdrc_cmd_en(sdrc_cmd_en),
         .sdrc_cmd(sdrc_cmd),
