@@ -37,16 +37,19 @@ boot.hex: bin/zld.exe boot.o
 start.o: bin/zas.exe start.s
 	$^ -o $@
 
+end.o: bin/zas.exe end.s
+	$^ -o $@
+
 program.s: program.zir
 	$(COMPILER) $< -o $@ -S -target zodiac -emit-hir -emit-mir -emit-lir
 
 program.o: program.s
 	bin/zas.exe $< -o $@
 
-program.bin: bin/zld.exe start.o program.o
-	$^ -o $@ --format=bin
+program.bin: bin/zld.exe start.o program.o end.o
+	$^ -o $@ --format=bin --origin=0x40000000
 
-program.hex: bin/zld.exe start.o program.o
+program.hex: bin/zld.exe start.o program.o end.o
 	$^ -o $@ --format=hex
 
 ram.sv: boot.hex program.hex

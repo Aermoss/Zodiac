@@ -2,16 +2,26 @@
 .global boot
 
 boot:
-    li x1, 0x80100000
-    li x2, 0x40000000
-    li x3, 0x00001000
+    li t0, 0x80100000
+    li t1, 0x40000000
+    lw t2, 4(t0)
+    sub t2, t2, t1
+    blez t2, fail
+    li t3, 0x700000
+    bgtu t2, t3, fail
 
 copy:
-    lw x4, 0(x1)
-    sw x4, 0(x2)
-    addi x1, x1, 4
-    addi x2, x2, 4
-    subi x3, x3, 4
-    bnez x3, copy
-    li x5, 0x40000000
-    br x5
+    lw t3, 0(t0)
+    sw t3, 0(t1)
+    addi t0, t0, 4
+    addi t1, t1, 4
+    subi t2, t2, 4
+    bgtz t2, copy
+    li t4, 0x40000000
+    br t4
+
+fail:
+    li t4, 0x2A
+    li t5, 0xFFF0
+    sw t4, 0(t5)
+    hlt

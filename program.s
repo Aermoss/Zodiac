@@ -320,8 +320,6 @@ Main:
 __LBB14_0:
     li a0, 115200
     bl ra, __z11SetBaudRateu32
-    li a0, 1
-    bl ra, __z5Sleepu32
     la a0, string.1
     bl ra, __z9WriteLinePi8
     la a0, string.2

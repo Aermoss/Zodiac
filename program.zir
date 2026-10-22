@@ -118,7 +118,6 @@ fn SoftwareDivide(dividend: u32, divisor: u32) -> DivisionResult {
 @nomangle
 fn Main() {
     SetBaudRate(115200);
-    Sleep(1);
 
     /* let software_start = GetTime();
     let software_result = SoftwareDivide(CLK_FREQ, 115200);
