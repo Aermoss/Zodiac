@@ -43,13 +43,27 @@ module alu(
     output logic [31:0] result,
     output logic ready
 );
+    logic is_mul_op;
+    assign is_mul_op = (alu_op == ALU_OP_MUL) || (alu_op == ALU_OP_MULH) || (alu_op == ALU_OP_MULHSU) || (alu_op == ALU_OP_MULHU);
+    logic [31:0] mul_left, mul_right;
+
+    always_ff @(posedge clk or posedge rst) begin
+        if (rst) begin
+            mul_left <= 0;
+            mul_right <= 0;
+        end else if (start && is_mul_op) begin
+            mul_left <= left;
+            mul_right <= right;
+        end
+    end
+
     logic signed [63:0] ss_prod;
     logic signed [63:0] su_prod;
     logic [63:0] uu_prod;
 
-    assign ss_prod = $signed(left) * $signed(right);
-    assign su_prod = $signed({left[31], left}) * $signed({1'b0, right});
-    assign uu_prod = left * right;
+    assign ss_prod = $signed(mul_left) * $signed(mul_right);
+    assign su_prod = $signed({mul_left[31], mul_left}) * $signed({1'b0, mul_right});
+    assign uu_prod = mul_left * mul_right;
 
     logic is_div_op;
     assign is_div_op = (alu_op == ALU_OP_DIV) || (alu_op == ALU_OP_DIVU) || (alu_op == ALU_OP_REM) || (alu_op == ALU_OP_REMU);
@@ -117,7 +131,7 @@ module alu(
     logic [31:0] final_quotient, final_remainder;
     assign final_quotient = (div_orig_divisor == 0) ? 32'hFFFFFFFF : (div_sign_q ? -Q : Q);
     assign final_remainder = (div_orig_divisor == 0) ? div_orig_dividend : (div_sign_r ? -R : R);
-    assign ready = is_div_op ? (!busy && (count == 0) && !start) : 1'b1;
+    assign ready = is_div_op ? (!busy && (count == 0) && !start) : !start;
 
     always_comb begin
         result = 0;
