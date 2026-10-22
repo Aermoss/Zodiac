@@ -16,7 +16,7 @@
 
 module cpu #(
     parameter bit SIMULATION = 1'b1,
-    parameter int CLK_FREQ = 33000000
+    parameter int CLK_FREQ = 45000000
 ) (
     input logic clk,
     input logic rst,
@@ -336,6 +336,12 @@ module cpu #(
         endcase
     end
 
+    logic [3:0] io_we;
+    logic io_read;
+
+    assign io_we = bus_stall ? 4'b0000 : mem_we;
+    assign io_read = mem_access && mem_we == 0 && !bus_stall;
+
     logic [3:0] uart_we;
     logic [15:0] uart_clks_per_bit;
 
@@ -343,7 +349,7 @@ module cpu #(
     logic uart_tx_started;
     logic uart_tx_write;
 
-    assign uart_tx_write = (mem_addr == 32'hFFFF) && (mem_we != 0) && !uart_tx_busy && !uart_tx_started;
+    assign uart_tx_write = (mem_addr == 32'hFFFF) && (io_we != 0) && !uart_tx_busy && !uart_tx_started;
 
     always_ff @(posedge clk or posedge rst) begin
         if (rst)
@@ -395,7 +401,7 @@ module cpu #(
         .rst(rst),
         .clks_per_bit(uart_clks_per_bit),
         .rx_pin(uart_rx),
-        .read_ack(mem_addr == 32'hFFFF && mem_we == 0 && mem_access),
+        .read_ack(mem_addr == 32'hFFFF && io_read),
         .rx_byte(uart_rx_byte),
         .rx_ready(uart_rx_ready)
     );
@@ -406,7 +412,7 @@ module cpu #(
     always_ff @(posedge clk or posedge rst) begin
         if (rst)
             uart_clks_per_bit <= UART_DEFAULT_CLKS_PER_BIT;
-        else if (mem_addr == 32'hFFF8 && mem_we != 0)
+        else if (mem_addr == 32'hFFF8 && io_we != 0)
             uart_clks_per_bit <= mem_write[15:0];
     end
 
@@ -457,7 +463,7 @@ module cpu #(
     always_ff @(posedge clk or posedge rst) begin
         if (rst)
             leds <= 6'h3F;
-        else if (mem_addr == 32'hFFF0 && mem_we != 0)
+        else if (mem_addr == 32'hFFF0 && io_we != 0)
             leds <= mem_write[5:0];
     end
 
@@ -466,7 +472,7 @@ module cpu #(
     ) ws2812_tx0 (
         .clk(clk),
         .rst(rst),
-        .strobe(mem_addr == 32'hFFE0 && mem_we != 0),
+        .strobe(mem_addr == 32'hFFE0 && io_we != 0),
         .write(mem_write[23:0]),
         .busy(),
         .out(ws2812)
@@ -477,7 +483,7 @@ module cpu #(
         actual_mem_we = 0;
 
         if (mem_addr == 32'hFFFF)
-            uart_we = mem_we;
+            uart_we = io_we;
         else if (mem_addr != 32'hFFF0 && mem_addr != 32'hFFE0 && mem_addr != 32'hFFEC && mem_addr != 32'hFFF4 && mem_addr != 32'hFFF8 && mem_addr != 32'hFFE8 && mem_addr != 32'hFFE4)
             actual_mem_we = mem_we;
     end

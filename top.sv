@@ -77,7 +77,7 @@ module top (
 
     cpu #(
         .SIMULATION(1'b0),
-        .CLK_FREQ(33000000)
+        .CLK_FREQ(45000000)
     ) cpu0 (
         .clk(sys_clk),
         .rst(rst_reg),

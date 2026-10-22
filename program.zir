@@ -1,4 +1,4 @@
-const CLK_FREQ: u32 = 33000000;
+const CLK_FREQ: u32 = 45000000;
 
 fn WriteCharacter(character: i8) {
     while (*(0xFFFC as *u32) & 2) != 0 {}

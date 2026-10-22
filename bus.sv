@@ -46,11 +46,23 @@ module bus (
 );
     wire is_sdram_addr = (cpu_mem_addr[31:30] == 2'b01);
     wire is_flash_addr = (cpu_mem_addr[31:30] == 2'b10);
+    wire is_sdram_fetch = is_sdram_addr && !cpu_mem_access;
+    wire is_sdram_data = is_sdram_addr && cpu_mem_access;
 
     wire [20:0] sdram_word_addr = {cpu_mem_addr[22:21], cpu_mem_addr[20:10], cpu_mem_addr[9:2]};
     wire [23:0] flash_byte_addr = cpu_mem_addr[23:0];
 
-    typedef enum logic [2:0] {
+    localparam int CACHE_LINES = 256;
+    localparam int LINE_WORDS = 4;
+    localparam int OFFSET_BITS = $clog2(LINE_WORDS);
+    localparam int INDEX_BITS = $clog2(CACHE_LINES);
+    localparam int TAG_BITS = 21 - INDEX_BITS - OFFSET_BITS;
+
+    wire [OFFSET_BITS - 1:0] line_offset = sdram_word_addr[OFFSET_BITS - 1:0];
+    wire [INDEX_BITS - 1:0] line_index = sdram_word_addr[OFFSET_BITS +: INDEX_BITS];
+    wire [TAG_BITS - 1:0] line_tag = sdram_word_addr[20 -: TAG_BITS];
+
+    typedef enum logic [3:0] {
         S_IDLE,
         S_ACTIVATE_WAIT,
         S_SDRAM_WAIT,
@@ -58,7 +70,8 @@ module bus (
         S_WRITE_DELAY,
         S_SDRAM_DONE,
         S_FLASH_WAIT,
-        S_FLASH_DONE
+        S_FLASH_DONE,
+        S_FILL
     } state_t;
 
     state_t state;
@@ -66,7 +79,7 @@ module bus (
     logic [2:0] write_delay_counter;
     logic [31:0] sdram_read_reg;
     logic sdram_read_active;
-    
+
     logic [31:0] flash_read_reg;
     logic flash_read_active;
 
@@ -84,6 +97,34 @@ module bus (
     assign sdrc_data_w = r_sdrc_data_w;
     assign sdrc_cmd = r_sdrc_cmd;
     assign sdrc_dqm = r_sdrc_dqm;
+
+    logic [31:0] cache_data [0:CACHE_LINES * LINE_WORDS - 1];
+    logic [TAG_BITS - 1:0] cache_tags [0:CACHE_LINES - 1];
+    logic [CACHE_LINES - 1:0] cache_valid;
+    logic [31:0] cache_read;
+    logic [TAG_BITS - 1:0] cache_read_tag;
+
+    logic lookup;
+    logic [OFFSET_BITS - 1:0] lookup_offset;
+    logic [INDEX_BITS - 1:0] lookup_index;
+    logic [TAG_BITS - 1:0] lookup_tag;
+    logic filling;
+    logic [OFFSET_BITS - 1:0] fill_offset;
+
+    wire cache_miss = lookup && !(cache_valid[lookup_index] && cache_read_tag == lookup_tag);
+    wire fill_write = filling && state == S_READ_DELAY && read_delay_counter <= 3'd1;
+
+    always_ff @(posedge clk) begin
+        if (fill_write) begin
+            cache_data[{lookup_index, fill_offset}] <= sdrc_data_r;
+
+            if (fill_offset == {OFFSET_BITS{1'b1}})
+                cache_tags[lookup_index] <= lookup_tag;
+        end
+
+        cache_read <= cache_data[{line_index, line_offset}];
+        cache_read_tag <= cache_tags[line_index];
+    end
 
     always_ff @(posedge clk or posedge rst) begin
         if (rst) begin
@@ -104,6 +145,13 @@ module bus (
             flash_read_active <= 1'b0;
             read_hold <= 32'b0;
             read_held <= 1'b0;
+            cache_valid <= '0;
+            lookup <= 1'b0;
+            lookup_offset <= '0;
+            lookup_index <= '0;
+            lookup_tag <= '0;
+            filling <= 1'b0;
+            fill_offset <= '0;
         end else begin
             sdram_read_active <= 1'b0;
             flash_read_active <= 1'b0;
@@ -116,20 +164,47 @@ module bus (
                 read_held <= 1'b1;
             end
 
+            if (!cpu_stall) begin
+                lookup <= is_sdram_fetch;
+                lookup_offset <= line_offset;
+                lookup_index <= line_index;
+                lookup_tag <= line_tag;
+            end else begin
+                lookup <= 1'b0;
+            end
+
             case (state)
                 S_IDLE: begin
-                    if (is_sdram_addr && sdrc_init_done) begin
+                    if (cache_miss) begin
+                        filling <= 1'b1;
+                        fill_offset <= '0;
+                        state <= S_FILL;
+                    end else if (is_sdram_data && sdrc_init_done) begin
                         sdrc_cmd_en <= 1'b1;
                         r_sdrc_addr <= sdram_word_addr;
                         r_sdrc_data_w <= cpu_mem_write;
-                        r_sdrc_dqm <= (cpu_mem_we != 4'b0000) ? ~cpu_mem_we : 4'b0000; 
+                        r_sdrc_dqm <= (cpu_mem_we != 4'b0000) ? ~cpu_mem_we : 4'b0000;
                         r_sdrc_is_read <= (cpu_mem_we == 4'b0000);
                         r_sdrc_cmd <= 3'b011;
                         state <= S_ACTIVATE_WAIT;
+
+                        if (cpu_mem_we != 4'b0000)
+                            cache_valid[line_index] <= 1'b0;
                     end else if (is_flash_addr && cpu_mem_access && (cpu_mem_we == 4'b0000)) begin
                         flash_req <= 1'b1;
                         flash_addr <= flash_byte_addr;
                         state <= S_FLASH_WAIT;
+                    end
+                end
+
+                S_FILL: begin
+                    if (sdrc_init_done) begin
+                        sdrc_cmd_en <= 1'b1;
+                        r_sdrc_addr <= {lookup_tag, lookup_index, fill_offset};
+                        r_sdrc_dqm <= 4'b0000;
+                        r_sdrc_is_read <= 1'b1;
+                        r_sdrc_cmd <= 3'b011;
+                        state <= S_ACTIVATE_WAIT;
                     end
                 end
 
@@ -165,6 +240,18 @@ module bus (
                 S_READ_DELAY: begin
                     if (read_delay_counter > 3'd1) begin
                         read_delay_counter <= read_delay_counter - 3'd1;
+                    end else if (filling) begin
+                        if (fill_offset == lookup_offset)
+                            read_hold <= sdrc_data_r;
+
+                        if (fill_offset == {OFFSET_BITS{1'b1}}) begin
+                            cache_valid[lookup_index] <= 1'b1;
+                            filling <= 1'b0;
+                            state <= S_IDLE;
+                        end else begin
+                            fill_offset <= fill_offset + 1'b1;
+                            state <= S_FILL;
+                        end
                     end else begin
                         sdram_read_reg <= sdrc_data_r;
                         state <= S_SDRAM_DONE;
@@ -203,27 +290,29 @@ module bus (
     end
 
     always_comb begin
+        if (state == S_IDLE)
+            cpu_stall = cache_miss || is_sdram_data || is_flash_addr;
+        else if (state == S_SDRAM_DONE || state == S_FLASH_DONE)
+            cpu_stall = 1'b0;
+        else
+            cpu_stall = 1'b1;
+
         bram_addr = cpu_mem_addr;
         bram_write = cpu_mem_write;
         bram_we = 4'b0000;
 
-        if (cpu_mem_access && !is_sdram_addr && !is_flash_addr && state == S_IDLE)
+        if (cpu_mem_access && !is_sdram_addr && !is_flash_addr && !cpu_stall)
             bram_we = cpu_mem_we;
 
         if (sdram_read_active)
             read_data = sdram_read_reg;
         else if (flash_read_active)
             read_data = flash_read_reg;
+        else if (lookup)
+            read_data = cache_read;
         else
             read_data = bram_read;
 
         cpu_mem_read = read_held ? read_hold : read_data;
-
-        if (state == S_IDLE)
-            cpu_stall = is_sdram_addr || is_flash_addr;
-        else if (state == S_SDRAM_DONE || state == S_FLASH_DONE)
-            cpu_stall = 1'b0;
-        else
-            cpu_stall = 1'b1;
     end
 endmodule

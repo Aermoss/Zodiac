@@ -294,7 +294,7 @@ __LBB12_3:
 	.global	__z11SetBaudRateu32
 __z11SetBaudRateu32:
 __LBB13_0:
-    li t0, 33000000
+    li t0, 45000000
     divu t0, t0, a0
     li t1, 63488
     sw t0, 2040(t1)
@@ -991,7 +991,7 @@ __LBB20_0:
 	.align	4
 	.global	CLK_FREQ
 CLK_FREQ:
-	.byte	64, 138, 247, 1
+	.byte	64, 165, 174, 2
 string.0:
 	.byte	48, 120, 0
 string.1:

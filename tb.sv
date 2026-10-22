@@ -28,7 +28,7 @@ module tb;
 
     cpu #(
         .SIMULATION(1'b1),
-        .CLK_FREQ(33000000)
+        .CLK_FREQ(45000000)
     ) cpu0 (
         .clk(clk),
         .rst(rst),
