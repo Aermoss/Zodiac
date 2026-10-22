@@ -24,6 +24,7 @@ extern "C" {
 const CLK_FREQ: u32 = 54000000;
 
 class Emulator {
+    pub quiet: bool,
     pc: u32,
     halted: bool,
     registers: *mut u32,
@@ -34,9 +35,18 @@ class Emulator {
     tick_counter: u32,
     uart_rx: u8,
     uart_rx_ready: bool,
-    uart_mutex: Mutex;
+    uart_mutex: Mutex,
+    interrupt_enable: bool,
+    previous_interrupt_enable: bool,
+    interrupt_mask: u32,
+    trap_pc: u32,
+    trap_cause: u32,
+    trap_vector: u32,
+    trap_scratch: u32,
+    timer_compare: u32;
 
-    Emulator(&mut this) {
+    Emulator(&mut this, quiet: bool) {
+        this.quiet = quiet;
         this.registers = new u32[32];
         this.bram = new u8[16 * 1024];
         this.sdram = new u8[8 * 1024 * 1024];
@@ -101,6 +111,9 @@ class Emulator {
     pub fn Reset(&mut this) {
         (this.pc, this.halted) = (0, false);
         (this.ms_counter, this.tick_counter) = (0, 0);
+        (this.interrupt_enable, this.previous_interrupt_enable, this.interrupt_mask) = (false, false, 0);
+        (this.trap_pc, this.trap_cause, this.trap_vector, this.trap_scratch) = (0, 0, 0, 0);
+        this.timer_compare = 0;
 
         for i in 0..32 {
             this.registers[i as usize] = 0;
@@ -118,7 +131,47 @@ class Emulator {
     }
 
     fn IsDevice(&this, address: u32) -> bool {
-        address == 0xFFFF || address == 0xFFFC || address == 0xFFF4 || address == 0xFFEC || address == 0xFFE8 || address == 0xFFE4
+        address == 0xFFFF || address == 0xFFFC || address == 0xFFF4 || address == 0xFFEC || address == 0xFFE8 || address == 0xFFE4 || address == 0xFFDC
+    }
+
+    fn GetPendingInterrupts(&this) -> u32 {
+        if ((this.tick_counter - this.timer_compare) as i32) >= 0 { 1 } else { 0 }
+    }
+
+    fn ReadCSR(&this, index: u32) -> u32 {
+        if index == CSR::STATUS as u32 {
+            (if this.previous_interrupt_enable { 2 } else { 0 }) | (if this.interrupt_enable { 1 } else { 0 })
+        } else if index == CSR::IENABLE as u32 {
+            this.interrupt_mask
+        } else if index == CSR::IPENDING as u32 {
+            this.GetPendingInterrupts()
+        } else if index == CSR::EPC as u32 {
+            this.trap_pc
+        } else if index == CSR::CAUSE as u32 {
+            this.trap_cause
+        } else if index == CSR::VECTOR as u32 {
+            this.trap_vector
+        } else if index == CSR::SCRATCH as u32 {
+            this.trap_scratch
+        } else {
+            0
+        }
+    }
+
+    fn WriteCSR(&mut this, index: u32, value: u32) {
+        if index == CSR::STATUS as u32 {
+            (this.interrupt_enable, this.previous_interrupt_enable) = ((value & 1) != 0, (value & 2) != 0);
+        } else if index == CSR::IENABLE as u32 {
+            this.interrupt_mask = value;
+        } else if index == CSR::EPC as u32 {
+            this.trap_pc = value;
+        } else if index == CSR::CAUSE as u32 {
+            this.trap_cause = value;
+        } else if index == CSR::VECTOR as u32 {
+            this.trap_vector = value;
+        } else if index == CSR::SCRATCH as u32 {
+            this.trap_scratch = value;
+        }
     }
 
     fn ReadDevice(&mut this, address: u32) -> u32 {
@@ -139,6 +192,7 @@ class Emulator {
             0xFFF4 => 1,
             0xFFE8 => this.tick_counter,
             0xFFE4 => this.tick_counter,
+            0xFFDC => this.timer_compare,
             _ => this.ms_counter
         }
     }
@@ -183,7 +237,9 @@ class Emulator {
         if address == 0xFFFF {
             Write((value as i8).ToString());
         } else if address == 0xFFF0 {
-            WriteLine("[LEDs: 0x" + String::FromInteger(value as u64, 16) + ']');
+            if !this.quiet {
+                WriteLine("[LEDs: 0x" + String::FromInteger(value as u64, 16) + ']');
+            }
         } else if (address & 0xC0000000) == 0x80000000 {
             this.flash[(address & 0x7FFFFF) as usize] = value;
         } else if (address & 0xC0000000) == 0x40000000 {
@@ -201,10 +257,17 @@ class Emulator {
     fn WriteWord(&mut this, address: u32, value: u32) {
         match address {
             0xFFE0 => {
-                WriteLine("[WS2812: RGB(0x" + String::FromInteger(value as u64, 16) + ")]");
+                if !this.quiet {
+                    WriteLine("[WS2812: RGB(0x" + String::FromInteger(value as u64, 16) + ")]");
+                }
             },
             0xFFF8 => {
-                WriteLine("[UART Baud Rate: ~" + String::FromInteger((CLK_FREQ / value) as u64, 10) + ']');
+                if !this.quiet {
+                    WriteLine("[UART Baud Rate: ~" + String::FromInteger((CLK_FREQ / value) as u64, 10) + ']');
+                }
+            },
+            0xFFDC => {
+                this.timer_compare = value;
             },
             _ => {
                 this.WriteByte(address, (value & 0xFF) as u8);
@@ -216,6 +279,12 @@ class Emulator {
     }
 
     fn Tick(&mut this) {
+        if this.interrupt_enable && (this.GetPendingInterrupts() & this.interrupt_mask) != 0 {
+            (this.trap_pc, this.trap_cause) = (this.pc, 0x80000000);
+            (this.previous_interrupt_enable, this.interrupt_enable) = (this.interrupt_enable, false);
+            this.pc = this.trap_vector;
+        }
+
         let word = this.ReadWord(this.pc);
         let opcode = (word >> OPCODE_SHIFT) as Opcode;
         let (reg0, reg1, reg2) = ((word >> REG0_SHIFT) & 0x1F, (word >> REG1_SHIFT) & 0x1F, (word >> REG2_SHIFT) & 0x1F);
@@ -400,6 +469,16 @@ class Emulator {
             Opcode::SRAI => {
                 this.SetRegister(reg0, ((this.GetRegister(reg1) as i32) >> ((imm16 & 0x1F) as i32)) as u32);
             },
+            Opcode::CSRR => {
+                this.SetRegister(reg0, this.ReadCSR(imm16));
+            },
+            Opcode::CSRW => {
+                this.WriteCSR(imm16, this.GetRegister(reg1));
+            },
+            Opcode::ERET => {
+                next_pc = this.trap_pc;
+                (this.interrupt_enable, this.previous_interrupt_enable) = (this.previous_interrupt_enable, true);
+            },
             Opcode::HLT => {
                 this.halted = true;
             },
@@ -414,17 +493,47 @@ class Emulator {
         }
     }
 
-    fn UartThread(&mut this) {
+    fn Receive(&mut this, character: u8) {
         loop {
-            let character = _getch();
             this.uart_mutex.Lock();
 
             if !this.uart_rx_ready {
-                this.uart_rx = character as u8;
+                this.uart_rx = character;
                 this.uart_rx_ready = true;
+                this.uart_mutex.Unlock();
+                return;
             }
 
             this.uart_mutex.Unlock();
+            Thread::Yield();
+        }
+    }
+
+    fn Receive(&mut this, mut sequence: *i8) {
+        while *sequence != '\0' {
+            this.Receive(*sequence as u8);
+            sequence += 1;
+        }
+    }
+
+    fn UartThread(&mut this) {
+        loop {
+            let character = _getch();
+
+            if character == 0 || character == 0xE0 {
+                match _getch() {
+                    0x48 => this.Receive("\x1B[A"),
+                    0x50 => this.Receive("\x1B[B"),
+                    0x4D => this.Receive("\x1B[C"),
+                    0x4B => this.Receive("\x1B[D"),
+                    0x47 => this.Receive("\x1B[H"),
+                    0x4F => this.Receive("\x1B[F"),
+                    0x53 => this.Receive("\x1B[3~"),
+                    _ => ()
+                }
+            } else {
+                this.Receive(character as u8);
+            }
         }
     }
 

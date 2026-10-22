@@ -90,8 +90,19 @@ module cpu #(
         OP_SRLI,
         OP_SRA,
         OP_SRAI,
+        OP_CSRR,
+        OP_CSRW,
+        OP_ERET,
         OP_HLT = 6'h3F
     } opcode_t;
+
+    localparam logic [15:0] CSR_STATUS = 0;
+    localparam logic [15:0] CSR_IENABLE = 1;
+    localparam logic [15:0] CSR_IPENDING = 2;
+    localparam logic [15:0] CSR_EPC = 3;
+    localparam logic [15:0] CSR_CAUSE = 4;
+    localparam logic [15:0] CSR_VECTOR = 5;
+    localparam logic [15:0] CSR_SCRATCH = 6;
 
     logic reg_we;
     logic [4:0] reg_addr;
@@ -130,6 +141,40 @@ module cpu #(
     assign id_simm21 = {{11{id_imm21[20]}}, id_imm21};
     assign id_simm26 = {{6{id_imm26[25]}}, id_imm26};
 
+    logic id_branch_always;
+    logic id_branch_if_eq;
+    logic id_branch_if_ne;
+    logic id_branch_if_lt;
+    logic id_branch_if_ge;
+    logic id_signed_compare;
+    logic signed [31:0] id_branch_offset;
+    logic [31:0] id_branch_target;
+
+    always_comb begin
+        id_branch_always = 0;
+        id_branch_if_eq = 0;
+        id_branch_if_ne = 0;
+        id_branch_if_lt = 0;
+        id_branch_if_ge = 0;
+        id_signed_compare = (id_opcode == OP_BLT) || (id_opcode == OP_BGE);
+
+        case (id_opcode)
+            OP_B, OP_BR, OP_BL, OP_BLR, OP_ERET: id_branch_always = 1;
+            OP_BEQ: id_branch_if_eq = 1;
+            OP_BNE: id_branch_if_ne = 1;
+            OP_BLT, OP_BLTU: id_branch_if_lt = 1;
+            OP_BGE, OP_BGEU: id_branch_if_ge = 1;
+        endcase
+
+        case (id_opcode)
+            OP_B: id_branch_offset = id_simm26;
+            OP_BL: id_branch_offset = id_simm21;
+            default: id_branch_offset = id_simm16;
+        endcase
+    end
+
+    assign id_branch_target = id_pc + (id_branch_offset << 2);
+
     logic [31:0] ex_pc;
     logic [31:0] ex_instr;
     logic [31:0] ex_result;
@@ -141,10 +186,14 @@ module cpu #(
     logic [31:0] ex_reg2;
     logic [15:0] ex_imm16;
     logic [20:0] ex_imm21;
-    logic [25:0] ex_imm26;
     logic signed [31:0] ex_simm16;
-    logic signed [31:0] ex_simm21;
-    logic signed [31:0] ex_simm26;
+    logic ex_branch_always;
+    logic ex_branch_if_eq;
+    logic ex_branch_if_ne;
+    logic ex_branch_if_lt;
+    logic ex_branch_if_ge;
+    logic ex_signed_compare;
+    logic [31:0] ex_branch_target;
 
     logic should_take_branch;
     logic [31:0] branch_target;
@@ -225,6 +274,7 @@ module cpu #(
             OP_NOP,
             OP_LUI, OP_AUIPC,
             OP_B,
+            OP_CSRR, OP_ERET,
             OP_HLT: return 0;
             default: return 1;
         endcase
@@ -250,7 +300,8 @@ module cpu #(
             OP_MUL, OP_MULH, OP_MULHSU, OP_MULHU, OP_DIV, OP_DIVU, OP_REM, OP_REMU,
             OP_AND, OP_ANDI, OP_OR, OP_ORI, OP_XOR, OP_XORI,
             OP_SLL, OP_SLLI, OP_SRL, OP_SRLI, OP_SRA, OP_SRAI,
-            OP_BL, OP_BLR: return 1;
+            OP_BL, OP_BLR,
+            OP_CSRR: return 1;
             default: return 0;
         endcase
     endfunction
@@ -425,6 +476,21 @@ module cpu #(
         end
     end
 
+    logic [31:0] timer_compare;
+    logic timer_pending;
+
+    always_ff @(posedge clk or posedge rst) begin
+        if (rst) begin
+            timer_compare <= 0;
+            timer_pending <= 0;
+        end else begin
+            if (mem_addr == 32'hFFDC && io_we != 0)
+                timer_compare <= mem_write;
+
+            timer_pending <= $signed(cycle_counter - timer_compare) >= 0;
+        end
+    end
+
     logic button_sync0, button_sync1;
 
     always_ff @(posedge clk or posedge rst) begin
@@ -461,21 +527,79 @@ module cpu #(
 
         if (mem_addr == 32'hFFFF)
             uart_we = io_we;
-        else if (mem_addr != 32'hFFF0 && mem_addr != 32'hFFE0 && mem_addr != 32'hFFEC && mem_addr != 32'hFFF4 && mem_addr != 32'hFFF8 && mem_addr != 32'hFFE8 && mem_addr != 32'hFFE4)
+        else if (mem_addr != 32'hFFF0 && mem_addr != 32'hFFE0 && mem_addr != 32'hFFEC && mem_addr != 32'hFFF4 && mem_addr != 32'hFFF8 && mem_addr != 32'hFFE8 && mem_addr != 32'hFFE4 && mem_addr != 32'hFFDC)
             actual_mem_we = mem_we;
+    end
+
+    logic csr_ie;
+    logic csr_pie;
+    logic [31:0] csr_ienable;
+    logic [31:0] csr_ipending;
+    logic [31:0] csr_epc;
+    logic [31:0] csr_cause;
+    logic [31:0] csr_vector;
+    logic [31:0] csr_scratch;
+    logic [31:0] csr_read;
+    logic take_interrupt;
+
+    assign csr_ipending = {31'b0, timer_pending};
+    assign take_interrupt = csr_ie && (csr_ipending & csr_ienable) != 0 && ex_instr != 0 && !is_multicycle_op && !halted;
+
+    always_comb begin
+        case (ex_imm16)
+            CSR_STATUS: csr_read = {30'b0, csr_pie, csr_ie};
+            CSR_IENABLE: csr_read = csr_ienable;
+            CSR_IPENDING: csr_read = csr_ipending;
+            CSR_EPC: csr_read = csr_epc;
+            CSR_CAUSE: csr_read = csr_cause;
+            CSR_VECTOR: csr_read = csr_vector;
+            CSR_SCRATCH: csr_read = csr_scratch;
+            default: csr_read = 0;
+        endcase
+    end
+
+    always_ff @(posedge clk or posedge rst) begin
+        if (rst) begin
+            csr_ie <= 0;
+            csr_pie <= 0;
+            csr_ienable <= 0;
+            csr_epc <= 0;
+            csr_cause <= 0;
+            csr_vector <= 0;
+            csr_scratch <= 0;
+        end else if (!bus_stall) begin
+            if (take_interrupt) begin
+                csr_epc <= ex_pc;
+                csr_cause <= 32'h80000000;
+                csr_pie <= csr_ie;
+                csr_ie <= 0;
+            end else if (ex_opcode == OP_ERET) begin
+                csr_ie <= csr_pie;
+                csr_pie <= 1;
+            end else if (ex_opcode == OP_CSRW) begin
+                case (ex_imm16)
+                    CSR_STATUS: {csr_pie, csr_ie} <= ex_reg1_fwd[1:0];
+                    CSR_IENABLE: csr_ienable <= ex_reg1_fwd;
+                    CSR_EPC: csr_epc <= ex_reg1_fwd;
+                    CSR_CAUSE: csr_cause <= ex_reg1_fwd;
+                    CSR_VECTOR: csr_vector <= ex_reg1_fwd;
+                    CSR_SCRATCH: csr_scratch <= ex_reg1_fwd;
+                    default: ;
+                endcase
+            end
+        end
     end
 
     logic branch_eq;
     logic branch_lt;
-    logic branch_ltu;
 
     assign branch_eq = (ex_reg0_fwd == ex_reg1_fwd);
-    assign branch_lt = ($signed(ex_reg0_fwd) < $signed(ex_reg1_fwd));
-    assign branch_ltu = (ex_reg0_fwd < ex_reg1_fwd);
+    assign branch_lt = $signed({ex_signed_compare & ex_reg0_fwd[31], ex_reg0_fwd}) < $signed({ex_signed_compare & ex_reg1_fwd[31], ex_reg1_fwd});
+    assign should_take_branch = take_interrupt || ex_branch_always || (branch_eq ? ex_branch_if_eq : ex_branch_if_ne) ||
+        (branch_lt ? ex_branch_if_lt : ex_branch_if_ge);
 
     always_comb begin
-        should_take_branch = 0;
-        branch_target = ex_pc + (ex_simm16 << 2);
+        branch_target = ex_branch_target;
         should_halt = 0;
         ex_result = alu_result;
         ex_addr = 0;
@@ -491,36 +615,23 @@ module cpu #(
             OP_SLTI: ex_result = ($signed(ex_reg1_fwd) < ex_simm16);
             OP_SLTIU: ex_result = (ex_reg1_fwd < {{16{1'b0}}, ex_imm16});
 
-            OP_B: begin
-                branch_target = ex_pc + (ex_simm26 << 2);
-                should_take_branch = 1;
-            end
-
-            OP_BR: begin
-                branch_target = ex_reg0_fwd;
-                should_take_branch = 1;
-            end
-
-            OP_BL: begin
-                ex_result = ex_pc + 4;
-                branch_target = ex_pc + (ex_simm21 << 2);
-                should_take_branch = 1;
-            end
+            OP_BR: branch_target = ex_reg0_fwd;
+            OP_BL: ex_result = ex_pc + 4;
 
             OP_BLR: begin
                 ex_result = ex_pc + 4;
                 branch_target = ex_reg1_fwd;
-                should_take_branch = 1;
             end
 
-            OP_BEQ: should_take_branch = branch_eq;
-            OP_BNE: should_take_branch = !branch_eq;
-            OP_BLT: should_take_branch = branch_lt;
-            OP_BLTU: should_take_branch = branch_ltu;
-            OP_BGE: should_take_branch = !branch_lt;
-            OP_BGEU: should_take_branch = !branch_ltu;
+            OP_CSRR: ex_result = csr_read;
+            OP_ERET: branch_target = csr_epc;
             OP_HLT: should_halt = 1;
         endcase
+
+        if (take_interrupt) begin
+            branch_target = csr_vector;
+            should_halt = 0;
+        end
     end
 
     assign mem_addr = stage_mem_addr;
@@ -569,6 +680,7 @@ module cpu #(
             32'hFFF4: io_read_word = {31'b0, button_sync1};
             32'hFFE8: io_read_word = cycle_counter;
             32'hFFE4: io_read_word = instret_counter;
+            32'hFFDC: io_read_word = timer_compare;
             default: begin
                 io_read_word = 0;
                 io_read_hit = 0;
@@ -628,10 +740,14 @@ module cpu #(
             ex_reg2 <= 0;
             ex_imm16 <= 0;
             ex_imm21 <= 0;
-            ex_imm26 <= 0;
             ex_simm16 <= 0;
-            ex_simm21 <= 0;
-            ex_simm26 <= 0;
+            ex_branch_always <= 0;
+            ex_branch_if_eq <= 0;
+            ex_branch_if_ne <= 0;
+            ex_branch_if_lt <= 0;
+            ex_branch_if_ge <= 0;
+            ex_signed_compare <= 0;
+            ex_branch_target <= 0;
             ex_fwd_mem <= 0;
             ex_fwd_wb <= 0;
 
@@ -663,12 +779,12 @@ module cpu #(
             if (reg_we && reg_addr != 0)
                 regs[reg_addr] <= reg_write;
 
-            if (halted) begin
-                if_pc <= 0;
-                if_pc_current <= 0;
-            end else if (should_take_branch) begin
+            if (should_take_branch) begin
                 if_pc <= branch_target;
                 if_pc_current <= branch_target;
+            end else if (halted) begin
+                if_pc <= 0;
+                if_pc_current <= 0;
             end else if (hazard_stall || alu_stall) begin
                 if_pc <= if_pc;
                 if_pc_current <= if_pc_current;
@@ -677,15 +793,13 @@ module cpu #(
                 if_pc_current <= if_pc;
             end
 
-            if (should_take_branch || branch_taken || halted) begin
-                id_instr <= 0;
-            end else if (hazard_stall || alu_stall) begin
-                id_pc <= id_pc;
-                id_instr <= id_instr;
-            end else begin
+            if (!hazard_stall && !alu_stall)
                 id_pc <= if_pc_current;
+
+            if (should_take_branch || branch_taken || halted)
+                id_instr <= 0;
+            else if (!hazard_stall && !alu_stall)
                 id_instr <= if_instr;
-            end
 
             if (!alu_stall) begin
                 ex_pc <= id_pc;
@@ -694,10 +808,9 @@ module cpu #(
                 ex_reg2 <= id_reg2;
                 ex_imm16 <= id_imm16;
                 ex_imm21 <= id_imm21;
-                ex_imm26 <= id_imm26;
                 ex_simm16 <= id_simm16;
-                ex_simm21 <= id_simm21;
-                ex_simm26 <= id_simm26;
+                ex_signed_compare <= id_signed_compare;
+                ex_branch_target <= id_branch_target;
                 ex_fwd_mem <= id_fwd_mem;
                 ex_fwd_wb <= id_fwd_wb;
 
@@ -705,10 +818,20 @@ module cpu #(
                     ex_instr <= 0;
                     ex_opcode <= OP_NOP;
                     ex_reg_addr <= 0;
+                    ex_branch_always <= 0;
+                    ex_branch_if_eq <= 0;
+                    ex_branch_if_ne <= 0;
+                    ex_branch_if_lt <= 0;
+                    ex_branch_if_ge <= 0;
                 end else begin
                     ex_instr <= id_instr;
                     ex_opcode <= id_opcode;
                     ex_reg_addr <= id_reg_addr;
+                    ex_branch_always <= id_branch_always;
+                    ex_branch_if_eq <= id_branch_if_eq;
+                    ex_branch_if_ne <= id_branch_if_ne;
+                    ex_branch_if_lt <= id_branch_if_lt;
+                    ex_branch_if_ge <= id_branch_if_ge;
                 end
             end
 
@@ -717,7 +840,7 @@ module cpu #(
 
             branch_taken <= should_take_branch;
 
-            if (alu_stall) begin
+            if (alu_stall || take_interrupt) begin
                 mem_pc <= 0;
                 mem_instr <= 0;
                 mem_result <= 0;

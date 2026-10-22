@@ -28,6 +28,7 @@ fn PrintUsage(executable: String) {
     WriteLine("USAGE: " + executable + " [options] <input>");
     WriteLine("OPTIONS:");
     WriteLine("  --flash=<file>           Load <file> into flash at 0x100000");
+    WriteLine("  --quiet                  Do not report writes to the LEDs, WS2812 and baud rate");
     WriteLine("  --version                Display emulator version");
     WriteLine("  -h, --help               Display this help message");
 }
@@ -41,6 +42,7 @@ fn Main(args: &mut Vector<String>) -> i32 {
         return 1;
     }
 
+    let mut quiet = false;
     let mut input = String();
     let mut flash = String();
     let mut i: usize = 1;
@@ -54,6 +56,8 @@ fn Main(args: &mut Vector<String>) -> i32 {
         } else if arg == "--version" {
             PrintVersion(executable);
             return 0;
+        } else if arg == "--quiet" {
+            quiet = true;
         } else if arg.StartsWith("--flash=") {
             flash = arg.SubString(8);
 
@@ -74,7 +78,7 @@ fn Main(args: &mut Vector<String>) -> i32 {
         return 1;
     }
 
-    let mut emulator = Emulator();
+    let mut emulator = Emulator(quiet);
 
     if !emulator.Load(input, 0) {
         Logger::Log("Failed to load program '" + input + "'.", LogSeverity::Error);

@@ -34,6 +34,18 @@ class Disassembler {
         "x" + String::FromInteger(register as u64)
     }
 
+    fn DisassembleCSR(&this, index: u32) -> String {
+        match index {
+            0 => "status",
+            1 => "ienable",
+            2 => "ipending",
+            3 => "epc",
+            4 => "cause",
+            5 => "vector",
+            _ => "scratch"
+        }.ToString()
+    }
+
     fn DisassembleInstruction(&this, word: u32, offset: u32, section: SectionType, object: &Object) -> String {
         let opcode = (word >> OPCODE_SHIFT) as Opcode;
         let (reg0, reg1, reg2) = ((word >> REG0_SHIFT) & 0x1F, (word >> REG1_SHIFT) & 0x1F, (word >> REG2_SHIFT) & 0x1F);
@@ -93,6 +105,9 @@ class Disassembler {
             Opcode::SRLI => "srli",
             Opcode::SRA => "sra",
             Opcode::SRAI => "srai",
+            Opcode::CSRR => "csrr",
+            Opcode::CSRW => "csrw",
+            Opcode::ERET => "eret",
             Opcode::HLT => "hlt"
         }.ToString();
 
@@ -132,6 +147,10 @@ class Disassembler {
             } else {
                 mnemonic + " " + this.DisassembleRegister(reg0) + ", " + this.DisassembleRegister(reg1) + ", " + String::FromInteger(simm16)
             }
+        } else if opcode == Opcode::CSRR {
+            mnemonic + " " + this.DisassembleRegister(reg0) + ", " + this.DisassembleCSR(imm16)
+        } else if opcode == Opcode::CSRW {
+            mnemonic + " " + this.DisassembleCSR(imm16) + ", " + this.DisassembleRegister(reg1)
         } else {
             mnemonic
         }

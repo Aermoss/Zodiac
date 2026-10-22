@@ -93,6 +93,25 @@ class Assembler {
         }
     }
 
+    fn AssembleCSRExpression(&mut this, node: *Node) -> u32 {
+        if node->_type == NodeType::IDENTIFIER {
+            let value = (node as *IdentifierNode)->value;
+
+            if value == "status" { 0 }
+            else if value == "ienable" { 1 }
+            else if value == "ipending" { 2 }
+            else if value == "epc" { 3 }
+            else if value == "cause" { 4 }
+            else if value == "vector" { 5 }
+            else if value == "scratch" { 6 }
+            else {
+                this.AssembleExpression(node)
+            }
+        } else {
+            this.AssembleExpression(node)
+        }
+    }
+
     fn AssembleExpression(&mut this, node: *Node) -> u32 {
         match node->_type {
             NodeType::ADDRESS => this.GetSectionSize(this.section),
@@ -427,7 +446,7 @@ class Assembler {
             else if mnemonic == "bgt" { (opcode, reverse, _zero) = (Opcode::BLT, true, false); }
             else if mnemonic == "ble" { (opcode, reverse, _zero) = (Opcode::BGE, true, false); }
             else if mnemonic == "bgtu" { (opcode, reverse, _zero) = (Opcode::BLTU, true, false); }
-            else if mnemonic == "bleu" { (opcode, reverse, _zero) = (Opcode::BGE, true, false); }
+            else if mnemonic == "bleu" { (opcode, reverse, _zero) = (Opcode::BGEU, true, false); }
             else { pseudo = false; }
 
             if pseudo {
@@ -495,6 +514,9 @@ class Assembler {
             else if mnemonic == "srli" { opcode = Opcode::SRLI; }
             else if mnemonic == "sra" { opcode = Opcode::SRA; }
             else if mnemonic == "srai" { opcode = Opcode::SRAI; }
+            else if mnemonic == "csrr" { opcode = Opcode::CSRR; }
+            else if mnemonic == "csrw" { opcode = Opcode::CSRW; }
+            else if mnemonic == "eret" { opcode = Opcode::ERET; }
             else if mnemonic == "hlt" { opcode = Opcode::HLT; }
             else {
                 Logger::Log("Unknown mnemonic: '" + mnemonic + "'.", instruction, LogSeverity::Error);
@@ -556,6 +578,12 @@ class Assembler {
                 } else {
                     word |= (this.AssembleExpression(operands[2]->expression) & IMM16_MASK);
                 }
+            } else if opcode == Opcode::CSRR {
+                word |= (this.AssembleExpression(operands[0]->expression) << REG0_SHIFT);
+                word |= (this.AssembleCSRExpression(operands[1]->expression) & IMM16_MASK);
+            } else if opcode == Opcode::CSRW {
+                word |= (this.AssembleCSRExpression(operands[0]->expression) & IMM16_MASK);
+                word |= (this.AssembleExpression(operands[1]->expression) << REG1_SHIFT);
             }
 
             this.WriteWord(this.section, word);
