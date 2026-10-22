@@ -555,54 +555,55 @@ module cpu #(
         endcase
     end
 
-    logic [31:0] wb_read_word;
+    logic [31:0] io_read_word;
+    logic io_read_hit;
 
     always_comb begin
-        if (wb_addr == 32'hFFFF)
-            wb_read_word = {4{uart_rx_byte}};
-        else if (wb_addr == 32'hFFFC)
-            wb_read_word = {30'b0, uart_tx_busy, uart_rx_ready};
-        else if (wb_addr == 32'hFFF8)
-            wb_read_word = {16'b0, uart_clks_per_bit};
-        else if (wb_addr == 32'hFFEC)
-            wb_read_word = ms_counter;
-        else if (wb_addr == 32'hFFF4)
-            wb_read_word = {31'b0, button_sync1};
-        else if (wb_addr == 32'hFFE8)
-            wb_read_word = cycle_counter;
-        else if (wb_addr == 32'hFFE4)
-            wb_read_word = instret_counter;
-        else
-            wb_read_word = mem_read;
+        io_read_hit = 1;
+
+        case (stage_mem_addr)
+            32'hFFFF: io_read_word = {4{uart_rx_byte}};
+            32'hFFFC: io_read_word = {30'b0, uart_tx_busy, uart_rx_ready};
+            32'hFFF8: io_read_word = {16'b0, uart_clks_per_bit};
+            32'hFFEC: io_read_word = ms_counter;
+            32'hFFF4: io_read_word = {31'b0, button_sync1};
+            32'hFFE8: io_read_word = cycle_counter;
+            32'hFFE4: io_read_word = instret_counter;
+            default: begin
+                io_read_word = 0;
+                io_read_hit = 0;
+            end
+        endcase
     end
 
+    logic wb_writes;
+    logic wb_load;
+    logic wb_load_byte;
+    logic wb_load_half;
+    logic wb_load_signed;
+    logic wb_io;
+    logic [31:0] wb_io_word;
+
+    logic [31:0] wb_read_word;
     logic [15:0] wb_read_half;
     logic [7:0] wb_read_byte;
 
+    assign wb_read_word = wb_io ? wb_io_word : mem_read;
     assign wb_read_half = wb_read_word[16 * wb_addr[1]+:16];
     assign wb_read_byte = wb_read_word[8 * wb_addr[1:0]+:8];
 
     always_comb begin
         reg_addr = wb_reg_addr;
-        reg_write = 0;
-        reg_we = 1;
+        reg_we = wb_writes;
 
-        case (wb_opcode)
-            OP_LUI, OP_AUIPC,
-            OP_SLT, OP_SLTU, OP_SLTI, OP_SLTIU,
-            OP_ADD, OP_ADDI, OP_SUB, OP_SUBI,
-            OP_MUL, OP_MULH, OP_MULHSU, OP_MULHU,
-            OP_DIV, OP_DIVU, OP_REM, OP_REMU,
-            OP_AND, OP_ANDI, OP_OR, OP_ORI, OP_XOR, OP_XORI,
-            OP_SLL, OP_SLLI, OP_SRL, OP_SRLI, OP_SRA, OP_SRAI,
-            OP_BL, OP_BLR: reg_write = wb_result;
-            OP_LB: reg_write = {{24{wb_read_byte[7]}}, wb_read_byte};
-            OP_LBU: reg_write = wb_read_byte;
-            OP_LH: reg_write = {{16{wb_read_half[15]}}, wb_read_half};
-            OP_LHU: reg_write = wb_read_half;
-            OP_LW: reg_write = wb_read_word;
-            default: reg_we = 0;
-        endcase
+        if (!wb_load)
+            reg_write = wb_result;
+        else if (wb_load_byte)
+            reg_write = {{24{wb_load_signed & wb_read_byte[7]}}, wb_read_byte};
+        else if (wb_load_half)
+            reg_write = {{16{wb_load_signed & wb_read_half[15]}}, wb_read_half};
+        else
+            reg_write = wb_read_word;
     end
 
     integer i;
@@ -651,6 +652,13 @@ module cpu #(
             wb_addr <= 0;
             wb_opcode <= OP_NOP;
             wb_reg_addr <= 0;
+            wb_writes <= 0;
+            wb_load <= 0;
+            wb_load_byte <= 0;
+            wb_load_half <= 0;
+            wb_load_signed <= 0;
+            wb_io <= 0;
+            wb_io_word <= 0;
         end else if (!bus_stall) begin
             if (reg_we && reg_addr != 0)
                 regs[reg_addr] <= reg_write;
@@ -733,6 +741,13 @@ module cpu #(
             wb_addr <= stage_mem_addr;
             wb_opcode <= mem_opcode;
             wb_reg_addr <= mem_reg_addr;
+            wb_writes <= writes_result(mem_opcode) || is_load_op(mem_opcode);
+            wb_load <= is_load_op(mem_opcode);
+            wb_load_byte <= (mem_opcode == OP_LB) || (mem_opcode == OP_LBU);
+            wb_load_half <= (mem_opcode == OP_LH) || (mem_opcode == OP_LHU);
+            wb_load_signed <= (mem_opcode == OP_LB) || (mem_opcode == OP_LH);
+            wb_io <= io_read_hit;
+            wb_io_word <= io_read_word;
 
             if (halted && id_instr == 0 && ex_instr == 0 && mem_instr == 0 && wb_instr == 0)
                 $finish;

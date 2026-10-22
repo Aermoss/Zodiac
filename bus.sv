@@ -124,6 +124,7 @@ module bus #(
     logic [TAG_BITS - 1:0] cache_read_tag;
 
     logic lookup;
+    logic lookup_valid;
     logic [OFFSET_BITS - 1:0] lookup_offset;
     logic [INDEX_BITS - 1:0] lookup_index;
     logic [TAG_BITS - 1:0] lookup_tag;
@@ -131,7 +132,7 @@ module bus #(
     logic filling;
     logic [OFFSET_BITS - 1:0] fill_offset;
 
-    wire cache_miss = lookup && !(cache_valid[lookup_index] && cache_read_tag == lookup_tag);
+    wire cache_miss = lookup && !(lookup_valid && cache_read_tag == lookup_tag);
     wire fill_write = filling && state == S_READ_DELAY && read_delay_counter <= 3'd1;
 
     always_ff @(posedge clk) begin
@@ -171,6 +172,7 @@ module bus #(
             fetch_held <= 1'b0;
             cache_valid <= '0;
             lookup <= 1'b0;
+            lookup_valid <= 1'b0;
             lookup_offset <= '0;
             lookup_index <= '0;
             lookup_tag <= '0;
@@ -199,6 +201,7 @@ module bus #(
 
             if (!cpu_stall) begin
                 lookup <= is_sdram_fetch;
+                lookup_valid <= cache_valid[fetch_index];
                 lookup_offset <= fetch_offset;
                 lookup_index <= fetch_index;
                 lookup_tag <= fetch_tag;
@@ -371,7 +374,13 @@ module bus #(
             read_data = bram_read;
 
         fetch_data = lookup ? cache_read : bram_fetch_read;
-        cpu_mem_read = read_held ? read_hold : read_data;
         cpu_fetch_read = fetch_held ? fetch_hold : fetch_data;
+
+        if (!read_held && !sdram_read_active && !flash_read_active)
+            cpu_mem_read = bram_read;
+        else if (read_held)
+            cpu_mem_read = read_hold;
+        else
+            cpu_mem_read = read_data;
     end
 endmodule
