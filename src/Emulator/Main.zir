@@ -27,6 +27,7 @@ fn PrintUsage(executable: String) {
     WriteLine("OVERVIEW: Zodiac emulator");
     WriteLine("USAGE: " + executable + " [options] <input>");
     WriteLine("OPTIONS:");
+    WriteLine("  --flash=<file>           Load <file> into flash at 0x100000");
     WriteLine("  --version                Display emulator version");
     WriteLine("  -h, --help               Display this help message");
 }
@@ -41,6 +42,7 @@ fn Main(args: &mut Vector<String>) -> i32 {
     }
 
     let mut input = String();
+    let mut flash = String();
     let mut i: usize = 1;
 
     while i < args.Length() {
@@ -52,6 +54,13 @@ fn Main(args: &mut Vector<String>) -> i32 {
         } else if arg == "--version" {
             PrintVersion(executable);
             return 0;
+        } else if arg.StartsWith("--flash=") {
+            flash = arg.SubString(8);
+
+            if !FileExists(flash) {
+                Logger::Log("Cannot find '" + flash + "'.", LogSeverity::Error);
+                return 1;
+            }
         } else if FileExists(arg) {
             input = arg;
         } else {
@@ -66,19 +75,14 @@ fn Main(args: &mut Vector<String>) -> i32 {
     }
 
     let mut emulator = Emulator();
-    let (_, extension) = SplitExtension(input);
 
-    let loaded: bool = if extension == ".hex" {
-        emulator.LoadHexadecimal(input)
-    } else if extension == ".bin" {
-        emulator.LoadBinary(input)
-    } else {
-        Logger::Log("Invalid input file '" + input + "'.", LogSeverity::Error);
-        return 1;
-    };
-
-    if !loaded {
+    if !emulator.Load(input, 0) {
         Logger::Log("Failed to load program '" + input + "'.", LogSeverity::Error);
+        return 1;
+    }
+
+    if !flash.Empty() && !emulator.Load(flash, 0x80100000) {
+        Logger::Log("Failed to load flash image '" + flash + "'.", LogSeverity::Error);
         return 1;
     }
 

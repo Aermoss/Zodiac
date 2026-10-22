@@ -41,6 +41,11 @@ class Emulator {
         this.bram = new u8[16 * 1024];
         this.sdram = new u8[8 * 1024 * 1024];
         this.flash = new u8[8 * 1024 * 1024];
+
+        for i in 0..(8 * 1024 * 1024) {
+            this.flash[i as usize] = 0xFF;
+        }
+
         this.Reset();
     }
 
@@ -51,7 +56,19 @@ class Emulator {
         delete[] this.registers;
     }
 
-    pub fn LoadHexadecimal(&mut this, path: &String) -> bool {
+    pub fn Load(&mut this, path: &String, address: u32) -> bool {
+        let (_, extension) = SplitExtension(path);
+
+        if extension == ".hex" {
+            this.LoadHexadecimal(path, address)
+        } else if extension == ".bin" {
+            this.LoadBinary(path, address)
+        } else {
+            false
+        }
+    }
+
+    pub fn LoadHexadecimal(&mut this, path: &String, address: u32) -> bool {
         let content = _ReadFile(path).Unwrap();
         if content.Empty() { return false; }
         let mut offset: u32 = 0;
@@ -59,14 +76,14 @@ class Emulator {
         for line in content.Split('\n') {
             if line.Empty() { continue; }
             let word = line.Strip().ToInteger(16).Unwrap() as u32;
-            this.WriteWord(offset, word);
+            this.WriteWord(address + offset, word);
             offset += 4;
         }
 
         true
     }
 
-    pub fn LoadBinary(&mut this, path: &String) -> bool {
+    pub fn LoadBinary(&mut this, path: &String, address: u32) -> bool {
         let mut file = File(path);
         if !file.Open(FileMode::ReadBinary) { return false; }
         let mut offset: u32 = 0;
@@ -74,7 +91,7 @@ class Emulator {
         loop {
             let mut word: u32 = 0;
             if !file.ReadWords(&mut word, 1) { break; }
-            this.WriteWord(offset, ByteSwap32(word));
+            this.WriteWord(address + offset, ByteSwap32(word));
             offset += 4;
         }
 

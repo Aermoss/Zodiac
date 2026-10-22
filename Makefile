@@ -65,8 +65,8 @@ build: boot.hex program.bin program.hex
 simulate: wave.fst
 	gtkwave $<
 
-emulate: bin/zemu.exe program.bin
-	$^
+emulate: bin/zemu.exe boot.hex program.bin
+	$< boot.hex --flash=program.bin
 
 all: bin/zas.exe bin/zda.exe bin/zar.exe bin/zld.exe bin/zemu.exe bin/zym.exe bin/ztr.exe
 
