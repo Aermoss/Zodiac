@@ -82,7 +82,7 @@ fn ReadCharacter() -> i8 {
 }
 
 fn ButtonPressed() -> bool {
-    (*(0xFFF4 as *u32) & 1) == 0
+    (*(0xFFF4 as *u32) & 1) != 0
 }
 
 fn GetTime() -> u32 {

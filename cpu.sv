@@ -599,8 +599,8 @@ module cpu #(
 
     always_ff @(posedge clk or posedge rst) begin
         if (rst) begin
-            button_sync0 <= 1'b1;
-            button_sync1 <= 1'b1;
+            button_sync0 <= 1'b0;
+            button_sync1 <= 1'b0;
         end else begin
             button_sync0 <= button;
             button_sync1 <= button_sync0;

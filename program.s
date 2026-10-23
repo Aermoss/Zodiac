@@ -255,7 +255,7 @@ __LBB10_0:
     li t0, 63488
     lw t0, 2036(t0)
     andi t0, t0, 1
-    sltiu a0, t0, 1
+    sltu a0, zero, t0
     br ra
 
 	.global	__z7GetTime
