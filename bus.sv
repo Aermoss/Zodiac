@@ -21,6 +21,9 @@ module bus #(
     input logic rst,
 
     input logic [31:0] cpu_fetch_addr,
+    input logic [31:0] cpu_fetch_pc,
+    input logic [31:0] cpu_fetch_pc_current,
+    input logic cpu_fetch_repeat,
     output logic [31:0] cpu_fetch_read,
 
     input logic cpu_mem_access,
@@ -58,7 +61,7 @@ module bus #(
 
     wire [20:0] sdram_word_addr = {cpu_mem_addr[22:21], cpu_mem_addr[20:10], cpu_mem_addr[9:2]};
     wire [20:0] fetch_word_addr = {cpu_fetch_addr[22:21], cpu_fetch_addr[20:10], cpu_fetch_addr[9:2]};
-    wire [23:0] flash_byte_addr = cpu_mem_addr[23:0];
+    wire [23:0] flash_byte_addr = {cpu_mem_addr[23:2], 2'b00};
 
     localparam int CACHE_LINES = 256;
     localparam int LINE_WORDS = 4;
@@ -70,6 +73,9 @@ module bus #(
     wire [INDEX_BITS - 1:0] fetch_index = fetch_word_addr[OFFSET_BITS +: INDEX_BITS];
     wire [TAG_BITS - 1:0] fetch_tag = fetch_word_addr[20 -: TAG_BITS];
     wire [INDEX_BITS - 1:0] data_index = sdram_word_addr[OFFSET_BITS +: INDEX_BITS];
+
+    wire [INDEX_BITS - 1:0] pc_index = cpu_fetch_pc[2 + OFFSET_BITS +: INDEX_BITS];
+    wire [INDEX_BITS - 1:0] pc_current_index = cpu_fetch_pc_current[2 + OFFSET_BITS +: INDEX_BITS];
 
     localparam int REFRESH_CYCLES = CLK_FREQ / 1000000 * 15;
 
@@ -201,7 +207,7 @@ module bus #(
 
             if (!cpu_stall) begin
                 lookup <= is_sdram_fetch;
-                lookup_valid <= cache_valid[fetch_index];
+                lookup_valid <= cpu_fetch_repeat ? cache_valid[pc_current_index] : cache_valid[pc_index];
                 lookup_offset <= fetch_offset;
                 lookup_index <= fetch_index;
                 lookup_tag <= fetch_tag;

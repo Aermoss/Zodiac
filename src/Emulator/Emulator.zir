@@ -134,11 +134,15 @@ class Emulator {
         address == 0xFFFF || address == 0xFFFC || address == 0xFFF4 || address == 0xFFEC || address == 0xFFE8 || address == 0xFFE4 || address == 0xFFDC
     }
 
-    fn GetPendingInterrupts(&this) -> u32 {
-        if ((this.tick_counter - this.timer_compare) as i32) >= 0 { 1 } else { 0 }
+    fn GetPendingInterrupts(&mut this) -> u32 {
+        this.uart_mutex.Lock();
+        let uart: u32 = if this.uart_rx_ready { 2 } else { 0 };
+        this.uart_mutex.Unlock();
+        let timer: u32 = if ((this.tick_counter - this.timer_compare) as i32) >= 0 { 1 } else { 0 };
+        uart | timer
     }
 
-    fn ReadCSR(&this, index: u32) -> u32 {
+    fn ReadCSR(&mut this, index: u32) -> u32 {
         if index == CSR::STATUS as u32 {
             (if this.previous_interrupt_enable { 2 } else { 0 }) | (if this.interrupt_enable { 1 } else { 0 })
         } else if index == CSR::IENABLE as u32 {
@@ -279,8 +283,10 @@ class Emulator {
     }
 
     fn Tick(&mut this) {
-        if this.interrupt_enable && (this.GetPendingInterrupts() & this.interrupt_mask) != 0 {
-            (this.trap_pc, this.trap_cause) = (this.pc, 0x80000000);
+        let interrupts = this.GetPendingInterrupts() & this.interrupt_mask;
+
+        if this.interrupt_enable && interrupts != 0 {
+            (this.trap_pc, this.trap_cause) = (this.pc, if (interrupts & 1) != 0 { 0x80000000 } else { 0x80000001 });
             (this.previous_interrupt_enable, this.interrupt_enable) = (this.interrupt_enable, false);
             this.pc = this.trap_vector;
         }

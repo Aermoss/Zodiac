@@ -29,6 +29,9 @@ module cpu #(
     output logic ws2812,
 
     output logic [31:0] fetch_addr,
+    output logic [31:0] fetch_pc,
+    output logic [31:0] fetch_pc_current,
+    output logic fetch_repeat,
     input logic [31:0] fetch_read,
 
     output logic mem_access,
@@ -175,6 +178,111 @@ module cpu #(
 
     assign id_branch_target = id_pc + (id_branch_offset << 2);
 
+    alu_op_t id_alu_op;
+    logic id_alu_use_imm;
+    logic [31:0] id_alu_imm;
+    logic id_multicycle;
+    logic id_load;
+    logic id_result_alu;
+    logic id_result_compare;
+    logic id_result_csr;
+    logic id_compare_signed;
+    logic [31:0] id_static_result;
+
+    always_comb begin
+        id_alu_op = ALU_OP_ADD;
+        id_alu_use_imm = 0;
+        id_alu_imm = {16'b0, id_imm16};
+        id_multicycle = 0;
+        id_load = 0;
+        id_result_alu = 1;
+        id_result_compare = 0;
+        id_result_csr = 0;
+        id_compare_signed = 0;
+        id_static_result = id_pc + 4;
+
+        case (id_opcode)
+            OP_LB, OP_LBU, OP_LH, OP_LHU, OP_LW: id_load = 1;
+
+            OP_ADDI: begin
+                id_alu_use_imm = 1;
+                id_alu_imm = id_simm16;
+            end
+
+            OP_SUB: id_alu_op = ALU_OP_SUB;
+
+            OP_SUBI: begin
+                id_alu_op = ALU_OP_SUB;
+                id_alu_use_imm = 1;
+                id_alu_imm = id_simm16;
+            end
+
+            OP_MUL: begin id_alu_op = ALU_OP_MUL; id_multicycle = 1; end
+            OP_MULH: begin id_alu_op = ALU_OP_MULH; id_multicycle = 1; end
+            OP_MULHSU: begin id_alu_op = ALU_OP_MULHSU; id_multicycle = 1; end
+            OP_MULHU: begin id_alu_op = ALU_OP_MULHU; id_multicycle = 1; end
+            OP_DIV: begin id_alu_op = ALU_OP_DIV; id_multicycle = 1; end
+            OP_DIVU: begin id_alu_op = ALU_OP_DIVU; id_multicycle = 1; end
+            OP_REM: begin id_alu_op = ALU_OP_REM; id_multicycle = 1; end
+            OP_REMU: begin id_alu_op = ALU_OP_REMU; id_multicycle = 1; end
+
+            OP_AND: id_alu_op = ALU_OP_AND;
+            OP_ANDI: begin id_alu_op = ALU_OP_AND; id_alu_use_imm = 1; end
+            OP_OR: id_alu_op = ALU_OP_OR;
+            OP_ORI: begin id_alu_op = ALU_OP_OR; id_alu_use_imm = 1; end
+            OP_XOR: id_alu_op = ALU_OP_XOR;
+            OP_XORI: begin id_alu_op = ALU_OP_XOR; id_alu_use_imm = 1; end
+            OP_SLL: id_alu_op = ALU_OP_SLL;
+            OP_SLLI: begin id_alu_op = ALU_OP_SLL; id_alu_use_imm = 1; end
+            OP_SRL: id_alu_op = ALU_OP_SRL;
+            OP_SRLI: begin id_alu_op = ALU_OP_SRL; id_alu_use_imm = 1; end
+            OP_SRA: id_alu_op = ALU_OP_SRA;
+            OP_SRAI: begin id_alu_op = ALU_OP_SRA; id_alu_use_imm = 1; end
+
+            OP_SLT: begin
+                id_result_alu = 0;
+                id_result_compare = 1;
+                id_compare_signed = 1;
+            end
+
+            OP_SLTU: begin
+                id_result_alu = 0;
+                id_result_compare = 1;
+            end
+
+            OP_SLTI: begin
+                id_result_alu = 0;
+                id_result_compare = 1;
+                id_compare_signed = 1;
+                id_alu_use_imm = 1;
+                id_alu_imm = id_simm16;
+            end
+
+            OP_SLTIU: begin
+                id_result_alu = 0;
+                id_result_compare = 1;
+                id_alu_use_imm = 1;
+            end
+
+            OP_LUI: begin
+                id_result_alu = 0;
+                id_static_result = id_imm21 << 11;
+            end
+
+            OP_AUIPC: begin
+                id_result_alu = 0;
+                id_static_result = id_pc + (id_imm21 << 11);
+            end
+
+            OP_BL, OP_BLR: id_result_alu = 0;
+
+            OP_CSRR: begin
+                id_result_alu = 0;
+                id_result_csr = 1;
+            end
+        endcase
+    end
+
     logic [31:0] ex_pc;
     logic [31:0] ex_instr;
     logic [31:0] ex_result;
@@ -185,8 +293,17 @@ module cpu #(
     logic [31:0] ex_reg1;
     logic [31:0] ex_reg2;
     logic [15:0] ex_imm16;
-    logic [20:0] ex_imm21;
     logic signed [31:0] ex_simm16;
+    alu_op_t ex_alu_op;
+    logic ex_alu_use_imm;
+    logic [31:0] ex_alu_imm;
+    logic ex_multicycle;
+    logic ex_load;
+    logic ex_result_alu;
+    logic ex_result_compare;
+    logic ex_result_csr;
+    logic ex_compare_signed;
+    logic [31:0] ex_static_result;
     logic ex_branch_always;
     logic ex_branch_if_eq;
     logic ex_branch_if_ne;
@@ -209,6 +326,7 @@ module cpu #(
     opcode_t mem_opcode;
     logic [4:0] mem_reg_addr;
     logic [31:0] mem_reg0;
+    logic mem_load;
 
     logic [31:0] wb_pc;
     logic [31:0] wb_instr;
@@ -236,8 +354,7 @@ module cpu #(
     );
 
     logic is_multicycle_op, alu_active, alu_stall;
-    assign is_multicycle_op = (ex_opcode == OP_MUL) || (ex_opcode == OP_MULH) || (ex_opcode == OP_MULHSU) || (ex_opcode == OP_MULHU) ||
-        (ex_opcode == OP_DIV) || (ex_opcode == OP_DIVU) || (ex_opcode == OP_REM) || (ex_opcode == OP_REMU);
+    assign is_multicycle_op = ex_multicycle;
     assign alu_start = is_multicycle_op && !alu_active;
     assign alu_stall = is_multicycle_op && !alu_ready;
 
@@ -334,35 +451,22 @@ module cpu #(
     assign ex_reg1_fwd = ex_fwd_mem[1] ? mem_result : (ex_fwd_wb[1] ? wb_result : ex_reg1);
     assign ex_reg2_fwd = ex_fwd_mem[2] ? mem_result : (ex_fwd_wb[2] ? wb_result : ex_reg2);
 
+    logic [1:0] ex_branch_fwd_mem /* synthesis syn_preserve=1 */;
+    logic [1:0] ex_branch_fwd_wb /* synthesis syn_preserve=1 */;
+    logic [31:0] branch_reg0;
+    logic [31:0] branch_reg1;
+
+    assign branch_reg0 = ex_branch_fwd_mem[0] ? mem_result : (ex_branch_fwd_wb[0] ? wb_result : ex_reg0);
+    assign branch_reg1 = ex_branch_fwd_mem[1] ? mem_result : (ex_branch_fwd_wb[1] ? wb_result : ex_reg1);
+
     logic hazard_stall;
 
-    assign hazard_stall = (is_load_op(ex_opcode) && (ex_reg_addr != 0) && reads_register(id_opcode, id_instr, ex_reg_addr)) ||
-        (is_load_op(mem_opcode) && (mem_reg_addr != 0) && reads_register(id_opcode, id_instr, mem_reg_addr));
+    assign hazard_stall = (ex_load && (ex_reg_addr != 0) && reads_register(id_opcode, id_instr, ex_reg_addr)) ||
+        (mem_load && (mem_reg_addr != 0) && reads_register(id_opcode, id_instr, mem_reg_addr));
 
-    always_comb begin
-        alu_left = ex_reg1_fwd;
-        alu_right = (ex_opcode == OP_ANDI) || (ex_opcode == OP_ORI) || (ex_opcode == OP_XORI) || (ex_opcode == OP_SLLI) || (ex_opcode == OP_SRLI) || (ex_opcode == OP_SRAI)
-            ? ex_imm16 : ((ex_opcode == OP_ADDI) || (ex_opcode == OP_SUBI) ? ex_simm16 : ex_reg2_fwd);
-        alu_op = ALU_OP_ADD;
-
-        case (ex_opcode)
-            OP_SUB, OP_SUBI: alu_op = ALU_OP_SUB;
-            OP_MUL: alu_op = ALU_OP_MUL;
-            OP_MULH: alu_op = ALU_OP_MULH;
-            OP_MULHSU: alu_op = ALU_OP_MULHSU;
-            OP_MULHU: alu_op = ALU_OP_MULHU;
-            OP_DIV: alu_op = ALU_OP_DIV;
-            OP_DIVU: alu_op = ALU_OP_DIVU;
-            OP_REM: alu_op = ALU_OP_REM;
-            OP_REMU: alu_op = ALU_OP_REMU;
-            OP_AND, OP_ANDI: alu_op = ALU_OP_AND;
-            OP_OR, OP_ORI: alu_op = ALU_OP_OR;
-            OP_XOR, OP_XORI: alu_op = ALU_OP_XOR;
-            OP_SLL, OP_SLLI: alu_op = ALU_OP_SLL;
-            OP_SRL, OP_SRLI: alu_op = ALU_OP_SRL;
-            OP_SRA, OP_SRAI: alu_op = ALU_OP_SRA;
-        endcase
-    end
+    assign alu_left = ex_reg1_fwd;
+    assign alu_right = ex_alu_use_imm ? ex_alu_imm : ex_reg2_fwd;
+    assign alu_op = ex_alu_op;
 
     logic [3:0] io_we;
     logic io_read;
@@ -540,10 +644,12 @@ module cpu #(
     logic [31:0] csr_vector;
     logic [31:0] csr_scratch;
     logic [31:0] csr_read;
+    logic [31:0] interrupts;
     logic take_interrupt;
 
-    assign csr_ipending = {31'b0, timer_pending};
-    assign take_interrupt = csr_ie && (csr_ipending & csr_ienable) != 0 && ex_instr != 0 && !is_multicycle_op && !halted;
+    assign csr_ipending = {30'b0, uart_rx_ready, timer_pending};
+    assign interrupts = csr_ipending & csr_ienable;
+    assign take_interrupt = csr_ie && interrupts != 0 && ex_instr != 0 && !is_multicycle_op && !halted;
 
     always_comb begin
         case (ex_imm16)
@@ -570,7 +676,7 @@ module cpu #(
         end else if (!bus_stall) begin
             if (take_interrupt) begin
                 csr_epc <= ex_pc;
-                csr_cause <= 32'h80000000;
+                csr_cause <= interrupts[0] ? 32'h80000000 : 32'h80000001;
                 csr_pie <= csr_ie;
                 csr_ie <= 0;
             end else if (ex_opcode == OP_ERET) begin
@@ -593,37 +699,27 @@ module cpu #(
     logic branch_eq;
     logic branch_lt;
 
-    assign branch_eq = (ex_reg0_fwd == ex_reg1_fwd);
-    assign branch_lt = $signed({ex_signed_compare & ex_reg0_fwd[31], ex_reg0_fwd}) < $signed({ex_signed_compare & ex_reg1_fwd[31], ex_reg1_fwd});
+    assign branch_eq = (branch_reg0 == branch_reg1);
+    assign branch_lt = $signed({ex_signed_compare & branch_reg0[31], branch_reg0}) < $signed({ex_signed_compare & branch_reg1[31], branch_reg1});
     assign should_take_branch = take_interrupt || ex_branch_always || (branch_eq ? ex_branch_if_eq : ex_branch_if_ne) ||
         (branch_lt ? ex_branch_if_lt : ex_branch_if_ge);
+
+    logic compare_less;
+
+    assign compare_less = $signed({ex_compare_signed & alu_left[31], alu_left}) < $signed({ex_compare_signed & alu_right[31], alu_right});
+    assign ex_result = ex_result_alu ? alu_result : (ex_result_compare ? {31'b0, compare_less} : (ex_result_csr ? csr_read : ex_static_result));
 
     always_comb begin
         branch_target = ex_branch_target;
         should_halt = 0;
-        ex_result = alu_result;
         ex_addr = 0;
 
         case (ex_opcode)
             OP_LB, OP_LBU, OP_LH, OP_LHU, OP_LW, OP_SB, OP_SH, OP_SW:
                 ex_addr = ex_reg1_fwd + ex_simm16;
 
-            OP_LUI: ex_result = (ex_imm21 << 11);
-            OP_AUIPC: ex_result = ex_pc + (ex_imm21 << 11);
-            OP_SLT: ex_result = ($signed(ex_reg1_fwd) < $signed(ex_reg2_fwd));
-            OP_SLTU: ex_result = (ex_reg1_fwd < ex_reg2_fwd);
-            OP_SLTI: ex_result = ($signed(ex_reg1_fwd) < ex_simm16);
-            OP_SLTIU: ex_result = (ex_reg1_fwd < {{16{1'b0}}, ex_imm16});
-
             OP_BR: branch_target = ex_reg0_fwd;
-            OP_BL: ex_result = ex_pc + 4;
-
-            OP_BLR: begin
-                ex_result = ex_pc + 4;
-                branch_target = ex_reg1_fwd;
-            end
-
-            OP_CSRR: ex_result = csr_read;
+            OP_BLR: branch_target = ex_reg1_fwd;
             OP_ERET: branch_target = csr_epc;
             OP_HLT: should_halt = 1;
         endcase
@@ -635,7 +731,10 @@ module cpu #(
     end
 
     assign mem_addr = stage_mem_addr;
-    assign fetch_addr = (hazard_stall || alu_stall) ? if_pc_current : if_pc;
+    assign fetch_repeat = hazard_stall || alu_stall;
+    assign fetch_pc = if_pc;
+    assign fetch_pc_current = if_pc_current;
+    assign fetch_addr = fetch_repeat ? if_pc_current : if_pc;
 
     always_comb begin
         mem_write = 0;
@@ -739,8 +838,17 @@ module cpu #(
             ex_reg1 <= 0;
             ex_reg2 <= 0;
             ex_imm16 <= 0;
-            ex_imm21 <= 0;
             ex_simm16 <= 0;
+            ex_alu_op <= ALU_OP_ADD;
+            ex_alu_use_imm <= 0;
+            ex_alu_imm <= 0;
+            ex_multicycle <= 0;
+            ex_load <= 0;
+            ex_result_alu <= 0;
+            ex_result_compare <= 0;
+            ex_result_csr <= 0;
+            ex_compare_signed <= 0;
+            ex_static_result <= 0;
             ex_branch_always <= 0;
             ex_branch_if_eq <= 0;
             ex_branch_if_ne <= 0;
@@ -750,6 +858,8 @@ module cpu #(
             ex_branch_target <= 0;
             ex_fwd_mem <= 0;
             ex_fwd_wb <= 0;
+            ex_branch_fwd_mem <= 0;
+            ex_branch_fwd_wb <= 0;
 
             halted <= 0;
             branch_taken <= 1;
@@ -761,6 +871,7 @@ module cpu #(
             mem_opcode <= OP_NOP;
             mem_reg_addr <= 0;
             mem_reg0 <= 0;
+            mem_load <= 0;
 
             wb_pc <= 0;
             wb_instr <= 0;
@@ -807,17 +918,28 @@ module cpu #(
                 ex_reg1 <= id_reg1;
                 ex_reg2 <= id_reg2;
                 ex_imm16 <= id_imm16;
-                ex_imm21 <= id_imm21;
                 ex_simm16 <= id_simm16;
+                ex_alu_op <= id_alu_op;
+                ex_alu_use_imm <= id_alu_use_imm;
+                ex_alu_imm <= id_alu_imm;
+                ex_result_alu <= id_result_alu;
+                ex_result_compare <= id_result_compare;
+                ex_result_csr <= id_result_csr;
+                ex_compare_signed <= id_compare_signed;
+                ex_static_result <= id_static_result;
                 ex_signed_compare <= id_signed_compare;
                 ex_branch_target <= id_branch_target;
                 ex_fwd_mem <= id_fwd_mem;
                 ex_fwd_wb <= id_fwd_wb;
+                ex_branch_fwd_mem <= id_fwd_mem[1:0];
+                ex_branch_fwd_wb <= id_fwd_wb[1:0];
 
                 if (should_take_branch || hazard_stall || halted) begin
                     ex_instr <= 0;
                     ex_opcode <= OP_NOP;
                     ex_reg_addr <= 0;
+                    ex_multicycle <= 0;
+                    ex_load <= 0;
                     ex_branch_always <= 0;
                     ex_branch_if_eq <= 0;
                     ex_branch_if_ne <= 0;
@@ -827,6 +949,8 @@ module cpu #(
                     ex_instr <= id_instr;
                     ex_opcode <= id_opcode;
                     ex_reg_addr <= id_reg_addr;
+                    ex_multicycle <= id_multicycle;
+                    ex_load <= id_load;
                     ex_branch_always <= id_branch_always;
                     ex_branch_if_eq <= id_branch_if_eq;
                     ex_branch_if_ne <= id_branch_if_ne;
@@ -848,6 +972,7 @@ module cpu #(
                 mem_opcode <= OP_NOP;
                 mem_reg_addr <= 0;
                 mem_reg0 <= 0;
+                mem_load <= 0;
             end else begin
                 mem_pc <= ex_pc;
                 mem_instr <= ex_instr;
@@ -856,6 +981,7 @@ module cpu #(
                 mem_opcode <= ex_opcode;
                 mem_reg_addr <= ex_reg_addr;
                 mem_reg0 <= ex_reg0_fwd;
+                mem_load <= ex_load;
             end
 
             wb_pc <= mem_pc;
