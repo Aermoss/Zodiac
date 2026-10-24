@@ -28,6 +28,12 @@ module cpu #(
     output logic [5:0] leds,
     output logic ws2812,
 
+    output logic flash_raw_enable,
+    output logic flash_raw_start,
+    output logic [7:0] flash_raw_tx,
+    input logic [7:0] flash_raw_rx,
+    input logic flash_raw_busy,
+
     output logic [31:0] fetch_addr,
     output logic [31:0] fetch_pc,
     output logic [31:0] fetch_pc_current,
@@ -614,6 +620,16 @@ module cpu #(
             leds <= mem_write[5:0];
     end
 
+    always_ff @(posedge clk or posedge rst) begin
+        if (rst)
+            flash_raw_enable <= 0;
+        else if (mem_addr == 32'hFFD4 && io_we != 0)
+            flash_raw_enable <= mem_write[0];
+    end
+
+    assign flash_raw_start = mem_addr == 32'hFFD8 && io_we != 0;
+    assign flash_raw_tx = mem_write[7:0];
+
     ws2812_tx #(
         .CLK_FREQ(CLK_FREQ)
     ) ws2812_tx0 (
@@ -631,7 +647,7 @@ module cpu #(
 
         if (mem_addr == 32'hFFFF)
             uart_we = io_we;
-        else if (mem_addr != 32'hFFF0 && mem_addr != 32'hFFE0 && mem_addr != 32'hFFEC && mem_addr != 32'hFFF4 && mem_addr != 32'hFFF8 && mem_addr != 32'hFFE8 && mem_addr != 32'hFFE4 && mem_addr != 32'hFFDC)
+        else if (mem_addr != 32'hFFF0 && mem_addr != 32'hFFE0 && mem_addr != 32'hFFEC && mem_addr != 32'hFFF4 && mem_addr != 32'hFFF8 && mem_addr != 32'hFFE8 && mem_addr != 32'hFFE4 && mem_addr != 32'hFFDC && mem_addr != 32'hFFD8 && mem_addr != 32'hFFD4)
             actual_mem_we = mem_we;
     end
 
@@ -780,6 +796,8 @@ module cpu #(
             32'hFFE8: io_read_word = cycle_counter;
             32'hFFE4: io_read_word = instret_counter;
             32'hFFDC: io_read_word = timer_compare;
+            32'hFFD8: io_read_word = {24'b0, flash_raw_rx};
+            32'hFFD4: io_read_word = {30'b0, flash_raw_busy, flash_raw_enable};
             default: begin
                 io_read_word = 0;
                 io_read_hit = 0;

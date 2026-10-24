@@ -23,6 +23,12 @@ module flash (
     output logic [31:0] flash_rdata,
     output logic flash_ready,
 
+    input logic raw_enable,
+    input logic raw_start,
+    input logic [7:0] raw_tx,
+    output logic [7:0] raw_rx,
+    output logic raw_busy,
+
     output logic flash_cs,
     output logic flash_sck,
     output logic flash_mosi,
@@ -30,10 +36,13 @@ module flash (
 );
     localparam logic [7:0] READ_CMD = 8'h03;
 
+    localparam int DESELECT_CYCLES = 7;
+
     typedef enum logic [1:0] {
         S_IDLE,
         S_XFER,
-        S_DONE
+        S_DONE,
+        S_RAW
     } state_t;
 
     state_t state;
@@ -42,9 +51,13 @@ module flash (
     logic phase, stage;
     logic [31:0] tx_shift;
     logic [31:0] rx_shift;
+    logic raw_pending;
+    logic [7:0] raw_byte;
+    logic [2:0] deselect_count;
 
     assign flash_sck = flash_cs ? 1'b0 : phase;
     assign flash_mosi = tx_shift[31];
+    assign raw_busy = raw_pending || raw_start || state == S_RAW;
 
     always_ff @(posedge clk or posedge rst) begin
         if (rst) begin
@@ -57,11 +70,37 @@ module flash (
             tx_shift <= 32'h0;
             rx_shift <= 32'h0;
             stage <= 1'b0;
+            raw_rx <= 8'h0;
+            raw_pending <= 1'b0;
+            raw_byte <= 8'h0;
+            deselect_count <= 3'd0;
         end else begin
+            // The byte is only on raw_tx while it is being written, the transfer may start later.
+            if (raw_start) begin
+                raw_pending <= 1'b1;
+                raw_byte <= raw_tx;
+            end
+
+            if (!flash_cs)
+                deselect_count <= 3'd0;
+            else if (deselect_count != 3'(DESELECT_CYCLES))
+                deselect_count <= deselect_count + 3'd1;
+
             case (state)
                 S_IDLE: begin
                     flash_ready <= 1'b0;
-                    if (flash_req) begin
+
+                    if (raw_enable) begin
+                        if (flash_cs && deselect_count == 3'(DESELECT_CYCLES)) begin
+                            flash_cs <= 1'b0;
+                        end else if (!flash_cs && raw_pending) begin
+                            tx_shift <= {raw_byte, 24'h0};
+                            bit_cnt <= 6'd8;
+                            phase <= 1'b0;
+                            raw_pending <= 1'b0;
+                            state <= S_RAW;
+                        end
+                    end else if (flash_req) begin
                         flash_cs <= 1'b0;
                         tx_shift <= {READ_CMD, flash_addr};
                         bit_cnt <= 6'd32;
@@ -70,6 +109,7 @@ module flash (
                         state <= S_XFER;
                     end else begin
                         flash_cs <= 1'b1;
+                        raw_pending <= raw_start;
                     end
                 end
 
@@ -100,6 +140,23 @@ module flash (
                     flash_rdata <= rx_shift;
                     flash_ready <= 1'b1;
                     state <= S_IDLE;
+                end
+
+                S_RAW: begin
+                    if (!phase) begin
+                        phase <= 1'b1;
+                    end else begin
+                        rx_shift <= {rx_shift[30:0], flash_miso};
+                        tx_shift <= {tx_shift[30:0], 1'b0};
+                        phase <= 1'b0;
+
+                        if (bit_cnt == 6'd1) begin
+                            raw_rx <= {rx_shift[6:0], flash_miso};
+                            state <= S_IDLE;
+                        end else begin
+                            bit_cnt <= bit_cnt - 6'd1;
+                        end
+                    end
                 end
 
                 default: state <= S_IDLE;

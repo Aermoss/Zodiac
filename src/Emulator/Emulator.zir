@@ -43,7 +43,17 @@ class Emulator {
     trap_cause: u32,
     trap_vector: u32,
     trap_scratch: u32,
-    timer_compare: u32;
+    timer_compare: u32,
+    flash_selected: bool,
+    flash_write_enabled: bool,
+    flash_read_warned: bool,
+    flash_command: u8,
+    flash_rx: u8,
+    flash_count: u32,
+    flash_address: u32,
+    flash_paths: Vector<String>,
+    flash_offsets: Vector<u32>,
+    flash_sizes: Vector<u32>;
 
     Emulator(&mut this, quiet: bool) {
         this.quiet = quiet;
@@ -105,6 +115,12 @@ class Emulator {
             offset += 4;
         }
 
+        if (address & 0xC0000000) == 0x80000000 {
+            this.flash_paths.PushBack(path);
+            this.flash_offsets.PushBack(address & 0x7FFFFF);
+            this.flash_sizes.PushBack(offset);
+        }
+
         true
     }
 
@@ -114,6 +130,8 @@ class Emulator {
         (this.interrupt_enable, this.previous_interrupt_enable, this.interrupt_mask) = (false, false, 0);
         (this.trap_pc, this.trap_cause, this.trap_vector, this.trap_scratch) = (0, 0, 0, 0);
         this.timer_compare = 0;
+        (this.flash_selected, this.flash_write_enabled, this.flash_read_warned) = (false, false, false);
+        (this.flash_command, this.flash_rx, this.flash_count, this.flash_address) = (0, 0, 0, 0);
 
         for i in 0..32 {
             this.registers[i as usize] = 0;
@@ -131,7 +149,97 @@ class Emulator {
     }
 
     fn IsDevice(&this, address: u32) -> bool {
-        address == 0xFFFF || address == 0xFFFC || address == 0xFFF4 || address == 0xFFEC || address == 0xFFE8 || address == 0xFFE4 || address == 0xFFDC
+        address == 0xFFFF || address == 0xFFFC || address == 0xFFF4 || address == 0xFFEC || address == 0xFFE8 || address == 0xFFE4 || address == 0xFFDC || address == 0xFFD8 || address == 0xFFD4
+    }
+
+    fn SelectFlash(&mut this, selected: bool) {
+        if selected && !this.flash_selected {
+            (this.flash_command, this.flash_count, this.flash_address) = (0, 0, 0);
+        } else if !selected && this.flash_selected {
+            this.FinishFlashCommand();
+        }
+
+        this.flash_selected = selected;
+    }
+
+    fn FinishFlashCommand(&mut this) {
+        let command = this.flash_command;
+
+        if command == 0x06 && this.flash_count == 1 {
+            this.flash_write_enabled = true;
+        } else if command == 0x04 {
+            this.flash_write_enabled = false;
+        } else if command == 0x20 && this.flash_count == 4 && this.flash_write_enabled {
+            let sector = this.flash_address & 0x7FF000;
+            let mut i: u32 = 0;
+
+            while i < 4096 {
+                this.flash[(sector + i) as usize] = 0xFF;
+                i += 1;
+            }
+
+            this.flash_write_enabled = false;
+            this.SaveFlash(sector, 4096);
+        } else if command == 0x02 && this.flash_count > 4 && this.flash_write_enabled {
+            this.flash_write_enabled = false;
+            this.SaveFlash(this.flash_address & 0x7FFF00, 256);
+        }
+    }
+
+    fn TransferFlashByte(&mut this, value: u8) {
+        if !this.flash_selected {
+            return;
+        }
+
+        let (command, count) = (this.flash_command, this.flash_count);
+        let mut result: u8 = 0xFF;
+
+        if count == 0 {
+            this.flash_command = value;
+        } else if count < 4 && (command == 0x03 || command == 0x20 || command == 0x02) {
+            this.flash_address = ((this.flash_address << 8) | value as u32) & 0xFFFFFF;
+        } else if command == 0x03 {
+            result = this.flash[(((this.flash_address + count - 4) & 0x7FFFFF) ^ 3) as usize];
+        } else if command == 0x02 {
+            if this.flash_write_enabled {
+                let address = (this.flash_address & 0x7FFF00) | ((this.flash_address + count - 4) & 0xFF);
+                this.flash[(address ^ 3) as usize] = this.flash[(address ^ 3) as usize] & value;
+            }
+        } else if command == 0x05 {
+            result = if this.flash_write_enabled { 2 } else { 0 };
+        } else if command == 0x9F {
+            result = if count == 1 { 0xEF } else if count == 2 { 0x40 } else { 0x17 };
+        }
+
+        this.flash_rx = result;
+        this.flash_count = count + 1;
+    }
+
+    fn SaveFlash(&mut this, start: u32, length: u32) {
+        for i in 0..this.flash_paths.Length() {
+            let offset = this.flash_offsets[i];
+
+            if start < offset || start + length > offset + this.flash_sizes[i] {
+                continue;
+            }
+
+            let mut file = File(this.flash_paths[i]);
+
+            if !file.Open(FileMode::UpdateBinary) || !file.Seek(start - offset) {
+                continue;
+            }
+
+            let mut address = start;
+
+            while address < start + length {
+                let mut word = this.flash[address as usize] as u32;
+                word |= this.flash[(address + 1) as usize] as u32 << 8;
+                word |= this.flash[(address + 2) as usize] as u32 << 16;
+                word |= this.flash[(address + 3) as usize] as u32 << 24;
+                file.WriteWord(ByteSwap32(word));
+                address += 4;
+            }
+        }
     }
 
     fn GetPendingInterrupts(&mut this) -> u32 {
@@ -197,6 +305,8 @@ class Emulator {
             0xFFE8 => this.tick_counter,
             0xFFE4 => this.tick_counter,
             0xFFDC => this.timer_compare,
+            0xFFD8 => this.flash_rx as u32,
+            0xFFD4 => if this.flash_selected { 1 } else { 0 },
             _ => this.ms_counter
         }
     }
@@ -205,6 +315,11 @@ class Emulator {
         if this.IsDevice(address) {
             ((this.ReadDevice(address) >> (8 * (address & 3))) & 0xFF) as u8
         } else if (address & 0xC0000000) == 0x80000000 {
+            if this.flash_selected && !this.flash_read_warned {
+                WriteLine("[Flash: read while CS is held by the software]");
+                this.flash_read_warned = true;
+            }
+
             this.flash[(address & 0x7FFFFF) as usize]
         } else if (address & 0xC0000000) == 0x40000000 {
             this.sdram[(address & 0x7FFFFF) as usize]
@@ -272,6 +387,12 @@ class Emulator {
             },
             0xFFDC => {
                 this.timer_compare = value;
+            },
+            0xFFD4 => {
+                this.SelectFlash((value & 1) != 0);
+            },
+            0xFFD8 => {
+                this.TransferFlashByte((value & 0xFF) as u8);
             },
             _ => {
                 this.WriteByte(address, (value & 0xFF) as u8);

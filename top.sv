@@ -81,6 +81,11 @@ module top (
     logic [31:0] cpu_mem_write;
     logic [31:0] cpu_mem_read;
     logic cpu_stall;
+    logic flash_raw_enable;
+    logic flash_raw_start;
+    logic [7:0] flash_raw_tx;
+    logic [7:0] flash_raw_rx;
+    logic flash_raw_busy;
 
     cpu #(
         .SIMULATION(1'b0),
@@ -95,6 +100,12 @@ module top (
         .button(button),
         .leds(leds),
         .ws2812(ws2812),
+
+        .flash_raw_enable(flash_raw_enable),
+        .flash_raw_start(flash_raw_start),
+        .flash_raw_tx(flash_raw_tx),
+        .flash_raw_rx(flash_raw_rx),
+        .flash_raw_busy(flash_raw_busy),
 
         .fetch_addr(cpu_fetch_addr),
         .fetch_pc(cpu_fetch_pc),
@@ -177,6 +188,11 @@ module top (
         .flash_addr(flash_addr),
         .flash_rdata(flash_rdata),
         .flash_ready(flash_ready),
+        .raw_enable(flash_raw_enable),
+        .raw_start(flash_raw_start),
+        .raw_tx(flash_raw_tx),
+        .raw_rx(flash_raw_rx),
+        .raw_busy(flash_raw_busy),
         .flash_cs(spi_cs_pin),
         .flash_sck(spi_clk_pin),
         .flash_mosi(spi_mosi_pin),

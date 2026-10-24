@@ -27,7 +27,7 @@ fn PrintUsage(executable: String) {
     WriteLine("OVERVIEW: Zodiac emulator");
     WriteLine("USAGE: " + executable + " [options] <input>");
     WriteLine("OPTIONS:");
-    WriteLine("  --flash=<file>           Load <file> into flash at 0x100000");
+    WriteLine("  --flash=<file>[@<offset>] Load <file> into flash at <offset>, 0x100000 if not given");
     WriteLine("  --quiet                  Do not report writes to the LEDs, WS2812 and baud rate");
     WriteLine("  --version                Display emulator version");
     WriteLine("  -h, --help               Display this help message");
@@ -44,7 +44,8 @@ fn Main(args: &mut Vector<String>) -> i32 {
 
     let mut quiet = false;
     let mut input = String();
-    let mut flash = String();
+    let mut flash_files = Vector<String>();
+    let mut flash_offsets = Vector<u32>();
     let mut i: usize = 1;
 
     while i < args.Length() {
@@ -59,12 +60,26 @@ fn Main(args: &mut Vector<String>) -> i32 {
         } else if arg == "--quiet" {
             quiet = true;
         } else if arg.StartsWith("--flash=") {
-            flash = arg.SubString(8);
+            let parts = arg.SubString(8).Split('@');
+            let mut offset: u32 = 0x100000;
 
-            if !FileExists(flash) {
-                Logger::Log("Cannot find '" + flash + "'.", LogSeverity::Error);
+            if parts.Length() > 1 {
+                let text = parts[1];
+
+                if text.StartsWith("0x") {
+                    offset = String::ToInteger(text.SubString(2), 16).Unwrap() as u32;
+                } else {
+                    offset = String::ToInteger(text, 10).Unwrap() as u32;
+                }
+            }
+
+            if !FileExists(parts[0]) {
+                Logger::Log("Cannot find '" + parts[0] + "'.", LogSeverity::Error);
                 return 1;
             }
+
+            flash_files.PushBack(parts[0]);
+            flash_offsets.PushBack(offset);
         } else if FileExists(arg) {
             input = arg;
         } else {
@@ -85,9 +100,11 @@ fn Main(args: &mut Vector<String>) -> i32 {
         return 1;
     }
 
-    if !flash.Empty() && !emulator.Load(flash, 0x80100000) {
-        Logger::Log("Failed to load flash image '" + flash + "'.", LogSeverity::Error);
-        return 1;
+    for j in 0..flash_files.Length() {
+        if !emulator.Load(flash_files[j], 0x80000000 + flash_offsets[j]) {
+            Logger::Log("Failed to load flash image '" + flash_files[j] + "'.", LogSeverity::Error);
+            return 1;
+        }
     }
 
     emulator.Emulate();

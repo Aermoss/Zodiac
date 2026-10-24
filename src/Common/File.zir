@@ -20,11 +20,12 @@ extern "C" {
     fn fopen(pathname: *i8, mode: *i8) -> *mut void;
     fn fread(ptr: *mut void, size: usize, nmemb: usize, stream: *mut void) -> usize;
     fn fwrite(ptr: *void, size: usize, nmemb: usize, stream: *mut void) -> usize;
+    fn fseek(stream: *mut void, offset: i32, whence: i32) -> i32;
     fn fclose(stream: *mut void) -> i32;
 }
 
 enum FileMode: u32 {
-    Read, ReadBinary, Write, WriteBinary
+    Read, ReadBinary, Write, WriteBinary, UpdateBinary
 }
 
 extend FileMode {
@@ -33,7 +34,8 @@ extend FileMode {
             FileMode::Read => "r",
             FileMode::ReadBinary => "rb",
             FileMode::Write => "w",
-            FileMode::WriteBinary => "wb"
+            FileMode::WriteBinary => "wb",
+            FileMode::UpdateBinary => "r+b"
         }
     }
 }
@@ -61,6 +63,10 @@ class File {
             fclose(this.handle);
             this.handle = null;
         }
+    }
+
+    pub fn Seek(&this, offset: u32) -> bool {
+        fseek(this.handle, offset as i32, 0) == 0
     }
 
     pub fn ReadBytes(&this, pointer: *mut u8, count: usize) -> bool {
