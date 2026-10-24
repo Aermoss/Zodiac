@@ -25,6 +25,11 @@ module top (
     output logic [5:0] leds,
     output logic ws2812,
 
+    output logic tmds_clk_p,
+    output logic tmds_clk_n,
+    output logic [2:0] tmds_d_p,
+    output logic [2:0] tmds_d_n,
+
     output wire spi_cs_pin,
     output wire spi_clk_pin,
     output wire spi_mosi_pin,
@@ -86,6 +91,11 @@ module top (
     logic [7:0] flash_raw_tx;
     logic [7:0] flash_raw_rx;
     logic flash_raw_busy;
+    logic video_write;
+    logic [11:0] video_address;
+    logic [15:0] video_data;
+    logic [15:0] video_cursor;
+    logic [4:0] video_scroll;
 
     cpu #(
         .SIMULATION(1'b0),
@@ -106,6 +116,12 @@ module top (
         .flash_raw_tx(flash_raw_tx),
         .flash_raw_rx(flash_raw_rx),
         .flash_raw_busy(flash_raw_busy),
+
+        .video_write(video_write),
+        .video_address(video_address),
+        .video_data(video_data),
+        .video_cursor(video_cursor),
+        .video_scroll(video_scroll),
 
         .fetch_addr(cpu_fetch_addr),
         .fetch_pc(cpu_fetch_pc),
@@ -174,6 +190,21 @@ module top (
         .O_sdrc_data(sdrc_data_r), 
         .O_sdrc_init_done(sdrc_init_done),
         .O_sdrc_cmd_ack(sdrc_cmd_ack)
+    );
+
+    video video0 (
+        .clk(clk),
+        .cpu_clk(sys_clk),
+        .rst(rst_reg),
+        .text_write(video_write),
+        .text_address(video_address),
+        .text_data(video_data),
+        .cursor(video_cursor),
+        .scroll(video_scroll),
+        .tmds_clk_p(tmds_clk_p),
+        .tmds_clk_n(tmds_clk_n),
+        .tmds_d_p(tmds_d_p),
+        .tmds_d_n(tmds_d_n)
     );
 
     logic flash_req;

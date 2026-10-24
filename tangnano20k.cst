@@ -45,3 +45,19 @@ IO_PORT "spi_mosi_pin" IO_TYPE=LVCMOS33 PULL_MODE=NONE DRIVE=8;
 
 IO_LOC "spi_miso_pin" 62;
 IO_PORT "spi_miso_pin" IO_TYPE=LVCMOS33 PULL_MODE=UP;
+
+IO_LOC "tmds_clk_p" 33;
+IO_PORT "tmds_clk_p" IO_TYPE=LVCMOS33D PULL_MODE=NONE DRIVE=8;
+IO_LOC "tmds_clk_n" 34;
+
+IO_LOC "tmds_d_p[0]" 35;
+IO_PORT "tmds_d_p[0]" IO_TYPE=LVCMOS33D PULL_MODE=NONE DRIVE=8;
+IO_LOC "tmds_d_n[0]" 36;
+
+IO_LOC "tmds_d_p[1]" 37;
+IO_PORT "tmds_d_p[1]" IO_TYPE=LVCMOS33D PULL_MODE=NONE DRIVE=8;
+IO_LOC "tmds_d_n[1]" 38;
+
+IO_LOC "tmds_d_p[2]" 39;
+IO_PORT "tmds_d_p[2]" IO_TYPE=LVCMOS33D PULL_MODE=NONE DRIVE=8;
+IO_LOC "tmds_d_n[2]" 40;

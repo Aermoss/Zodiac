@@ -34,6 +34,12 @@ module cpu #(
     input logic [7:0] flash_raw_rx,
     input logic flash_raw_busy,
 
+    output logic video_write,
+    output logic [11:0] video_address,
+    output logic [15:0] video_data,
+    output logic [15:0] video_cursor,
+    output logic [4:0] video_scroll,
+
     output logic [31:0] fetch_addr,
     output logic [31:0] fetch_pc,
     output logic [31:0] fetch_pc_current,
@@ -630,6 +636,24 @@ module cpu #(
     assign flash_raw_start = mem_addr == 32'hFFD8 && io_we != 0;
     assign flash_raw_tx = mem_write[7:0];
 
+    logic in_text_window;
+
+    assign in_text_window = mem_addr[31:14] == 18'd2;
+    assign video_write = in_text_window && io_we != 0;
+    assign video_address = mem_addr[13:2];
+    assign video_data = mem_write[15:0];
+
+    always_ff @(posedge clk or posedge rst) begin
+        if (rst) begin
+            video_cursor <= 0;
+            video_scroll <= 0;
+        end else if (mem_addr == 32'hFFD0 && io_we != 0) begin
+            video_cursor <= mem_write[15:0];
+        end else if (mem_addr == 32'hFFCC && io_we != 0) begin
+            video_scroll <= mem_write[4:0];
+        end
+    end
+
     ws2812_tx #(
         .CLK_FREQ(CLK_FREQ)
     ) ws2812_tx0 (
@@ -647,7 +671,7 @@ module cpu #(
 
         if (mem_addr == 32'hFFFF)
             uart_we = io_we;
-        else if (mem_addr != 32'hFFF0 && mem_addr != 32'hFFE0 && mem_addr != 32'hFFEC && mem_addr != 32'hFFF4 && mem_addr != 32'hFFF8 && mem_addr != 32'hFFE8 && mem_addr != 32'hFFE4 && mem_addr != 32'hFFDC && mem_addr != 32'hFFD8 && mem_addr != 32'hFFD4)
+        else if (mem_addr != 32'hFFF0 && mem_addr != 32'hFFE0 && mem_addr != 32'hFFEC && mem_addr != 32'hFFF4 && mem_addr != 32'hFFF8 && mem_addr != 32'hFFE8 && mem_addr != 32'hFFE4 && mem_addr != 32'hFFDC && mem_addr != 32'hFFD8 && mem_addr != 32'hFFD4 && mem_addr != 32'hFFD0 && mem_addr != 32'hFFCC && !in_text_window)
             actual_mem_we = mem_we;
     end
 
@@ -798,9 +822,11 @@ module cpu #(
             32'hFFDC: io_read_word = timer_compare;
             32'hFFD8: io_read_word = {24'b0, flash_raw_rx};
             32'hFFD4: io_read_word = {30'b0, flash_raw_busy, flash_raw_enable};
+            32'hFFD0: io_read_word = {16'b0, video_cursor};
+            32'hFFCC: io_read_word = {27'b0, video_scroll};
             default: begin
                 io_read_word = 0;
-                io_read_hit = 0;
+                io_read_hit = stage_mem_addr[31:14] == 18'd2;
             end
         endcase
     end
