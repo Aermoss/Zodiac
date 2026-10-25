@@ -70,6 +70,7 @@ module bus #(
     localparam int DCACHE_LINES = 256;
     localparam int DINDEX_BITS = $clog2(DCACHE_LINES);
     localparam int DTAG_BITS = 21 - DINDEX_BITS - OFFSET_BITS;
+    localparam int CLEAR_BITS = INDEX_BITS > DINDEX_BITS ? INDEX_BITS : DINDEX_BITS;
 
     wire [OFFSET_BITS - 1:0] fetch_offset = fetch_word_addr[OFFSET_BITS - 1:0];
     wire [INDEX_BITS - 1:0] fetch_index = fetch_word_addr[OFFSET_BITS +: INDEX_BITS];
@@ -128,7 +129,7 @@ module bus #(
     logic [TAG_BITS - 1:0] cache_read_tag;
     logic cache_read_valid;
     logic clearing;
-    logic [INDEX_BITS - 1:0] clear_index;
+    logic [CLEAR_BITS - 1:0] clear_index;
 
     logic lookup;
     logic [OFFSET_BITS - 1:0] lookup_offset;
@@ -139,13 +140,12 @@ module bus #(
     logic [OFFSET_BITS - 1:0] fill_offset;
 
     logic [31:0] dcache_data [0:DCACHE_LINES * LINE_WORDS - 1];
-    logic [DTAG_BITS - 1:0] dcache_tags [0:DCACHE_LINES - 1];
-    logic [DCACHE_LINES - 1:0] dcache_valid;
+    logic [DTAG_BITS:0] dcache_tags [0:DCACHE_LINES - 1];
     logic [31:0] dcache_read;
     logic [DTAG_BITS - 1:0] dcache_read_tag;
+    logic dcache_read_valid;
 
     logic dlookup;
-    logic dlookup_valid;
     logic [OFFSET_BITS - 1:0] dlookup_offset;
     logic [DINDEX_BITS - 1:0] dlookup_index;
     logic [DTAG_BITS - 1:0] dlookup_tag;
@@ -159,10 +159,10 @@ module bus #(
     wire [INDEX_BITS - 1:0] sdrc_code_index = r_sdrc_addr[OFFSET_BITS +: INDEX_BITS];
 
     wire cache_miss = lookup && !(cache_read_valid && cache_read_tag == lookup_tag);
-    wire dcache_miss = dlookup && !(dlookup_valid && dcache_read_tag == dlookup_tag);
+    wire dcache_miss = dlookup && !(dcache_read_valid && dcache_read_tag == dlookup_tag);
     wire fill_write = filling && state == S_READ_DELAY && read_delay_counter <= 3'd1;
 
-    wire store_hit = store_check && dcache_valid[sdrc_index] && dcache_read_tag == sdrc_tag;
+    wire store_hit = store_check && dcache_read_valid && dcache_read_tag == sdrc_tag;
     logic [31:0] store_word;
 
     always_comb begin
@@ -175,7 +175,7 @@ module bus #(
             cache_data[{lookup_index, fill_offset}] <= sdrc_data_r;
 
         if (clearing)
-            cache_tags[clear_index] <= '0;
+            cache_tags[clear_index[INDEX_BITS - 1:0]] <= '0;
         else if (store_check)
             cache_tags[sdrc_code_index] <= '0;
         else if (fill_write && !filling_data && fill_offset == {OFFSET_BITS{1'b1}})
@@ -189,11 +189,13 @@ module bus #(
         if ((fill_write && filling_data) || store_hit)
             dcache_data[{sdrc_index, sdrc_offset}] <= store_hit ? store_word : sdrc_data_r;
 
-        if (fill_write && filling_data && fill_offset == {OFFSET_BITS{1'b1}})
-            dcache_tags[sdrc_index] <= sdrc_tag;
+        if (clearing)
+            dcache_tags[clear_index[DINDEX_BITS - 1:0]] <= '0;
+        else if (fill_write && filling_data && fill_offset == {OFFSET_BITS{1'b1}})
+            dcache_tags[sdrc_index] <= {1'b1, sdrc_tag};
 
         dcache_read <= dcache_data[{data_index, data_offset}];
-        dcache_read_tag <= dcache_tags[data_index];
+        {dcache_read_valid, dcache_read_tag} <= dcache_tags[data_index];
     end
 
     always_ff @(posedge clk or posedge rst) begin
@@ -226,9 +228,7 @@ module bus #(
             miss_pending <= 1'b0;
             filling <= 1'b0;
             fill_offset <= '0;
-            dcache_valid <= '0;
             dlookup <= 1'b0;
-            dlookup_valid <= 1'b0;
             dlookup_offset <= '0;
             dlookup_index <= '0;
             dlookup_tag <= '0;
@@ -243,7 +243,7 @@ module bus #(
             if (clearing) begin
                 clear_index <= clear_index + 1'b1;
 
-                if (clear_index == {INDEX_BITS{1'b1}})
+                if (clear_index == {CLEAR_BITS{1'b1}})
                     clearing <= 1'b0;
             end
 
@@ -269,7 +269,6 @@ module bus #(
                 lookup_tag <= fetch_tag;
 
                 dlookup <= is_sdram_load;
-                dlookup_valid <= dcache_valid[data_index];
                 dlookup_offset <= data_offset;
                 dlookup_index <= data_index;
                 dlookup_tag <= data_tag;
@@ -386,9 +385,6 @@ module bus #(
                             fetch_hold <= sdrc_data_r;
 
                         if (fill_offset == {OFFSET_BITS{1'b1}}) begin
-                            if (filling_data)
-                                dcache_valid[dlookup_index] <= 1'b1;
-
                             filling <= 1'b0;
                             state <= S_IDLE;
                         end else begin
