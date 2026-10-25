@@ -41,9 +41,6 @@ module cpu #(
     output logic [4:0] video_scroll,
 
     output logic [31:0] fetch_addr,
-    output logic [31:0] fetch_pc,
-    output logic [31:0] fetch_pc_current,
-    output logic fetch_repeat,
     input logic [31:0] fetch_read,
 
     output logic mem_access,
@@ -771,10 +768,7 @@ module cpu #(
     end
 
     assign mem_addr = stage_mem_addr;
-    assign fetch_repeat = hazard_stall || alu_stall;
-    assign fetch_pc = if_pc;
-    assign fetch_pc_current = if_pc_current;
-    assign fetch_addr = fetch_repeat ? if_pc_current : if_pc;
+    assign fetch_addr = (hazard_stall || alu_stall) ? if_pc_current : if_pc;
 
     always_comb begin
         mem_write = 0;

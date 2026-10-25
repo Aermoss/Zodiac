@@ -76,9 +76,6 @@ module top (
     localparam int CLK_FREQ = 54000000;
 
     logic [31:0] cpu_fetch_addr;
-    logic [31:0] cpu_fetch_pc;
-    logic [31:0] cpu_fetch_pc_current;
-    logic cpu_fetch_repeat;
     logic [31:0] cpu_fetch_read;
     logic cpu_mem_access;
     logic [3:0] cpu_mem_we;
@@ -124,9 +121,6 @@ module top (
         .video_scroll(video_scroll),
 
         .fetch_addr(cpu_fetch_addr),
-        .fetch_pc(cpu_fetch_pc),
-        .fetch_pc_current(cpu_fetch_pc_current),
-        .fetch_repeat(cpu_fetch_repeat),
         .fetch_read(cpu_fetch_read),
 
         .mem_access(cpu_mem_access),
@@ -237,9 +231,6 @@ module top (
         .rst(rst_reg),
 
         .cpu_fetch_addr(cpu_fetch_addr),
-        .cpu_fetch_pc(cpu_fetch_pc),
-        .cpu_fetch_pc_current(cpu_fetch_pc_current),
-        .cpu_fetch_repeat(cpu_fetch_repeat),
         .cpu_fetch_read(cpu_fetch_read),
 
         .cpu_mem_access(cpu_mem_access),
