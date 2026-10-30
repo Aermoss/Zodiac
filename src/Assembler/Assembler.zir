@@ -516,6 +516,7 @@ class Assembler {
             else if mnemonic == "srai" { opcode = Opcode::SRAI; }
             else if mnemonic == "csrr" { opcode = Opcode::CSRR; }
             else if mnemonic == "csrw" { opcode = Opcode::CSRW; }
+            else if mnemonic == "ecall" { opcode = Opcode::ECALL; }
             else if mnemonic == "eret" { opcode = Opcode::ERET; }
             else if mnemonic == "hlt" { opcode = Opcode::HLT; }
             else {

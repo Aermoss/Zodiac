@@ -407,7 +407,7 @@ class Emulator {
         let interrupts = this.GetPendingInterrupts() & this.interrupt_mask;
 
         if this.interrupt_enable && interrupts != 0 {
-            (this.trap_pc, this.trap_cause) = (this.pc, if (interrupts & 1) != 0 { 0x80000000 } else { 0x80000001 });
+            (this.trap_pc, this.trap_cause) = (this.pc, if (interrupts & 1) != 0 { TrapCause::Timer as u32 } else { TrapCause::Uart as u32 });
             (this.previous_interrupt_enable, this.interrupt_enable) = (this.interrupt_enable, false);
             this.pc = this.trap_vector;
         }
@@ -601,6 +601,11 @@ class Emulator {
             },
             Opcode::CSRW => {
                 this.WriteCSR(imm16, this.GetRegister(reg1));
+            },
+            Opcode::ECALL => {
+                (this.trap_pc, this.trap_cause) = (this.pc + 4, TrapCause::SystemCall as u32);
+                (this.previous_interrupt_enable, this.interrupt_enable) = (this.interrupt_enable, false);
+                next_pc = this.trap_vector;
             },
             Opcode::ERET => {
                 next_pc = this.trap_pc;

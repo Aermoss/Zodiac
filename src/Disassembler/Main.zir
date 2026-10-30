@@ -15,7 +15,7 @@
  */
 
 #[include "std/io", "std/str", "std/vec", "std/file", "src/Disassembler/Disassembler.zir", "src/Common/Endian.zir",
-    "src/Common/File.zir", "src/Common/Object.zir", "src/Common/Archive.zir", "src/Common/Logger.zir" : *]
+    "src/Common/File.zir", "src/Common/Object.zir", "src/Common/Archive.zir", "src/Common/Binary.zir", "src/Common/Logger.zir" : *]
 
 fn PrintVersion(executable: String) {
     WriteLine("Unversioned build of " + executable + ".");
@@ -152,6 +152,52 @@ fn Main(args: &mut Vector<String>) -> i32 {
                 if line.Empty() { continue; }
                 let word = line.Strip().ToInteger(16).Unwrap() as u32;
                 object.sections[0].PushBack(word);
+            }
+
+            disassembler.objects.PushBack(object);
+        } else if extension.Empty() {
+            let mut file = File(input);
+
+            if !file.Open(FileMode::ReadBinary) {
+                Logger::Log("Failed to open file '" + input + "'.", LogSeverity::Error);
+                return 1;
+            }
+
+            let magic = file.ReadWord();
+
+            if magic != EXECUTABLE_MAGIC {
+                Logger::Log("Invalid executable format '" + input + "'.", LogSeverity::Error);
+                return 1;
+            }
+
+            let entry = file.ReadWord();
+            let code_words = file.ReadWord();
+            let relocation_count = file.ReadWord();
+
+            let mut object = Object();
+            object.sections.Resize(SECTION_COUNT);
+            object.path = input;
+            object.sections[0].Resize(code_words as usize);
+
+            if code_words > 0 && !file.ReadWords(object.sections[0].Data(), code_words as usize) {
+                Logger::Log("Invalid executable format '" + input + "'.", LogSeverity::Error);
+                return 1;
+            }
+
+            let mut symbol = Symbol();
+            symbol.name = "_entry";
+            symbol.binding = BindingType::Global;
+            symbol.section = SectionType::Text;
+            symbol.offset = entry;
+            object.symbols.PushBack(symbol);
+
+            for _ in 0..relocation_count {
+                let mut relocation = Relocation();
+                relocation.section = SectionType::Text;
+                relocation.offset = file.ReadWord();
+                relocation._type = RelocationType::Absolute32;
+                relocation.symbol = "_base";
+                object.relocations.PushBack(relocation);
             }
 
             disassembler.objects.PushBack(object);

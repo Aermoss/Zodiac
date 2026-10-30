@@ -23,12 +23,18 @@ enum Opcode: u32 {
     MUL, MULH, MULHSU, MULHU, DIV, DIVU, REM, REMU,
     AND, ANDI, OR, ORI, XOR, XORI,
     SLL, SLLI, SRL, SRLI, SRA, SRAI,
-    CSRR, CSRW, ERET,
+    CSRR, CSRW, ECALL, ERET,
     HLT = 0x3F
 }
 
 enum CSR: u32 {
     STATUS, IENABLE, IPENDING, EPC, CAUSE, VECTOR, SCRATCH
+}
+
+enum TrapCause: u32 {
+    SystemCall = 0x00000008,
+    Timer = 0x80000000,
+    Uart = 0x80000001
 }
 
 const OPCODE_SHIFT: u32 = 26;

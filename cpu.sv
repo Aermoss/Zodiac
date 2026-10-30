@@ -104,6 +104,7 @@ module cpu #(
         OP_SRAI,
         OP_CSRR,
         OP_CSRW,
+        OP_ECALL,
         OP_ERET,
         OP_HLT = 6'h3F
     } opcode_t;
@@ -171,7 +172,7 @@ module cpu #(
         id_signed_compare = (id_opcode == OP_BLT) || (id_opcode == OP_BGE);
 
         case (id_opcode)
-            OP_B, OP_BR, OP_BL, OP_BLR, OP_ERET: id_branch_always = 1;
+            OP_B, OP_BR, OP_BL, OP_BLR, OP_ECALL, OP_ERET: id_branch_always = 1;
             OP_BEQ: id_branch_if_eq = 1;
             OP_BNE: id_branch_if_ne = 1;
             OP_BLT, OP_BLTU: id_branch_if_lt = 1;
@@ -400,7 +401,7 @@ module cpu #(
             OP_NOP,
             OP_LUI, OP_AUIPC,
             OP_B,
-            OP_CSRR, OP_ERET,
+            OP_CSRR, OP_ECALL, OP_ERET,
             OP_HLT: return 0;
             default: return 1;
         endcase
@@ -716,6 +717,11 @@ module cpu #(
                 csr_cause <= interrupts[0] ? 32'h80000000 : 32'h80000001;
                 csr_pie <= csr_ie;
                 csr_ie <= 0;
+            end else if (ex_opcode == OP_ECALL) begin
+                csr_epc <= ex_pc + 32'd4;
+                csr_cause <= 32'h00000008;
+                csr_pie <= csr_ie;
+                csr_ie <= 0;
             end else if (ex_opcode == OP_ERET) begin
                 csr_ie <= csr_pie;
                 csr_pie <= 1;
@@ -757,6 +763,7 @@ module cpu #(
 
             OP_BR: branch_target = ex_reg0_fwd;
             OP_BLR: branch_target = ex_reg1_fwd;
+            OP_ECALL: branch_target = csr_vector;
             OP_ERET: branch_target = csr_epc;
             OP_HLT: should_halt = 1;
         endcase

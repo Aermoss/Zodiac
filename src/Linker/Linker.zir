@@ -187,6 +187,7 @@ class Linker {
                     },
                     RelocationType::Absolute32 => {
                         word = target;
+                        result.relocations.PushBack(pc - this.origin);
                     },
                     _ => {
                         Logger::Log("Unknown relocation type.", LogSeverity::Error);
@@ -196,6 +197,20 @@ class Linker {
 
                 this.sections[relocation.section as usize][index] = word;
             }
+        }
+
+        let mut entry_index = this.symbol_names.Index("_start".ToString());
+
+        if entry_index.IsNone() {
+            entry_index = this.symbol_names.Index("Main".ToString());
+        }
+
+        if entry_index.IsNone() {
+            entry_index = this.symbol_names.Index("__z4Main".ToString());
+        }
+
+        if entry_index.IsSome() {
+            result.entry = this.symbol_addresses[entry_index.Unwrap()] - this.origin;
         }
 
         this.symbol_names.Clear();

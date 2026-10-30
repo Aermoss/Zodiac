@@ -16,8 +16,26 @@
 
 #[include "std/str", "std/vec", "src/Common/File.zir", "src/Common/Endian.zir" : *]
 
+const EXECUTABLE_MAGIC: u32 = 0x4558455A;
+
+enum OutputFormat: u32 {
+    Binary, Hexadecimal, Executable
+}
+
 class Binary {
-    pub words: Vector<u32>;
+    pub words: Vector<u32>,
+    pub relocations: Vector<u32>,
+    pub entry: u32 = 0;
+
+    pub fn Write(&this, file: &File) {
+        let mut words = Vector<u32>();
+
+        for word in this.words {
+            words.PushBack(ByteSwap32(word));
+        }
+
+        file.WriteWords(words.Data(), words.Length());
+    }
 
     pub fn WriteHexadecimal(&this, file: &File) {
         for word in this.words {
@@ -31,13 +49,12 @@ class Binary {
         }
     }
 
-    pub fn Write(&this, file: &File) {
-        let mut words = Vector<u32>();
-
-        for word in this.words {
-            words.PushBack(ByteSwap32(word));
-        }
-
-        file.WriteWords(words.Data(), words.Length());
+    pub fn WriteExecutable(&this, file: &File) {
+        file.WriteWord(EXECUTABLE_MAGIC);
+        file.WriteWord(this.entry);
+        file.WriteWord(this.words.Length() as u32);
+        file.WriteWord(this.relocations.Length() as u32);
+        file.WriteWords(this.words.Data(), this.words.Length());
+        file.WriteWords(this.relocations.Data(), this.relocations.Length());
     }
 }
