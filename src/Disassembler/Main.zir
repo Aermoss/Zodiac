@@ -85,9 +85,9 @@ fn Main(args: &mut Vector<String>) -> i32 {
         let (_, extension) = SplitExtension(input);
 
         if extension == ".a" {
-            let mut file = File(input);
+            let mut file = _File(input);
 
-            if !file.Open(FileMode::ReadBinary) {
+            if !file.Open(FileMode::Read) {
                 Logger::Log("Failed to open file '" + input + "'.", LogSeverity::Error);
                 return 1;
             }
@@ -101,9 +101,9 @@ fn Main(args: &mut Vector<String>) -> i32 {
                 return 1;
             }
         } else if extension == ".o" {
-            let mut file = File(input);
+            let mut file = _File(input);
 
-            if !file.Open(FileMode::ReadBinary) {
+            if !file.Open(FileMode::Read) {
                 Logger::Log("Failed to open file '" + input + "'.", LogSeverity::Error);
                 return 1;
             }
@@ -117,9 +117,9 @@ fn Main(args: &mut Vector<String>) -> i32 {
                 return 1;
             }
         } else if extension == ".bin" {
-            let mut file = File(input);
+            let mut file = _File(input);
 
-            if !file.Open(FileMode::ReadBinary) {
+            if !file.Open(FileMode::Read) {
                 Logger::Log("Failed to open file '" + input + "'.", LogSeverity::Error);
                 return 1;
             }
@@ -136,7 +136,7 @@ fn Main(args: &mut Vector<String>) -> i32 {
 
             disassembler.objects.PushBack(object);
         } else if extension == ".hex" {
-            let content = match _ReadFile(input) {
+            let content = match File::ReadText(input) {
                 Result<String, IOError>::Ok(content) => content,
                 Result<String, IOError>::Err(error) => {
                     Logger::Log("Failed to read file '" + input + "': " + error.ToString() + ".", LogSeverity::Error);
@@ -156,9 +156,9 @@ fn Main(args: &mut Vector<String>) -> i32 {
 
             disassembler.objects.PushBack(object);
         } else if extension.Empty() {
-            let mut file = File(input);
+            let mut file = _File(input);
 
-            if !file.Open(FileMode::ReadBinary) {
+            if !file.Open(FileMode::Read) {
                 Logger::Log("Failed to open file '" + input + "'.", LogSeverity::Error);
                 return 1;
             }
@@ -212,7 +212,7 @@ fn Main(args: &mut Vector<String>) -> i32 {
     if output.Empty() {
         WriteLine(result);
     } else {
-        let mut file = File(output);
+        let mut file = _File(output);
 
         if !file.Open(FileMode::Write) {
             Logger::Log("Failed to open file '" + output + "'.", LogSeverity::Error);

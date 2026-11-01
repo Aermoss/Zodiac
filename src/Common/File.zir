@@ -14,132 +14,129 @@
  * limitations under the License.
  */
 
-#[include "std/str" : *]
+#[include "std/str", "std/file" : *]
 
-extern "C" {
-    fn fopen(pathname: *i8, mode: *i8) -> *mut void;
-    fn fread(ptr: *mut void, size: usize, nmemb: usize, stream: *mut void) -> usize;
-    fn fwrite(ptr: *void, size: usize, nmemb: usize, stream: *mut void) -> usize;
-    fn fseek(stream: *mut void, offset: i32, whence: i32) -> i32;
-    fn fclose(stream: *mut void) -> i32;
-}
-
-enum FileMode: u32 {
-    Read, ReadBinary, Write, WriteBinary, UpdateBinary
-}
-
-extend FileMode {
-    pub fn ToString(this) -> *i8 {
-        match this {
-            FileMode::Read => "r",
-            FileMode::ReadBinary => "rb",
-            FileMode::Write => "w",
-            FileMode::WriteBinary => "wb",
-            FileMode::UpdateBinary => "r+b"
-        }
-    }
-}
-
-class File {
+class _File {
     pub path: String,
-    handle: *mut void = null;
+    file: *mut File = null;
 
-    File(&mut this, path: &String) {
+    _File(&mut this, path: &String) {
         this.path = path;
     }
 
-    ~File(&mut this) {
+    ~_File(&mut this) {
         this.Close();
     }
 
     pub fn Open(&mut this, mode: FileMode) -> bool {
-        if this.handle != null { fclose(this.handle); }
-        this.handle = fopen(this.path.Data(), mode.ToString());
-        this.handle != null
+        if this.file == null { this.file = new File(); }
+        this.file->Open(this.path, mode).IsOk()
     }
 
     pub fn Close(&mut this) {
-        if this.handle != null {
-            fclose(this.handle);
-            this.handle = null;
+        if this.file != null {
+            this.file->Close();
+            delete this.file;
+            this.file = null;
         }
     }
 
     pub fn Seek(&this, offset: u32) -> bool {
-        fseek(this.handle, offset as i32, 0) == 0
+        this.file->Seek(offset as isize, SeekOrigin::Start).IsOk()
     }
 
     pub fn ReadBytes(&this, pointer: *mut u8, count: usize) -> bool {
-        fread(pointer, 1, count, this.handle) == count
+        this.file->ReadExact(pointer, count).IsOk()
     }
 
     pub fn ReadHalves(&this, pointer: *mut u16, count: usize) -> bool {
-        fread(pointer, 2, count, this.handle) == count
+        if !this.ReadBytes(pointer as *mut u8, count * 2) { return false; }
+        let bytes = pointer as *u8;
+        let mut i: usize = 0;
+
+        while i < count {
+            let at = bytes + i * 2;
+            pointer[i] = (at[0] as u16) | ((at[1] as u16) << 8);
+            i += 1;
+        }
+
+        true
     }
 
     pub fn ReadWords(&this, pointer: *mut u32, count: usize) -> bool {
-        fread(pointer, 4, count, this.handle) == count
+        if !this.ReadBytes(pointer as *mut u8, count * 4) { return false; }
+        let bytes = pointer as *u8;
+        let mut i: usize = 0;
+
+        while i < count {
+            let at = bytes + i * 4;
+            pointer[i] = (at[0] as u32) | ((at[1] as u32) << 8) | ((at[2] as u32) << 16) | ((at[3] as u32) << 24);
+            i += 1;
+        }
+
+        true
     }
 
     pub fn ReadByte(&this) -> u8 {
-        let mut result: u8;
-
-        if !this.ReadBytes(&mut result, 1) {
-            result = 0;
-        }
-
-        result
+        this.file->ReadU8().UnwrapOr(0)
     }
 
     pub fn ReadHalf(&this) -> u16 {
-        let mut result: u16;
-
-        if !this.ReadHalves(&mut result, 1) {
-            result = 0;
-        }
-
-        result
+        this.file->ReadU16().UnwrapOr(0)
     }
 
     pub fn ReadWord(&this) -> u32 {
-        let mut result: u32;
-
-        if !this.ReadWords(&mut result, 1) {
-            result = 0;
-        }
-
-        result
+        this.file->ReadU32().UnwrapOr(0)
     }
 
     pub fn WriteBytes(&this, pointer: *u8, count: usize) -> bool {
-        fwrite(pointer, 1, count, this.handle) == count
+        this.file->Write(pointer, count).IsOk()
     }
 
     pub fn WriteHalves(&this, pointer: *u16, count: usize) -> bool {
-        fwrite(pointer, 2, count, this.handle) == count
+        let mut i: usize = 0;
+
+        while i < count {
+            if this.file->WriteU16(pointer[i]).IsErr() { return false; }
+            i += 1;
+        }
+
+        true
     }
 
     pub fn WriteWords(&this, pointer: *u32, count: usize) -> bool {
-        fwrite(pointer, 4, count, this.handle) == count
+        let mut i: usize = 0;
+
+        while i < count {
+            if this.file->WriteU32(pointer[i]).IsErr() { return false; }
+            i += 1;
+        }
+
+        true
     }
 
     pub fn WriteByte(&this, value: u8) -> bool {
-        this.WriteBytes(&value, 1)
+        this.file->WriteU8(value).IsOk()
     }
 
     pub fn WriteHalf(&this, value: u16) -> bool {
-        this.WriteHalves(&value, 1)
+        this.file->WriteU16(value).IsOk()
     }
 
     pub fn WriteWord(&this, value: u32) -> bool {
-        this.WriteWords(&value, 1)
+        this.file->WriteU32(value).IsOk()
     }
 
     pub fn ReadString(&this) -> String {
         let length = this.ReadWord() as usize;
         let buffer = new u8[length + 1];
-        this.ReadBytes(buffer, length);
-        buffer[length] = 0;
+
+        if !this.ReadBytes(buffer, length) {
+            buffer[0] = 0;
+        } else {
+            buffer[length] = 0;
+        }
+
         let string = String(buffer as *i8);
         delete[] buffer;
         string

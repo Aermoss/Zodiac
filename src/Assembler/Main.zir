@@ -84,7 +84,7 @@ fn Main(args: &mut Vector<String>) -> i32 {
         return 1;
     }
 
-    let content = match _ReadFile(input) {
+    let content = match File::ReadText(input) {
         Result<String, IOError>::Ok(content) => content,
         Result<String, IOError>::Err(error) => {
             Logger::Log("Failed to read file '" + input + "': " + error.ToString() + ".", LogSeverity::Error);
@@ -107,9 +107,9 @@ fn Main(args: &mut Vector<String>) -> i32 {
         output = SplitExtension(input).0 + ".o";
     }
 
-    let mut file = File(output);
+    let mut file = _File(output);
 
-    if !file.Open(FileMode::WriteBinary) {
+    if !file.Open(FileMode::Write) {
         Logger::Log("Failed to open file '" + output + "'.", LogSeverity::Error);
         return 1;
     }

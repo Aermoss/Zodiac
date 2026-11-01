@@ -31,7 +31,7 @@ class Disassembler {
     }
 
     fn DisassembleRegister(&this, register: u32) -> String {
-        "x" + String::FromInteger(register as u64)
+        "x" + String::FromInteger(register as HostUnsigned)
     }
 
     fn DisassembleCSR(&this, index: u32) -> String {
@@ -50,10 +50,10 @@ class Disassembler {
         let opcode = (word >> OPCODE_SHIFT) as Opcode;
         let (reg0, reg1, reg2) = ((word >> REG0_SHIFT) & 0x1F, (word >> REG1_SHIFT) & 0x1F, (word >> REG2_SHIFT) & 0x1F);
         let (imm11, imm16, imm21, imm26) = (word & IMM11_MASK, word & IMM16_MASK, word & IMM21_MASK, word & IMM26_MASK);
-        let simm11 = (((imm11 as i32) ^ (1 << 10)) - (1 << 10)) as i64;
-        let simm16 = (((imm16 as i32) ^ (1 << 15)) - (1 << 15)) as i64;
-        let simm21 = (((imm21 as i32) ^ (1 << 20)) - (1 << 20)) as i64;
-        let simm26 = (((imm26 as i32) ^ (1 << 25)) - (1 << 25)) as i64;
+        let simm11 = (((imm11 as i32) ^ (1 << 10)) - (1 << 10)) as HostSigned;
+        let simm16 = (((imm16 as i32) ^ (1 << 15)) - (1 << 15)) as HostSigned;
+        let simm21 = (((imm21 as i32) ^ (1 << 20)) - (1 << 20)) as HostSigned;
+        let simm26 = (((imm26 as i32) ^ (1 << 25)) - (1 << 25)) as HostSigned;
 
         let mnemonic = match opcode {
             Opcode::NOP => "nop",
@@ -158,7 +158,7 @@ class Disassembler {
     }
 
     fn FormatHexWord(&this, word: u32) -> String {
-        let mut hex = String::FromInteger(word as u64, 16);
+        let mut hex = String::FromInteger(word as HostUnsigned, 16);
         while hex.Length() < 8 { hex = "0" + hex; }
 
         hex.SubString(0, 2) + " " + hex.SubString(2, 2) + " "
@@ -166,7 +166,7 @@ class Disassembler {
     }
 
     fn FormatHexAddress(&this, address: u32) -> String {
-        let mut hex = String::FromInteger(address as u64, 16);
+        let mut hex = String::FromInteger(address as HostUnsigned, 16);
         while hex.Length() < 8 { hex = "0" + hex; }
         hex
     }
@@ -240,7 +240,7 @@ class Disassembler {
                         if section_type == SectionType::Text {
                             result += "    " + this.DisassembleInstruction(word, offset, section_type, object) + '\n';
                         } else {
-                            result += "    .word " + String::FromInteger(word as i64) + '\n';
+                            result += "    .word " + String::FromInteger(word as HostUnsigned) + '\n';
                         }
                     } offset += 4;
                 } result += '\n';

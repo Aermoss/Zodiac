@@ -69,9 +69,9 @@ fn Main(args: &mut Vector<String>) -> i32 {
     let mut objects: Vector<Object>;
 
     for input in inputs {
-        let mut file = File(input);
+        let mut file = _File(input);
 
-        if !file.Open(FileMode::ReadBinary) {
+        if !file.Open(FileMode::Read) {
             Logger::Log("Failed to open file '" + input + "'.", LogSeverity::Error);
             return 1;
         }
@@ -110,7 +110,7 @@ fn Main(args: &mut Vector<String>) -> i32 {
                 character = if symbol.binding == BindingType::Global { 'D' } else { 'd' };
             }
 
-            let mut address = String::FromInteger(symbol.offset as u64, 16);
+            let mut address = String::FromInteger(symbol.offset as HostUnsigned, 16);
             while address.Length() < 8 { address = "0" + address; }
             WriteLine(address + ' ' + character + ' ' + symbol.name);
         }

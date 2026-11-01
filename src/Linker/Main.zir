@@ -108,9 +108,9 @@ fn Main(args: &mut Vector<String>) -> i32 {
     }
 
     for input in inputs {
-        let mut file = File(input);
+        let mut file = _File(input);
 
-        if !file.Open(FileMode::ReadBinary) {
+        if !file.Open(FileMode::Read) {
             Logger::Log("Failed to open file '" + input + "'.", LogSeverity::Error);
             return 1;
         }
@@ -140,9 +140,9 @@ fn Main(args: &mut Vector<String>) -> i32 {
         output = SplitExtension(inputs[0]).0 + extension;
     }
 
-    let mut file = File(output);
+    let mut file = _File(output);
 
-    if !file.Open(if format == OutputFormat::Hexadecimal { FileMode::Write } else { FileMode::WriteBinary }) {
+    if !file.Open(FileMode::Write) {
         Logger::Log("Failed to open file '" + output + "'.", LogSeverity::Error);
         return 1;
     }

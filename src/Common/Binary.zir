@@ -27,7 +27,7 @@ class Binary {
     pub relocations: Vector<u32>,
     pub entry: u32 = 0;
 
-    pub fn Write(&this, file: &File) {
+    pub fn Write(&this, file: &_File) {
         let mut words = Vector<u32>();
 
         for word in this.words {
@@ -37,9 +37,9 @@ class Binary {
         file.WriteWords(words.Data(), words.Length());
     }
 
-    pub fn WriteHexadecimal(&this, file: &File) {
+    pub fn WriteHexadecimal(&this, file: &_File) {
         for word in this.words {
-            let mut result = String::FromInteger(word as u64, 16);
+            let mut result = String::FromInteger(word as HostUnsigned, 16);
 
             while result.Length() < 8 {
                 result = "0" + result;
@@ -49,7 +49,7 @@ class Binary {
         }
     }
 
-    pub fn WriteExecutable(&this, file: &File) {
+    pub fn WriteExecutable(&this, file: &_File) {
         file.WriteWord(EXECUTABLE_MAGIC);
         file.WriteWord(this.entry);
         file.WriteWord(this.words.Length() as u32);

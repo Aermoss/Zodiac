@@ -129,7 +129,7 @@ class Linker {
 
                 match symbol.binding {
                     BindingType::Local => {
-                        name = String::FromInteger(i as u64) + ":" + name;
+                        name = String::FromInteger(i as HostUnsigned) + ":" + name;
                     },
                     BindingType::Global => {
                         if this.symbol_names.Contains(name) {
@@ -147,7 +147,7 @@ class Linker {
             let object = this.objects[i];
 
             for relocation in object.relocations {
-                let mut symbol_index = this.symbol_names.Index(String::FromInteger(i as u64) + ":" + relocation.symbol);
+                let mut symbol_index = this.symbol_names.Index(String::FromInteger(i as HostUnsigned) + ":" + relocation.symbol);
 
                 if symbol_index.IsNone() {
                     symbol_index = this.symbol_names.Index(relocation.symbol);

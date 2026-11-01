@@ -89,7 +89,7 @@ class Emulator {
     }
 
     pub fn LoadHexadecimal(&mut this, path: &String, address: u32) -> bool {
-        let content = _ReadFile(path).Unwrap();
+        let content = File::ReadText(path).Unwrap();
         if content.Empty() { return false; }
         let mut offset: u32 = 0;
 
@@ -104,8 +104,8 @@ class Emulator {
     }
 
     pub fn LoadBinary(&mut this, path: &String, address: u32) -> bool {
-        let mut file = File(path);
-        if !file.Open(FileMode::ReadBinary) { return false; }
+        let mut file = _File(path);
+        if !file.Open(FileMode::Read) { return false; }
         let mut offset: u32 = 0;
 
         loop {
@@ -223,9 +223,9 @@ class Emulator {
                 continue;
             }
 
-            let mut file = File(this.flash_paths[i]);
+            let mut file = _File(this.flash_paths[i]);
 
-            if !file.Open(FileMode::UpdateBinary) || !file.Seek(start - offset) {
+            if !file.Open(FileMode::Update) || !file.Seek(start - offset) {
                 continue;
             }
 

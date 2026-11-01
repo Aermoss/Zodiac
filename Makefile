@@ -8,25 +8,25 @@ INCLUDE := $(ZIRCON_PATH)/include
 default: simulate
 
 bin/zas.exe: $(wildcard src/Assembler/*.zir) $(wildcard src/Common/*.zir)
-	$(COMPILER) src/Assembler/Main.zir -o $@ -I$(INCLUDE) -lDbgHelp -lucrt -DASSEMBLER
+	$(COMPILER) src/Assembler/Main.zir -o $@ -I$(INCLUDE) -lDbgHelp -DASSEMBLER
 
 bin/zda.exe: $(wildcard src/Disassembler/*.zir) $(wildcard src/Common/*.zir)
-	$(COMPILER) src/Disassembler/Main.zir -o $@ -I$(INCLUDE) -lDbgHelp -lucrt -DDISASSEMBLER
+	$(COMPILER) src/Disassembler/Main.zir -o $@ -I$(INCLUDE) -lDbgHelp -DDISASSEMBLER
 
 bin/zar.exe: $(wildcard src/Archiver/*.zir) $(wildcard src/Common/*.zir)
-	$(COMPILER) src/Archiver/Main.zir -o $@ -I$(INCLUDE) -lDbgHelp -lucrt -DARCHIVER
+	$(COMPILER) src/Archiver/Main.zir -o $@ -I$(INCLUDE) -lDbgHelp -DARCHIVER
 
 bin/zld.exe: $(wildcard src/Linker/*.zir) $(wildcard src/Common/*.zir)
-	$(COMPILER) src/Linker/Main.zir -o $@ -I$(INCLUDE) -lDbgHelp -lucrt -DLINKER
+	$(COMPILER) src/Linker/Main.zir -o $@ -I$(INCLUDE) -lDbgHelp -DLINKER
 
 bin/zemu.exe: $(wildcard src/Emulator/*.zir) $(wildcard src/Common/*.zir)
-	$(COMPILER) src/Emulator/Main.zir -o $@ -I$(INCLUDE) -lDbgHelp -lucrt -lvcruntime -DEMULATOR
+	$(COMPILER) src/Emulator/Main.zir -o $@ -I$(INCLUDE) -lDbgHelp -lucrt -DEMULATOR
 
 bin/zym.exe: $(wildcard src/Symbols/*.zir) $(wildcard src/Common/*.zir)
-	$(COMPILER) src/Symbols/Main.zir -o $@ -I$(INCLUDE) -lDbgHelp -lucrt -DSYMBOLS
+	$(COMPILER) src/Symbols/Main.zir -o $@ -I$(INCLUDE) -lDbgHelp -DSYMBOLS
 
 bin/ztr.exe: $(wildcard src/Strings/*.zir) $(wildcard src/Common/*.zir)
-	$(COMPILER) src/Strings/Main.zir -o $@ -I$(INCLUDE) -lDbgHelp -lucrt -DSTRINGS
+	$(COMPILER) src/Strings/Main.zir -o $@ -I$(INCLUDE) -lDbgHelp -DSTRINGS
 
 %.o: bin/zas.exe %.s
 	$^ -o $@
