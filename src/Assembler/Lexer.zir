@@ -87,7 +87,7 @@ class Lexer {
 
     fn LexString(&mut this) -> Token {
         let mut token: Token;
-        (token.row, token.column, token.file) = (this.row, this.column, this.file);
+        (token.row, token.column, token.file) = (this.row, this.column, this.file.Data());
         let quote_char = this.CurrentChar();
         token._type = if quote_char != '"' { TokenType::CHAR } else { TokenType::STRING };
         this.Advance(1);
@@ -187,7 +187,7 @@ class Lexer {
 
     fn LexNumber(&mut this) -> Token {
         let mut token: Token;
-        (token.row, token.column, token.file) = (this.row, this.column, this.file);
+        (token.row, token.column, token.file) = (this.row, this.column, this.file.Data());
         token._type = TokenType::NUMBER;
 
         if this.CurrentChar() == '0' {
@@ -236,7 +236,7 @@ class Lexer {
 
     fn LexIdentifier(&mut this) -> Token {
         let mut token: Token;
-        (token.row, token.column, token.file) = (this.row, this.column, this.file);
+        (token.row, token.column, token.file) = (this.row, this.column, this.file.Data());
         token._type = TokenType::IDENTIFIER;
 
         loop {
@@ -279,7 +279,7 @@ class Lexer {
 
     fn LexSymbol(&mut this) -> Token {
         let mut token: Token;
-        (token.row, token.column, token.file) = (this.row, this.column, this.file);
+        (token.row, token.column, token.file) = (this.row, this.column, this.file.Data());
         let current = this.CurrentChar();
         let next = this.PeekChar(1);
         token.value += current;
@@ -391,7 +391,7 @@ class Lexer {
             if this.CurrentChar() == '\n' {
                 let mut token: Token;
                 (token._type, token.value) = (TokenType::NEWLINE, "\n".ToString());
-                (token.row, token.column, token.file) = (this.row, this.column, this.file);
+                (token.row, token.column, token.file) = (this.row, this.column, this.file.Data());
                 tokens.PushBack(token);
                 this.Advance(1);
                 continue;
@@ -415,7 +415,7 @@ class Lexer {
         }
 
         let mut eof: Token;
-        (eof._type, eof.row, eof.column, eof.file) = (TokenType::EOF, this.row, this.column, this.file);
+        (eof._type, eof.row, eof.column, eof.file) = (TokenType::EOF, this.row, this.column, this.file.Data());
         tokens.PushBack(eof);
         tokens
     }

@@ -189,19 +189,19 @@ class Logger {
 
 #[if ASSEMBLER]
     pub fn Log(message: &String, token: Token, severity: LogSeverity) {
-        Logger::Log(token.file.Data(), token.row, token.column, -1 as u32, -1 as u32, message.Data(), severity);
+        Logger::Log(token.file, token.row, token.column, -1 as u32, -1 as u32, message.Data(), severity);
     }
 
     pub fn Log(message: *i8, token: Token, severity: LogSeverity) {
-        Logger::Log(token.file.Data(), token.row, token.column, -1 as u32, -1 as u32, message, severity);
+        Logger::Log(token.file, token.row, token.column, -1 as u32, -1 as u32, message, severity);
     }
 
     pub fn Log(message: &String, node: *Node, severity: LogSeverity) {
-        Logger::Log(node->start.file.Data(), node->start.row, node->start.column, node->end.row, node->end.column, message.Data(), severity);
+        Logger::Log(node->file, node->row, node->column, -1 as u32, -1 as u32, message.Data(), severity);
     }
 
     pub fn Log(message: *i8, node: *Node, severity: LogSeverity) {
-        Logger::Log(node->start.file.Data(), node->start.row, node->start.column, node->end.row, node->end.column, message, severity);
+        Logger::Log(node->file, node->row, node->column, -1 as u32, -1 as u32, message, severity);
     }
 #[endif]
 

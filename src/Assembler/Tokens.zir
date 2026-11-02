@@ -65,5 +65,5 @@ class Token {
     pub value: String,
     pub row: u32,
     pub column: u32,
-    pub file: String
+    pub file: *i8
 }

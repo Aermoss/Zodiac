@@ -238,10 +238,11 @@ class Parser {
         this.arena.New<LabelNode>(token.value, token)
     }
 
-    pub fn Parse(&mut this, tokens: &Vector<Token>) -> *RootNode {
-        (this.tokens, this.index) = (tokens, 0);
+    pub fn Parse(&mut this, tokens: &mut Vector<Token>) -> *RootNode {
         this.arena.Clear();
         let root = this.arena.New<RootNode>();
+        this.tokens.Swap(tokens);
+        this.index = 0;
 
         while this.Current()._type != TokenType::EOF {
             if this.Match(TokenType::NEWLINE) { continue; }
@@ -259,6 +260,7 @@ class Parser {
             }
         }
 
+        this.tokens.Swap(tokens);
         root
     }
 }

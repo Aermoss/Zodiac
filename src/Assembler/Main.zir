@@ -93,7 +93,7 @@ fn Main(args: &mut Vector<String>) -> i32 {
     };
 
     let mut lexer = Lexer();
-    let tokens = lexer.Lex(content, input);
+    let mut tokens = lexer.Lex(content, input);
 
     let mut parser = Parser();
     let root = parser.Parse(tokens);

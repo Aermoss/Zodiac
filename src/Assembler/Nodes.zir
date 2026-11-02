@@ -42,11 +42,16 @@ extend NodeType {
 
 class Node {
     pub _type: NodeType,
-    pub start: Token,
-    pub end: Token;
+    pub file: *i8,
+    pub row: u32,
+    pub column: u32;
+
+    Node(&mut this, _type: NodeType) {
+        (this._type, this.file, this.row, this.column) = (_type, "", -1 as u32, -1 as u32);
+    }
 
     Node(&mut this, _type: NodeType, start: Token) {
-        (this._type, this.start) = (_type, start);
+        (this._type, this.file, this.row, this.column) = (_type, start.file, start.row, start.column);
     }
 
     virtual ~Node(&mut this) {}
@@ -120,5 +125,5 @@ class LabelNode : Node {
 class RootNode : Node {
     pub declarations: Vector<*Node>;
 
-    RootNode(&mut this) : Node(NodeType::ROOT, Token()) {}
+    RootNode(&mut this) : Node(NodeType::ROOT) {}
 }
