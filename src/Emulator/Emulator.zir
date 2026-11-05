@@ -22,6 +22,7 @@ extern "C" {
 }
 
 const CLK_FREQ: u32 = 54000000;
+const CYCLES_PER_MS: u32 = CLK_FREQ / 1000;
 
 class Emulator {
     pub quiet: bool,
@@ -31,11 +32,12 @@ class Emulator {
     bram: *mut u8,
     sdram: *mut u8,
     flash: *mut u8,
-    ms_counter: u32,
-    tick_counter: u32,
+    cycle_counter: u64,
+    instruction_counter: u32,
     uart_rx: u8,
     uart_rx_ready: bool,
     uart_mutex: Mutex,
+    uart_changed: ConditionVariable,
     interrupt_enable: bool,
     previous_interrupt_enable: bool,
     interrupt_mask: u32,
@@ -126,7 +128,7 @@ class Emulator {
 
     pub fn Reset(&mut this) {
         (this.pc, this.halted) = (0, false);
-        (this.ms_counter, this.tick_counter) = (0, 0);
+        (this.cycle_counter, this.instruction_counter) = (0, 0);
         (this.interrupt_enable, this.previous_interrupt_enable, this.interrupt_mask) = (false, false, 0);
         (this.trap_pc, this.trap_cause, this.trap_vector, this.trap_scratch) = (0, 0, 0, 0);
         this.timer_compare = 0;
@@ -242,11 +244,16 @@ class Emulator {
         }
     }
 
-    fn GetPendingInterrupts(&mut this) -> u32 {
+    fn IsUartReady(&mut this) -> bool {
         this.uart_mutex.Lock();
-        let uart: u32 = if this.uart_rx_ready { 2 } else { 0 };
+        let ready = this.uart_rx_ready;
         this.uart_mutex.Unlock();
-        let timer: u32 = if ((this.tick_counter - this.timer_compare) as i32) >= 0 { 1 } else { 0 };
+        ready
+    }
+
+    fn GetPendingInterrupts(&mut this, mask: u32) -> u32 {
+        let uart: u32 = if (mask & 2) != 0 && this.IsUartReady() { 2 } else { 0 };
+        let timer: u32 = if (mask & 1) != 0 && ((this.cycle_counter as u32 - this.timer_compare) as i32) >= 0 { 1 } else { 0 };
         uart | timer
     }
 
@@ -256,7 +263,7 @@ class Emulator {
         } else if index == CSR::IENABLE as u32 {
             this.interrupt_mask
         } else if index == CSR::IPENDING as u32 {
-            this.GetPendingInterrupts()
+            this.GetPendingInterrupts(3)
         } else if index == CSR::EPC as u32 {
             this.trap_pc
         } else if index == CSR::CAUSE as u32 {
@@ -290,24 +297,23 @@ class Emulator {
         match address {
             0xFFFF => {
                 this.uart_mutex.Lock();
-                let result = if this.uart_rx_ready { this.uart_rx as u32 } else { 0 };
-                this.uart_rx_ready = false;
+                let mut result: u32 = 0;
+                if this.uart_rx_ready {
+                    result = this.uart_rx as u32;
+                    this.uart_rx_ready = false;
+                    this.uart_changed.Signal();
+                }
                 this.uart_mutex.Unlock();
                 result * 0x01010101
             },
-            0xFFFC => {
-                this.uart_mutex.Lock();
-                let ready = this.uart_rx_ready;
-                this.uart_mutex.Unlock();
-                if ready { 1 } else { 0 }
-            },
+            0xFFFC => if this.IsUartReady() { 1 } else { 0 },
             0xFFF4 => 0,
-            0xFFE8 => this.tick_counter,
-            0xFFE4 => this.tick_counter,
+            0xFFE8 => this.cycle_counter as u32,
+            0xFFE4 => this.instruction_counter,
             0xFFDC => this.timer_compare,
             0xFFD8 => this.flash_rx as u32,
             0xFFD4 => if this.flash_selected { 1 } else { 0 },
-            _ => this.ms_counter
+            _ => (this.cycle_counter / CYCLES_PER_MS as u64) as u32
         }
     }
 
@@ -403,10 +409,34 @@ class Emulator {
         }
     }
 
-    fn Tick(&mut this) {
-        let interrupts = this.GetPendingInterrupts() & this.interrupt_mask;
+    fn WaitForInterrupt(&mut this) {
+        let timer_enabled = (this.interrupt_mask & 1) != 0;
+        let uart_enabled = (this.interrupt_mask & 2) != 0;
+        if !timer_enabled && !uart_enabled { return; }
+        let cycles_until_timer = (this.timer_compare - this.cycle_counter as u32) as i32;
+        let mut elapsed_cycles: u64 = 0;
+        this.uart_mutex.Lock();
+        let started = Instant::Now();
 
-        if this.interrupt_enable && interrupts != 0 {
+        while (!uart_enabled || !this.uart_rx_ready) && (!timer_enabled || (cycles_until_timer > 0 && elapsed_cycles < cycles_until_timer as u64)) {
+            let timeout = if timer_enabled {
+                ((cycles_until_timer as u64 - elapsed_cycles + CYCLES_PER_MS as u64 - 1) / CYCLES_PER_MS as u64) as u32
+            } else { INFINITE };
+
+            this.uart_changed.Wait(&mut this.uart_mutex, timeout);
+            elapsed_cycles = (started.Elapsed() * CLK_FREQ as f64) as u64;
+        }
+
+        this.uart_mutex.Unlock();
+        this.cycle_counter += elapsed_cycles;
+    }
+
+    fn Tick(&mut this) {
+        let interrupts = if this.interrupt_enable {
+            this.GetPendingInterrupts(this.interrupt_mask)
+        } else { 0 };
+
+        if interrupts != 0 {
             (this.trap_pc, this.trap_cause) = (this.pc, if (interrupts & 1) != 0 { TrapCause::Timer as u32 } else { TrapCause::Uart as u32 });
             (this.previous_interrupt_enable, this.interrupt_enable) = (this.interrupt_enable, false);
             this.pc = this.trap_vector;
@@ -611,6 +641,9 @@ class Emulator {
                 next_pc = this.trap_pc;
                 (this.interrupt_enable, this.previous_interrupt_enable) = (this.previous_interrupt_enable, true);
             },
+            Opcode::WFI => {
+                this.WaitForInterrupt();
+            },
             Opcode::HLT => {
                 this.halted = true;
             },
@@ -618,27 +651,21 @@ class Emulator {
         }
 
         this.pc = next_pc;
-        this.tick_counter += 1;
-
-        if this.tick_counter % (CLK_FREQ / 1000) == 0 {
-            this.ms_counter += 1;
-        }
+        this.cycle_counter += 1;
+        this.instruction_counter += 1;
     }
 
     fn Receive(&mut this, character: u8) {
-        loop {
-            this.uart_mutex.Lock();
+        this.uart_mutex.Lock();
 
-            if !this.uart_rx_ready {
-                this.uart_rx = character;
-                this.uart_rx_ready = true;
-                this.uart_mutex.Unlock();
-                return;
-            }
-
-            this.uart_mutex.Unlock();
-            Thread::Yield();
+        while this.uart_rx_ready {
+            this.uart_changed.Wait(&mut this.uart_mutex);
         }
+
+        this.uart_rx = character;
+        this.uart_rx_ready = true;
+        this.uart_changed.Signal();
+        this.uart_mutex.Unlock();
     }
 
     fn Receive(&mut this, mut sequence: *i8) {

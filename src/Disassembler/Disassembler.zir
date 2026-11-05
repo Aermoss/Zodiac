@@ -109,6 +109,7 @@ class Disassembler {
             Opcode::CSRW => "csrw",
             Opcode::ECALL => "ecall",
             Opcode::ERET => "eret",
+            Opcode::WFI => "wfi",
             Opcode::HLT => "hlt"
         }.ToString();
 

@@ -518,6 +518,7 @@ class Assembler {
             else if mnemonic == "csrw" { opcode = Opcode::CSRW; }
             else if mnemonic == "ecall" { opcode = Opcode::ECALL; }
             else if mnemonic == "eret" { opcode = Opcode::ERET; }
+            else if mnemonic == "wfi" { opcode = Opcode::WFI; }
             else if mnemonic == "hlt" { opcode = Opcode::HLT; }
             else {
                 Logger::Log("Unknown mnemonic: '" + mnemonic + "'.", instruction, LogSeverity::Error);

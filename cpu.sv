@@ -106,6 +106,7 @@ module cpu #(
         OP_CSRW,
         OP_ECALL,
         OP_ERET,
+        OP_WFI,
         OP_HLT = 6'h3F
     } opcode_t;
 
@@ -329,6 +330,10 @@ module cpu #(
     logic should_halt;
     logic halted;
 
+    logic should_wait;
+    logic waiting_for_interrupt;
+    logic wake_from_interrupt;
+
     logic [31:0] mem_pc;
     logic [31:0] mem_instr;
     logic [31:0] mem_result;
@@ -401,7 +406,7 @@ module cpu #(
             OP_NOP,
             OP_LUI, OP_AUIPC,
             OP_B,
-            OP_CSRR, OP_ECALL, OP_ERET,
+            OP_CSRR, OP_ECALL, OP_ERET, OP_WFI,
             OP_HLT: return 0;
             default: return 1;
         endcase
@@ -687,7 +692,9 @@ module cpu #(
 
     assign csr_ipending = {30'b0, uart_rx_ready, timer_pending};
     assign interrupts = csr_ipending & csr_ienable;
-    assign take_interrupt = csr_ie && interrupts != 0 && ex_instr != 0 && !is_multicycle_op && !halted;
+    assign take_interrupt = csr_ie && interrupts != 0 && !halted && (waiting_for_interrupt || (ex_instr != 0 && !is_multicycle_op));
+    assign should_wait = ex_opcode == OP_WFI && csr_ienable[1:0] != 0 && interrupts == 0;
+    assign wake_from_interrupt = waiting_for_interrupt && interrupts != 0;
 
     always_comb begin
         case (ex_imm16)
@@ -713,7 +720,7 @@ module cpu #(
             csr_scratch <= 0;
         end else if (!bus_stall) begin
             if (take_interrupt) begin
-                csr_epc <= ex_pc;
+                csr_epc <= waiting_for_interrupt ? if_pc : ex_pc;
                 csr_cause <= interrupts[0] ? 32'h80000000 : 32'h80000001;
                 csr_pie <= csr_ie;
                 csr_ie <= 0;
@@ -744,8 +751,8 @@ module cpu #(
 
     assign branch_eq = (branch_reg0 == branch_reg1);
     assign branch_lt = $signed({ex_signed_compare & branch_reg0[31], branch_reg0}) < $signed({ex_signed_compare & branch_reg1[31], branch_reg1});
-    assign should_take_branch = take_interrupt || ex_branch_always || (branch_eq ? ex_branch_if_eq : ex_branch_if_ne) ||
-        (branch_lt ? ex_branch_if_lt : ex_branch_if_ge);
+    assign should_take_branch = take_interrupt || should_wait || wake_from_interrupt || ex_branch_always ||
+        (branch_eq ? ex_branch_if_eq : ex_branch_if_ne) || (branch_lt ? ex_branch_if_lt : ex_branch_if_ge);
 
     logic compare_less;
 
@@ -753,7 +760,7 @@ module cpu #(
     assign ex_result = ex_result_alu ? alu_result : (ex_result_compare ? {31'b0, compare_less} : (ex_result_csr ? csr_read : ex_static_result));
 
     always_comb begin
-        branch_target = ex_branch_target;
+        branch_target = waiting_for_interrupt ? if_pc : ex_branch_target;
         should_halt = 0;
         ex_addr = 0;
 
@@ -765,6 +772,7 @@ module cpu #(
             OP_BLR: branch_target = ex_reg1_fwd;
             OP_ECALL: branch_target = csr_vector;
             OP_ERET: branch_target = csr_epc;
+            OP_WFI: branch_target = ex_pc + 32'd4;
             OP_HLT: should_halt = 1;
         endcase
 
@@ -775,7 +783,7 @@ module cpu #(
     end
 
     assign mem_addr = stage_mem_addr;
-    assign fetch_addr = (hazard_stall || alu_stall) ? if_pc_current : if_pc;
+    assign fetch_addr = (hazard_stall || alu_stall || waiting_for_interrupt) ? if_pc_current : if_pc;
 
     always_comb begin
         mem_write = 0;
@@ -907,6 +915,7 @@ module cpu #(
             ex_branch_fwd_wb <= 0;
 
             halted <= 0;
+            waiting_for_interrupt <= 0;
             branch_taken <= 1;
 
             mem_pc <= 0;
@@ -941,7 +950,7 @@ module cpu #(
             end else if (halted) begin
                 if_pc <= 0;
                 if_pc_current <= 0;
-            end else if (hazard_stall || alu_stall) begin
+            end else if (hazard_stall || alu_stall || waiting_for_interrupt) begin
                 if_pc <= if_pc;
                 if_pc_current <= if_pc_current;
             end else begin
@@ -952,7 +961,7 @@ module cpu #(
             if (!hazard_stall && !alu_stall)
                 id_pc <= if_pc_current;
 
-            if (should_take_branch || branch_taken || halted)
+            if (should_take_branch || branch_taken || halted || waiting_for_interrupt)
                 id_instr <= 0;
             else if (!hazard_stall && !alu_stall)
                 id_instr <= if_instr;
@@ -979,7 +988,7 @@ module cpu #(
                 ex_branch_fwd_mem <= id_fwd_mem[1:0];
                 ex_branch_fwd_wb <= id_fwd_wb[1:0];
 
-                if (should_take_branch || hazard_stall || halted) begin
+                if (should_take_branch || hazard_stall || halted || waiting_for_interrupt) begin
                     ex_instr <= 0;
                     ex_opcode <= OP_NOP;
                     ex_reg_addr <= 0;
@@ -1006,6 +1015,11 @@ module cpu #(
 
             if (should_halt)
                 halted <= 1;
+
+            if (wake_from_interrupt)
+                waiting_for_interrupt <= 0;
+            else if (should_wait)
+                waiting_for_interrupt <= 1;
 
             branch_taken <= should_take_branch;
 

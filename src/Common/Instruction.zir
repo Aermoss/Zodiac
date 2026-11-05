@@ -23,7 +23,7 @@ enum Opcode: u32 {
     MUL, MULH, MULHSU, MULHU, DIV, DIVU, REM, REMU,
     AND, ANDI, OR, ORI, XOR, XORI,
     SLL, SLLI, SRL, SRLI, SRA, SRAI,
-    CSRR, CSRW, ECALL, ERET,
+    CSRR, CSRW, ECALL, ERET, WFI,
     HLT = 0x3F
 }
 
