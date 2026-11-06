@@ -24,7 +24,7 @@ fn PrintVersion(executable: String) {
 }
 
 fn PrintUsage(executable: String) {
-    WriteLine("OVERVIEW: Zodiac emulator");
+    WriteLine("OVERVIEW: Svarog emulator");
     WriteLine("USAGE: " + executable + " [options] <input>");
     WriteLine("OPTIONS:");
     WriteLine("  --flash=<file>[@<offset>] Load <file> into flash at <offset>, 0x100000 if not given");

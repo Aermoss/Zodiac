@@ -25,7 +25,7 @@ fn PrintVersion(executable: String) {
 }
 
 fn PrintUsage(executable: String) {
-    WriteLine("OVERVIEW: Zodiac assembler");
+    WriteLine("OVERVIEW: Svarog assembler");
     WriteLine("USAGE: " + executable + " [options] <input>");
     WriteLine("OPTIONS:");
     WriteLine("  -o <file>                Write output to <file>");

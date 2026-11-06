@@ -78,7 +78,7 @@ module video (
     logic [7:0] font [0:4095];
 
     initial begin
-        $readmemh("C:\\Users\\rencb\\Documents\\GitHub\\Zodiac\\font.hex", font);
+        $readmemh("C:\\Users\\rencb\\Documents\\GitHub\\Svarog\\font.hex", font);
     end
 
     always_ff @(posedge cpu_clk) begin

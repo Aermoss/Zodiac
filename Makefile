@@ -7,40 +7,40 @@ INCLUDE := $(ZIRCON_PATH)/include
 
 default: simulate
 
-bin/zas.exe: $(wildcard src/Assembler/*.zir) $(wildcard src/Common/*.zir)
+bin/svarog-as.exe: $(wildcard src/Assembler/*.zir) $(wildcard src/Common/*.zir)
 	$(COMPILER) src/Assembler/Main.zir -o $@ -I$(INCLUDE) -lDbgHelp -DASSEMBLER
 
-bin/zda.exe: $(wildcard src/Disassembler/*.zir) $(wildcard src/Common/*.zir)
+bin/svarog-objdump.exe: $(wildcard src/Disassembler/*.zir) $(wildcard src/Common/*.zir)
 	$(COMPILER) src/Disassembler/Main.zir -o $@ -I$(INCLUDE) -lDbgHelp -DDISASSEMBLER
 
-bin/zar.exe: $(wildcard src/Archiver/*.zir) $(wildcard src/Common/*.zir)
+bin/svarog-ar.exe: $(wildcard src/Archiver/*.zir) $(wildcard src/Common/*.zir)
 	$(COMPILER) src/Archiver/Main.zir -o $@ -I$(INCLUDE) -lDbgHelp -DARCHIVER
 
-bin/zld.exe: $(wildcard src/Linker/*.zir) $(wildcard src/Common/*.zir)
+bin/svarog-ld.exe: $(wildcard src/Linker/*.zir) $(wildcard src/Common/*.zir)
 	$(COMPILER) src/Linker/Main.zir -o $@ -I$(INCLUDE) -lDbgHelp -DLINKER
 
-bin/zemu.exe: $(wildcard src/Emulator/*.zir) $(wildcard src/Common/*.zir)
+bin/svarog-emu.exe: $(wildcard src/Emulator/*.zir) $(wildcard src/Common/*.zir)
 	$(COMPILER) src/Emulator/Main.zir -o $@ -I$(INCLUDE) -lDbgHelp -lucrt -DEMULATOR
 
-bin/zym.exe: $(wildcard src/Symbols/*.zir) $(wildcard src/Common/*.zir)
+bin/svarog-nm.exe: $(wildcard src/Symbols/*.zir) $(wildcard src/Common/*.zir)
 	$(COMPILER) src/Symbols/Main.zir -o $@ -I$(INCLUDE) -lDbgHelp -DSYMBOLS
 
-bin/ztr.exe: $(wildcard src/Strings/*.zir) $(wildcard src/Common/*.zir)
+bin/svarog-strings.exe: $(wildcard src/Strings/*.zir) $(wildcard src/Common/*.zir)
 	$(COMPILER) src/Strings/Main.zir -o $@ -I$(INCLUDE) -lDbgHelp -DSTRINGS
 
-%.o: bin/zas.exe %.s
+%.o: bin/svarog-as.exe %.s
 	$^ -o $@
 
-boot.hex: bin/zld.exe boot.o
+boot.hex: bin/svarog-ld.exe boot.o
 	$^ -o $@ --format=hex
 
 program.s: program.zir
-	$(COMPILER) $< -o $@ -S -target zodiac -emit-hir -emit-mir -emit-lir
+	$(COMPILER) $< -o $@ -S -target svarog -emit-hir -emit-mir -emit-lir
 
-program.bin: bin/zld.exe start.o program.o end.o
+program.bin: bin/svarog-ld.exe start.o program.o end.o
 	$^ -o $@ --format=bin --origin=0x40000000
 
-program.hex: bin/zld.exe start.o program.o end.o
+program.hex: bin/svarog-ld.exe start.o program.o end.o
 	$^ -o $@ --format=hex
 
 ram.sv: boot.hex program.hex
@@ -56,10 +56,10 @@ build: boot.hex program.bin program.hex
 simulate: wave.fst
 	gtkwave $<
 
-emulate: bin/zemu.exe boot.hex program.bin
+emulate: bin/svarog-emu.exe boot.hex program.bin
 	$< boot.hex --flash=program.bin
 
-all: bin/zas.exe bin/zda.exe bin/zar.exe bin/zld.exe bin/zemu.exe bin/zym.exe bin/ztr.exe
+all: bin/svarog-as.exe bin/svarog-objdump.exe bin/svarog-ar.exe bin/svarog-ld.exe bin/svarog-emu.exe bin/svarog-nm.exe bin/svarog-strings.exe
 
 bin/Count.exe: scripts/Count.zir
 	$(COMPILER) $< -o $@ -I$(INCLUDE)

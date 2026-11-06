@@ -11,12 +11,12 @@
 *.mir
 *.lir
 
-!bin/zas.exe
-!bin/zda.exe
-!bin/zar.exe
-!bin/zld.exe
-!bin/zemu.exe
-!bin/zym.exe
-!bin/ztr.exe
+!bin/svarog-as.exe
+!bin/svarog-objdump.exe
+!bin/svarog-ar.exe
+!bin/svarog-ld.exe
+!bin/svarog-emu.exe
+!bin/svarog-nm.exe
+!bin/svarog-strings.exe
 
 !font.hex

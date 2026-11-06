@@ -135,7 +135,7 @@ fn Main() {
     WriteInteger(hardware_time);
     WriteLine(" ms."); */
 
-    WriteLine("Zodiac interactive terminal initialized!");
+    WriteLine("Svarog interactive terminal initialized!");
     WriteLine("Type anything to echo, press 1-6 to toggle LEDs, or +/- to change RGB brightness.");
     WriteLine("Press the button on the board to cycle WS2812 animation modes.");
 

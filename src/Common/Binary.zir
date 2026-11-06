@@ -16,7 +16,7 @@
 
 #[include "std/str", "std/vec", "src/Common/File.zir", "src/Common/Endian.zir" : *]
 
-const EXECUTABLE_MAGIC: u32 = 0x4558455A;
+const EXECUTABLE_MAGIC: u32 = 0x45584553;
 
 enum OutputFormat: u32 {
     Binary, Hexadecimal, Executable

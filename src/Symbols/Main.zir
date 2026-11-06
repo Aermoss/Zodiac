@@ -25,7 +25,7 @@ fn PrintVersion(executable: String) {
 }
 
 fn PrintUsage(executable: String) {
-    WriteLine("OVERVIEW: Zodiac symbol dumper");
+    WriteLine("OVERVIEW: Svarog symbol dumper");
     WriteLine("USAGE: " + executable + " [options] <inputs...>");
     WriteLine("OPTIONS:");
     WriteLine("  --version                Display symbol dumper version");

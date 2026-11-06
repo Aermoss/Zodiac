@@ -36,7 +36,7 @@ module bram #(
     assign fetch_word_addr = fetch_addr[2 + $clog2(WORD_DEPTH) - 1:2];
 
     initial begin
-        $readmemh("C:\\Users\\rencb\\Documents\\GitHub\\Zodiac\\boot.hex", mem);
+        $readmemh("C:\\Users\\rencb\\Documents\\GitHub\\Svarog\\boot.hex", mem);
     end
 
     always_ff @(posedge clk) begin
