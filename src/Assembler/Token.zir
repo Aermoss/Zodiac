@@ -1,0 +1,112 @@
+/*
+ * Copyright 2025-2026 Yusuf Rençber
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+#[include "std/str", "src/Common/Source.zir" : *]
+
+enum TokenType: u8 {
+    Unknown, EndOfFile, NewLine,
+
+    Identifier, Number, String, Character,
+    Plus, Minus, Mul, Div, Mod, And, Or, Xor, Not, LeftShift, RightShift,
+    LeftParen, RightParen, LeftBrace, RightBrace, LeftBracket, RightBracket,
+
+    Comma, Colon, Dollar
+}
+
+extend TokenType {
+    pub fn ToString(this) -> String {
+        match this {
+            TokenType::Unknown => "Unknown",
+            TokenType::EndOfFile => "EndOfFile",
+            TokenType::NewLine => "NewLine",
+            TokenType::Identifier => "Identifier",
+            TokenType::Number => "Number",
+            TokenType::String => "String",
+            TokenType::Character => "Character",
+            TokenType::Plus => "Plus",
+            TokenType::Minus => "Minus",
+            TokenType::Mul => "Mul",
+            TokenType::Div => "Div",
+            TokenType::Mod => "Mod",
+            TokenType::And => "And",
+            TokenType::Or => "Or",
+            TokenType::Xor => "Xor",
+            TokenType::Not => "Not",
+            TokenType::LeftShift => "LeftShift",
+            TokenType::RightShift => "RightShift",
+            TokenType::LeftParen => "LeftParen",
+            TokenType::RightParen => "RightParen",
+            TokenType::LeftBrace => "LeftBrace",
+            TokenType::RightBrace => "RightBrace",
+            TokenType::LeftBracket => "LeftBracket",
+            TokenType::RightBracket => "RightBracket",
+            TokenType::Comma => "Comma",
+            TokenType::Colon => "Colon",
+            TokenType::Dollar => "Dollar"
+        }.ToString()
+    }
+
+    pub fn Describe(this) -> String {
+        match this {
+            TokenType::Unknown => "unknown token",
+            TokenType::EndOfFile => "end of file",
+            TokenType::NewLine => "end of line",
+            TokenType::Identifier => "identifier",
+            TokenType::Number => "number",
+            TokenType::String => "string literal",
+            TokenType::Character => "character literal",
+            TokenType::Plus => "'+'",
+            TokenType::Minus => "'-'",
+            TokenType::Mul => "'*'",
+            TokenType::Div => "'/'",
+            TokenType::Mod => "'%'",
+            TokenType::And => "'&'",
+            TokenType::Or => "'|'",
+            TokenType::Xor => "'^'",
+            TokenType::Not => "'!'",
+            TokenType::LeftShift => "'<<'",
+            TokenType::RightShift => "'>>'",
+            TokenType::LeftParen => "'('",
+            TokenType::RightParen => "')'",
+            TokenType::LeftBrace => "'{'",
+            TokenType::RightBrace => "'}'",
+            TokenType::LeftBracket => "'['",
+            TokenType::RightBracket => "']'",
+            TokenType::Comma => "','",
+            TokenType::Colon => "':'",
+            TokenType::Dollar => "'$'"
+        }.ToString()
+    }
+}
+
+class Token {
+    pub _type: TokenType,
+    pub span: SourceSpan;
+
+    pub fn Text(&this) -> String {
+        let file = Sources()->File(this.span.file);
+        if file == null { return String(); }
+        String(file->text, this.span.start as usize, (this.span.end - this.span.start) as usize)
+    }
+
+    pub fn Describe(&this) -> String {
+        match this._type {
+            TokenType::NewLine => "end of line".ToString(),
+            TokenType::EndOfFile => "end of file".ToString(),
+            _ => "'" + this.Text() + "'"
+        }
+    }
+}

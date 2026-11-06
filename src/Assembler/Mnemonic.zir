@@ -1,0 +1,227 @@
+/*
+ * Copyright 2025-2026 Yusuf Rençber
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+#[include "std/str", "std/opt" : *]
+
+enum Mnemonic: u8 {
+    Li, La, Mv, Not, Neg, Seqz, Snez, Sltz, Sgtz,
+    Beqz, Bnez, Blez, Bgez, Bltz, Bgtz, Bgt, Ble, Bgtu, Bleu,
+    Nop, Lb, Lbu, Lh, Lhu, Lw, Lui, Auipc, Sb, Sh, Sw,
+    B, Br, Bl, Blr, Beq, Bne, Blt, Bltu, Bge, Bgeu,
+    Slt, Sltu, Slti, Sltiu,
+    Add, Addi, Sub, Subi,
+    Mul, Mulh, Mulhsu, Mulhu, Div, Divu, Rem, Remu,
+    And, Andi, Or, Ori, Xor, Xori,
+    Sll, Slli, Srl, Srli, Sra, Srai,
+    Csrr, Csrw, Ecall, Eret, Wfi, Hlt
+}
+
+extend Mnemonic {
+    pub fn Name(this) -> *i8 {
+        match this {
+            Mnemonic::Li => "li",
+            Mnemonic::La => "la",
+            Mnemonic::Mv => "mv",
+            Mnemonic::Not => "not",
+            Mnemonic::Neg => "neg",
+            Mnemonic::Seqz => "seqz",
+            Mnemonic::Snez => "snez",
+            Mnemonic::Sltz => "sltz",
+            Mnemonic::Sgtz => "sgtz",
+            Mnemonic::Beqz => "beqz",
+            Mnemonic::Bnez => "bnez",
+            Mnemonic::Blez => "blez",
+            Mnemonic::Bgez => "bgez",
+            Mnemonic::Bltz => "bltz",
+            Mnemonic::Bgtz => "bgtz",
+            Mnemonic::Bgt => "bgt",
+            Mnemonic::Ble => "ble",
+            Mnemonic::Bgtu => "bgtu",
+            Mnemonic::Bleu => "bleu",
+            Mnemonic::Nop => "nop",
+            Mnemonic::Lb => "lb",
+            Mnemonic::Lbu => "lbu",
+            Mnemonic::Lh => "lh",
+            Mnemonic::Lhu => "lhu",
+            Mnemonic::Lw => "lw",
+            Mnemonic::Lui => "lui",
+            Mnemonic::Auipc => "auipc",
+            Mnemonic::Sb => "sb",
+            Mnemonic::Sh => "sh",
+            Mnemonic::Sw => "sw",
+            Mnemonic::B => "b",
+            Mnemonic::Br => "br",
+            Mnemonic::Bl => "bl",
+            Mnemonic::Blr => "blr",
+            Mnemonic::Beq => "beq",
+            Mnemonic::Bne => "bne",
+            Mnemonic::Blt => "blt",
+            Mnemonic::Bltu => "bltu",
+            Mnemonic::Bge => "bge",
+            Mnemonic::Bgeu => "bgeu",
+            Mnemonic::Slt => "slt",
+            Mnemonic::Sltu => "sltu",
+            Mnemonic::Slti => "slti",
+            Mnemonic::Sltiu => "sltiu",
+            Mnemonic::Add => "add",
+            Mnemonic::Addi => "addi",
+            Mnemonic::Sub => "sub",
+            Mnemonic::Subi => "subi",
+            Mnemonic::Mul => "mul",
+            Mnemonic::Mulh => "mulh",
+            Mnemonic::Mulhsu => "mulhsu",
+            Mnemonic::Mulhu => "mulhu",
+            Mnemonic::Div => "div",
+            Mnemonic::Divu => "divu",
+            Mnemonic::Rem => "rem",
+            Mnemonic::Remu => "remu",
+            Mnemonic::And => "and",
+            Mnemonic::Andi => "andi",
+            Mnemonic::Or => "or",
+            Mnemonic::Ori => "ori",
+            Mnemonic::Xor => "xor",
+            Mnemonic::Xori => "xori",
+            Mnemonic::Sll => "sll",
+            Mnemonic::Slli => "slli",
+            Mnemonic::Srl => "srl",
+            Mnemonic::Srli => "srli",
+            Mnemonic::Sra => "sra",
+            Mnemonic::Srai => "srai",
+            Mnemonic::Csrr => "csrr",
+            Mnemonic::Csrw => "csrw",
+            Mnemonic::Ecall => "ecall",
+            Mnemonic::Eret => "eret",
+            Mnemonic::Wfi => "wfi",
+            Mnemonic::Hlt => "hlt"
+        }
+    }
+
+    pub fn ToString(this) -> String {
+        this.Name().ToString()
+    }
+
+    pub fn Signature(this) -> *i8 {
+        match this {
+            Mnemonic::Li | Mnemonic::La => "RE",
+            Mnemonic::Mv | Mnemonic::Not | Mnemonic::Neg | Mnemonic::Seqz | Mnemonic::Snez | Mnemonic::Sltz | Mnemonic::Sgtz => "RR",
+            Mnemonic::Beqz | Mnemonic::Bnez | Mnemonic::Blez | Mnemonic::Bgez | Mnemonic::Bltz | Mnemonic::Bgtz => "RE",
+            Mnemonic::Bgt | Mnemonic::Ble | Mnemonic::Bgtu | Mnemonic::Bleu => "RRE",
+            Mnemonic::Nop | Mnemonic::Ecall | Mnemonic::Eret | Mnemonic::Wfi | Mnemonic::Hlt => "",
+            Mnemonic::Lb | Mnemonic::Lbu | Mnemonic::Lh | Mnemonic::Lhu | Mnemonic::Lw | Mnemonic::Sb | Mnemonic::Sh | Mnemonic::Sw => "RM",
+            Mnemonic::Lui | Mnemonic::Auipc | Mnemonic::Bl => "RE",
+            Mnemonic::B => "E",
+            Mnemonic::Br => "R",
+            Mnemonic::Blr => "RR",
+            Mnemonic::Beq | Mnemonic::Bne | Mnemonic::Blt | Mnemonic::Bltu | Mnemonic::Bge | Mnemonic::Bgeu => "RRE",
+            Mnemonic::Slti | Mnemonic::Sltiu | Mnemonic::Addi | Mnemonic::Subi | Mnemonic::Andi | Mnemonic::Ori | Mnemonic::Xori | Mnemonic::Slli | Mnemonic::Srli | Mnemonic::Srai => "RRE",
+            Mnemonic::Csrr => "RC",
+            Mnemonic::Csrw => "CR",
+            _ => "RRR"
+        }
+    }
+}
+
+fn StringToMnemonic(name: &String) -> Option<Mnemonic> {
+    let mut mnemonic = Mnemonic::Li;
+
+    loop {
+        if name == mnemonic.Name() { return Option<Mnemonic>::Some(mnemonic); }
+        if mnemonic == Mnemonic::Hlt { break; }
+        mnemonic = (mnemonic as u8 + 1) as Mnemonic;
+    }
+
+    Option<Mnemonic>::None
+}
+
+enum Directive: u8 {
+    Text, Data, Byte, Half, Word, String, Align, Space, Global, Extern
+}
+
+extend Directive {
+    pub fn Name(this) -> *i8 {
+        match this {
+            Directive::Text => ".text",
+            Directive::Data => ".data",
+            Directive::Byte => ".byte",
+            Directive::Half => ".half",
+            Directive::Word => ".word",
+            Directive::String => ".string",
+            Directive::Align => ".align",
+            Directive::Space => ".space",
+            Directive::Global => ".global",
+            Directive::Extern => ".extern"
+        }
+    }
+
+    pub fn ToString(this) -> String {
+        this.Name().ToString()
+    }
+}
+
+fn StringToDirective(name: &String) -> Option<Directive> {
+    let mut directive = Directive::Text;
+
+    loop {
+        if name == directive.Name() { return Option<Directive>::Some(directive); }
+        if directive == Directive::Extern { break; }
+        directive = (directive as u8 + 1) as Directive;
+    }
+
+    Option<Directive>::None
+}
+
+fn ParseRegister(value: &String) -> Option<u32> {
+    if value == "zero" { return Option<u32>::Some(0); }
+    if value == "ra" { return Option<u32>::Some(1); }
+    if value == "sp" { return Option<u32>::Some(2); }
+    if value == "gp" { return Option<u32>::Some(3); }
+    if value == "tp" { return Option<u32>::Some(4); }
+    if value == "fp" { return Option<u32>::Some(5); }
+    if value.Length() < 2 { return Option<u32>::None; }
+
+    let prefix = value[0];
+    let (mut base, mut limit): (u32, u32) = (0, 0);
+
+    if prefix == 'x' {
+        (base, limit) = (0, 31);
+    } else if prefix == 's' {
+        (base, limit) = (5, 11);
+    } else if prefix == 't' {
+        (base, limit) = (17, 6);
+    } else if prefix == 'a' {
+        (base, limit) = (24, 7);
+    } else {
+        return Option<u32>::None;
+    }
+
+    let mut number: u32 = 0;
+
+    for i in 1..value.Length() {
+        let character = value[i];
+
+        if character < '0' || character > '9' {
+            return Option<u32>::None;
+        }
+
+        number = number * 10 + (character - '0') as u32;
+
+        if number > limit {
+            return Option<u32>::None;
+        }
+    }
+
+    Option<u32>::Some(base + number)
+}

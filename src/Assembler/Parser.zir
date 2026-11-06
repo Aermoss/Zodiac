@@ -14,39 +14,56 @@
  * limitations under the License.
  */
 
-#[include "std/str", "std/vec", "std/arena", "src/Common/Logger.zir",
-    "src/Assembler/Tokens.zir", "src/Assembler/Nodes.zir" : *]
+#[include "std/str", "std/vec", "std/arena", "std/opt", "src/Common/Logger.zir",
+    "src/Assembler/Lexer.zir", "src/Assembler/AST.zir" : *]
 
 class Parser {
     arena: Arena,
-    tokens: Vector<Token>,
-    index: usize;
+    lexer: *mut Lexer = null,
+    buffer: Vector<Token>,
+    previous: SourceSpan;
 
-    fn Current(&this) -> Token {
-        if this.index >= this.tokens.Length() {
-            this.tokens[this.tokens.Length() - 1]
-        } else {
-            this.tokens[this.index]
+    Parser(&mut this, lexer: *mut Lexer) {
+        this.lexer = lexer;
+        this.previous = SourceSpan { file: 0, start: 0, end: 0 };
+    }
+
+    fn New<T>(&mut this, args...) -> *mut T {
+        let node = this.arena.New<T>(args...);
+        this.Finish(node);
+        node
+    }
+
+    fn Finish(&this, node: *mut ASTNode) {
+        if node != null && node->span.file == this.previous.file && this.previous.end > node->span.end {
+            node->span.end = this.previous.end;
         }
     }
 
-    fn Peek(&this, offset: usize) -> Token {
-        let index = this.index + offset;
-
-        if index >= this.tokens.Length() {
-            this.tokens[this.tokens.Length() - 1]
-        } else {
-            this.tokens[index]
+    fn Fill(&mut this, count: usize) {
+        while this.buffer.Length() < count {
+            this.buffer.PushBack(this.lexer->Next());
         }
+    }
+
+    fn Current(&mut this) -> Token {
+        this.Fill(1);
+        this.buffer[0]
+    }
+
+    fn Peek(&mut this, offset: usize) -> Token {
+        this.Fill(offset + 1);
+        this.buffer[offset]
     }
 
     fn Advance(&mut this) -> Token {
         let token = this.Current();
 
-        if this.index < this.tokens.Length() {
-            this.index += 1;
+        if token._type != TokenType::EndOfFile {
+            this.buffer.RemoveAt(0);
         }
 
+        this.previous = token.span;
         token
     }
 
@@ -59,21 +76,26 @@ class Parser {
         }
     }
 
-    fn Expect(&mut this, _type: TokenType) -> Token {
-        let token = this.Current();
-
-        if token._type == _type {
-            return this.Advance();
-        }
-
-        Logger::Log("Expected '" + _type.ToString() + "' but got '" + token._type.ToString() + "'.", token, LogSeverity::Error);
-
-        let mut error: Token;
-        (error._type, error.row, error.column, error.file) = (TokenType::UNKNOWN, token.row, token.column, token.file);
-        error
+    fn IsEndOfLine(&mut this) -> bool {
+        let _type = this.Current()._type;
+        _type == TokenType::NewLine || _type == TokenType::EndOfFile
     }
 
-    fn Expect2(&mut this, _type: TokenType) -> bool {
+    fn SkipLine(&mut this) {
+        while !this.IsEndOfLine() {
+            this.Advance();
+        }
+    }
+
+    fn ExpectedAt(&this, token: &Token) -> SourceSpan {
+        if token._type == TokenType::NewLine || token._type == TokenType::EndOfFile {
+            return SourceSpan { file: this.previous.file, start: this.previous.end, end: this.previous.end };
+        }
+
+        token.span
+    }
+
+    fn Expect(&mut this, _type: TokenType) -> bool {
         let token = this.Current();
 
         if token._type == _type {
@@ -81,186 +103,330 @@ class Parser {
             return true;
         }
 
-        Logger::Log("Expected '" + _type.ToString() + "' but got '" + token._type.ToString() + "'.", token, LogSeverity::Error);
+        Logger::Log("Expected " + _type.Describe() + ", found " + token.Describe() + ".", this.ExpectedAt(token), LogSeverity::Error);
         false
     }
 
-    fn GetBinaryOperatorPrecedence(&this, _type: TokenType) -> i32 {
+    fn BinaryPrecedence(&this, _type: TokenType) -> i32 {
         match _type {
-            TokenType::OR => 1,
-            TokenType::XOR => 2,
-            TokenType::AND => 3,
-            TokenType::LSHIFT | TokenType::RSHIFT => 4,
-            TokenType::PLUS | TokenType::MINUS => 5,
-            TokenType::MUL | TokenType::DIV | TokenType::MOD => 6,
+            TokenType::Or => 1,
+            TokenType::Xor => 2,
+            TokenType::And => 3,
+            TokenType::LeftShift | TokenType::RightShift => 4,
+            TokenType::Plus | TokenType::Minus => 5,
+            TokenType::Mul | TokenType::Div | TokenType::Mod => 6,
             _ => -1
         }
     }
 
-    fn IsBinaryOperator(&this, _type: TokenType) -> bool {
-        this.GetBinaryOperatorPrecedence(_type) > 0
+    fn BinaryKind(&this, _type: TokenType) -> ASTBinaryKind {
+        match _type {
+            TokenType::Plus => ASTBinaryKind::Add,
+            TokenType::Minus => ASTBinaryKind::Subtract,
+            TokenType::Mul => ASTBinaryKind::Multiply,
+            TokenType::Div => ASTBinaryKind::Divide,
+            TokenType::Mod => ASTBinaryKind::Modulo,
+            TokenType::And => ASTBinaryKind::BitwiseAnd,
+            TokenType::Or => ASTBinaryKind::BitwiseOr,
+            TokenType::Xor => ASTBinaryKind::BitwiseXor,
+            TokenType::LeftShift => ASTBinaryKind::LeftShift,
+            _ => ASTBinaryKind::RightShift
+        }
     }
 
-    fn IsUnaryOperator(&this, _type: TokenType) -> bool {
-        _type == TokenType::NOT || _type == TokenType::MINUS
-    }
+    fn ParseInteger(&mut this, token: &Token) -> *ASTExpression {
+        let text = this.lexer->Text(token.span);
 
-    fn ParsePrimary(&mut this) -> *Node {
-        let token = this.Current();
+        let value = if text.StartsWith("0x") || text.StartsWith("0X") {
+            text.SubString(2).ToInteger(16)
+        } else if text.StartsWith("0b") || text.StartsWith("0B") {
+            text.SubString(2).ToInteger(2)
+        } else if text.StartsWith("0o") || text.StartsWith("0O") {
+            text.SubString(2).ToInteger(8)
+        } else {
+            text.ToInteger(10)
+        };
 
-        match token._type {
-            TokenType::IDENTIFIER => {
-                this.Advance();
-                this.arena.New<IdentifierNode>(token.value, token)
-            },
-            TokenType::NUMBER | TokenType::STRING | TokenType::CHAR => {
-                this.Advance();
-                this.arena.New<LiteralNode>(token.value, token)
-            },
-            TokenType::DOLLAR => {
-                this.Advance();
-                this.arena.New<AddressNode>(token)
-            },
-            TokenType::LPAREN => {
-                this.Advance();
-                let expression = this.ParseExpression();
-                if expression == null || !this.Expect2(TokenType::RPAREN) { return null; }
-                expression
-            },
-            _ => {
-                this.Advance();
-                Logger::Log("Unexpected token '" + token.value + "'.", token, LogSeverity::Error);
+        match value {
+            Option<HostSigned>::Some(value) => this.New<ASTIntegerLiteral>(value as u32, token.span),
+            Option<HostSigned>::None => {
+                Logger::Log("Invalid integer literal '" + text + "'.", token.span, LogSeverity::Error);
                 null
             }
         }
     }
 
-    fn ParsePostfix(&mut this) -> *Node {
-        this.ParsePrimary()
-    }
-
-    fn ParseUnary(&mut this) -> *Node {
+    fn ParsePrimary(&mut this) -> *ASTExpression {
         let token = this.Current();
-        let mut mutable = false;
 
-        if this.IsUnaryOperator(token._type) {
-            this.Advance();
-            let expression = this.ParseUnary();
-            if expression == null { return null; }
-            this.arena.New<UnaryOperationNode>(expression, token._type, token)
-        } else {
-            this.ParsePostfix()
+        match token._type {
+            TokenType::Identifier => {
+                this.Advance();
+                let name = this.lexer->Text(token.span);
+
+                match ParseRegister(name) {
+                    Option<u32>::Some(index) => this.New<ASTRegisterExpression>(index, token.span),
+                    Option<u32>::None => this.New<ASTIdentifierExpression>(name, token.span)
+                }
+            },
+            TokenType::Number => {
+                this.Advance();
+                this.ParseInteger(token)
+            },
+            TokenType::String => {
+                this.Advance();
+                this.New<ASTStringLiteral>(this.lexer->Unescape(token.span), token.span)
+            },
+            TokenType::Character => {
+                this.Advance();
+                let value = this.lexer->Unescape(token.span);
+
+                if value.Length() != 1 {
+                    Logger::Log("Invalid character literal.", token.span, LogSeverity::Error);
+                    return null;
+                }
+
+                this.New<ASTCharacterLiteral>(value[0] as u8 as u32, token.span)
+            },
+            TokenType::Dollar => {
+                this.Advance();
+                this.New<ASTAddressExpression>(token.span)
+            },
+            TokenType::LeftParen => {
+                this.Advance();
+                let expression = this.ParseExpression();
+                if expression == null || !this.Expect(TokenType::RightParen) { return null; }
+                expression
+            },
+            _ => {
+                Logger::Log("Expected an expression, found " + token.Describe() + ".", this.ExpectedAt(token), LogSeverity::Error);
+                null
+            }
         }
     }
 
-    fn ParseBinary(&mut this, min_precedence: i32) -> *Node {
+    fn ParseUnary(&mut this) -> *ASTExpression {
+        let token = this.Current();
+
+        if token._type == TokenType::Not || token._type == TokenType::Minus {
+            this.Advance();
+            let operand = this.ParseUnary();
+            if operand == null { return null; }
+            let kind = if token._type == TokenType::Not { ASTUnaryKind::Not } else { ASTUnaryKind::Negate };
+            return this.New<ASTUnaryExpression>(kind, operand, token.span);
+        }
+
+        this.ParsePrimary()
+    }
+
+    fn ParseBinary(&mut this, min_precedence: i32) -> *ASTExpression {
         let mut left = this.ParseUnary();
         if left == null { return null; }
 
         loop {
             let token = this.Current();
-            let precedence = this.GetBinaryOperatorPrecedence(token._type);
+            let precedence = this.BinaryPrecedence(token._type);
             if precedence < min_precedence { break; }
             this.Advance();
 
             let right = this.ParseBinary(precedence + 1);
             if right == null { return null; }
-            left = this.arena.New<BinaryOperationNode>(left, right, token._type, token);
+            left = this.New<ASTBinaryExpression>(this.BinaryKind(token._type), left, right, left->span);
         }
 
         left
     }
 
-    fn ParseExpression(&mut this) -> *Node {
+    fn ParseExpression(&mut this) -> *ASTExpression {
         this.ParseBinary(0)
     }
 
-    fn ParseOperand(&mut this) -> *OperandNode {
-        let token = this.Current();
-        let expr = this.ParseExpression();
-        if expr == null { return null; }
+    fn ParseOperand(&mut this) -> *ASTOperand {
+        let start = this.Current();
+        let expression = this.ParseExpression();
+        if expression == null { return null; }
 
-        if this.Match(TokenType::LPAREN) {
-            let reg = this.ParseExpression();
-            if reg == null || !this.Expect2(TokenType::RPAREN) { return null; }
-            return this.arena.New<OperandNode>(reg, expr, token);
+        if this.Match(TokenType::LeftParen) {
+            let base = this.ParseExpression();
+            if base == null || !this.Expect(TokenType::RightParen) { return null; }
+            return this.New<ASTOperand>(base, expression, start.span);
         }
 
-        this.arena.New<OperandNode>(expr, null, token)
+        this.New<ASTOperand>(expression, null, start.span)
     }
 
-    fn ParseInstruction(&mut this) -> *InstructionNode {
-        let token = this.Expect(TokenType::IDENTIFIER);
-        if token._type == TokenType::UNKNOWN { return null; }
-        let mnemonic = token.value;
-        let instruction = this.arena.New<InstructionNode>(mnemonic, token);
+    fn ParseOperands(&mut this, operands: &mut Vector<*ASTOperand>) -> bool {
+        if this.IsEndOfLine() { return true; }
 
-        if this.Current()._type != TokenType::NEWLINE && this.Current()._type != TokenType::EOF {
-            let mut index = 0;
-
-            loop {
-                let operand = this.ParseOperand();
-
-                if operand != null {
-                    let state = (mnemonic == "lb" || mnemonic == "lbu" || mnemonic == "lh" || mnemonic == "lhu" || mnemonic == "lw" || mnemonic == "sb" || mnemonic == "sh" || mnemonic == "sw") && index == 1;
-                    let mut is_reloc = false;
-
-                    if operand->offset != null {
-                        if operand->offset->_type == NodeType::IDENTIFIER {
-                            let value = (operand->offset as *IdentifierNode)->value;
-                            if value == "hi" || value == "lo" { is_reloc = true; }
-                        }
-                    }
-
-                    if state && operand->offset == null {
-                        Logger::Log("Instruction '" + mnemonic + "' requires dereference operator 'offset(reg)' for operand " + String::FromInteger(index as HostUnsigned + 1) + ".", token, LogSeverity::Error);
-                    } else if !state && operand->offset != null && !is_reloc {
-                        Logger::Log("Instruction '" + mnemonic + "' does not support dereference operator for operand " + String::FromInteger(index as HostUnsigned + 1) + ".", token, LogSeverity::Error);
-                    }
-
-                    instruction->operands.PushBack(operand);
-                }
-
-                if this.Match(TokenType::COMMA) {
-                    index += 1;
-                } else {
-                    break;
-                }
-            }
+        loop {
+            let operand = this.ParseOperand();
+            if operand == null { return false; }
+            operands.PushBack(operand);
+            if !this.Match(TokenType::Comma) { break; }
         }
 
-        instruction
-    }
-
-    fn ParseLabel(&mut this) -> *LabelNode {
-        let token = this.Expect(TokenType::IDENTIFIER);
-        if token._type == TokenType::UNKNOWN || !this.Expect2(TokenType::COLON) { return null; }
-        this.arena.New<LabelNode>(token.value, token)
-    }
-
-    pub fn Parse(&mut this, tokens: &mut Vector<Token>) -> *RootNode {
-        this.arena.Clear();
-        let root = this.arena.New<RootNode>();
-        this.tokens.Swap(tokens);
-        this.index = 0;
-
-        while this.Current()._type != TokenType::EOF {
-            if this.Match(TokenType::NEWLINE) { continue; }
+        if !this.IsEndOfLine() {
             let token = this.Current();
+            Logger::Log("Expected end of line, found " + token.Describe() + ".", token.span, LogSeverity::Error);
+            return false;
+        }
 
-            if token._type == TokenType::IDENTIFIER {
-                if this.Peek(1)._type == TokenType::COLON {
-                    root->declarations.PushBack(this.ParseLabel());
-                } else {
-                    root->declarations.PushBack(this.ParseInstruction());
+        true
+    }
+
+    fn IsRegister(&this, expression: *ASTExpression) -> bool {
+        expression->kind == ASTExpressionKind::Register
+    }
+
+    fn IsRelocationOffset(&this, offset: *ASTExpression) -> bool {
+        if offset->kind != ASTExpressionKind::Identifier { return false; }
+        let name = (offset as *ASTIdentifierExpression)->name;
+        name == "hi" || name == "lo"
+    }
+
+    fn ValidateOperands(&mut this, instruction: *ASTInstructionStatement) -> bool {
+        let signature = instruction->mnemonic.Signature().ToString();
+        let name = instruction->mnemonic.ToString();
+        let &operands = instruction->operands;
+
+        if operands.Length() != signature.Length() {
+            Logger::Log("Instruction '" + name + "' expects " + String::FromInteger(signature.Length() as HostUnsigned) + " operand(s), but " + String::FromInteger(operands.Length() as HostUnsigned) + " were given.", instruction->span, LogSeverity::Error);
+            return false;
+        }
+
+        let mut valid = true;
+
+        for i in 0..operands.Length() {
+            let (operand, kind) = (operands[i], signature[i]);
+            let number = String::FromInteger(i as HostUnsigned + 1);
+
+            if kind == 'M' {
+                if operand->offset == null {
+                    Logger::Log("Instruction '" + name + "' requires dereference operator 'offset(reg)' for operand " + number + ".", operand->span, LogSeverity::Error);
+                    valid = false;
+                } else if !this.IsRegister(operand->expression) {
+                    Logger::Log("Expected a register inside the parentheses of operand " + number + " of '" + name + "'.", operand->expression->span, LogSeverity::Error);
+                    valid = false;
                 }
-            } else {
-                Logger::Log("Unexpected token '" + token.value + "'.", token, LogSeverity::Error);
-                this.Advance();
+
+                continue;
+            }
+
+            if operand->offset != null && !this.IsRelocationOffset(operand->offset) {
+                Logger::Log("Instruction '" + name + "' does not support dereference operator for operand " + number + ".", operand->span, LogSeverity::Error);
+                valid = false;
+                continue;
+            }
+
+            if kind == 'R' && !this.IsRegister(operand->expression) {
+                Logger::Log("Expected a register for operand " + number + " of '" + name + "'.", operand->span, LogSeverity::Error);
+                valid = false;
             }
         }
 
-        this.tokens.Swap(tokens);
-        root
+        valid
+    }
+
+    fn ValidateDirective(&mut this, statement: *ASTDirectiveStatement) -> bool {
+        let name = statement->directive.ToString();
+        let &operands = statement->operands;
+
+        if (statement->directive == Directive::Align || statement->directive == Directive::Space) && operands.Length() != 1 {
+            Logger::Log("Directive '" + name + "' expects 1 operand, but " + String::FromInteger(operands.Length() as HostUnsigned) + " were given.", statement->span, LogSeverity::Error);
+            return false;
+        }
+
+        let mut valid = true;
+
+        for operand in operands {
+            if operand->offset != null {
+                Logger::Log("Directive '" + name + "' does not support dereference operator.", operand->span, LogSeverity::Error);
+                valid = false;
+            } else if statement->directive == Directive::String && !(operand->expression->kind == ASTExpressionKind::Literal && (operand->expression as *ASTLiteral)->kind == ASTLiteralKind::String) {
+                Logger::Log("Directive '.string' expects string literals.", operand->span, LogSeverity::Error);
+                valid = false;
+            } else if (statement->directive == Directive::Global || statement->directive == Directive::Extern) && operand->expression->kind != ASTExpressionKind::Identifier {
+                Logger::Log("Directive '" + name + "' expects symbol names.", operand->span, LogSeverity::Error);
+                valid = false;
+            }
+        }
+
+        valid
+    }
+
+    fn ParseStatement(&mut this) -> *ASTStatement {
+        let token = this.Current();
+
+        if token._type != TokenType::Identifier {
+            Logger::Log("Expected a label, instruction or directive, found " + token.Describe() + ".", token.span, LogSeverity::Error);
+            this.SkipLine();
+            return null;
+        }
+
+        this.Advance();
+        let name = this.lexer->Text(token.span);
+
+        if this.Current()._type == TokenType::Colon {
+            let label = this.New<ASTLabelStatement>(name, token.span);
+            this.Advance();
+            return label;
+        }
+
+        if name.StartsWith('.') {
+            let directive = match StringToDirective(name) {
+                Option<Directive>::Some(directive) => directive,
+                Option<Directive>::None => {
+                    Logger::Log("Unknown directive: '" + name + "'.", token.span, LogSeverity::Error);
+                    this.SkipLine();
+                    return null;
+                }
+            };
+
+            let statement = this.New<ASTDirectiveStatement>(directive, token.span);
+
+            if !this.ParseOperands(statement->operands) {
+                this.SkipLine();
+                return null;
+            }
+
+            this.Finish(statement);
+            if !this.ValidateDirective(statement) { return null; }
+            return statement;
+        }
+
+        let mnemonic = match StringToMnemonic(name) {
+            Option<Mnemonic>::Some(mnemonic) => mnemonic,
+            Option<Mnemonic>::None => {
+                Logger::Log("Unknown mnemonic: '" + name + "'.", token.span, LogSeverity::Error);
+                this.SkipLine();
+                return null;
+            }
+        };
+
+        let statement = this.New<ASTInstructionStatement>(mnemonic, token.span);
+
+        if !this.ParseOperands(statement->operands) {
+            this.SkipLine();
+            return null;
+        }
+
+        this.Finish(statement);
+        if !this.ValidateOperands(statement) { return null; }
+        statement
+    }
+
+    pub fn Parse(&mut this) -> *ASTModule {
+        let module = this.arena.New<ASTModule>();
+
+        while this.Current()._type != TokenType::EndOfFile {
+            if this.Match(TokenType::NewLine) { continue; }
+            let statement = this.ParseStatement();
+
+            if statement != null {
+                module->statements.PushBack(statement);
+            }
+        }
+
+        module
     }
 }

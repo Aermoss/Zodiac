@@ -1,0 +1,99 @@
+/*
+ * Copyright 2026 Yusuf Rençber
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+#[include "std/str", "std/vec", "std/opt" : *]
+
+class NameIndex {
+    keys: Vector<String>,
+    slots: Vector<u32>;
+
+    NameIndex(&mut this) {}
+
+    pub fn Length(&this) -> usize {
+        this.keys.Length()
+    }
+
+    pub fn Contains(&this, name: &String) -> bool {
+        this.Find(name).IsSome()
+    }
+
+    pub fn Find(&this, name: &String) -> Option<usize> {
+        if this.slots.Empty() {
+            return Option<usize>::None;
+        }
+
+        let mask = this.slots.Length() - 1;
+        let mut slot = (name.Hash() as usize) & mask;
+
+        loop {
+            let entry = this.slots[slot];
+
+            if entry == 0 {
+                return Option<usize>::None;
+            }
+
+            if this.keys[(entry - 1) as usize] == name {
+                return Option<usize>::Some((entry - 1) as usize);
+            }
+
+            slot = (slot + 1) & mask;
+        }
+    }
+
+    pub fn Insert(&mut this, name: &String) -> usize {
+        if let Option<usize>::Some(index) = this.Find(name) {
+            return index;
+        }
+
+        if (this.keys.Length() + 1) * 2 > this.slots.Length() {
+            this.Grow();
+        }
+
+        this.keys.PushBack(name);
+        this.Place(this.keys.Length() - 1);
+        this.keys.Length() - 1
+    }
+
+    pub fn Clear(&mut this) {
+        this.keys.Clear();
+        this.slots.Clear();
+    }
+
+    fn Place(&mut this, index: usize) {
+        let mask = this.slots.Length() - 1;
+        let mut slot = (this.keys[index].Hash() as usize) & mask;
+
+        while this.slots[slot] != 0 {
+            slot = (slot + 1) & mask;
+        }
+
+        this.slots[slot] = (index + 1) as u32;
+    }
+
+    fn Grow(&mut this) {
+        let capacity = if this.slots.Empty() { 64 } else { this.slots.Length() * 2 };
+        this.slots.Clear();
+        this.slots.Resize(capacity);
+
+        for i in 0..capacity {
+            this.slots[i] = 0;
+        }
+
+        for i in 0..this.keys.Length() {
+            this.Place(i);
+        }
+    }
+}

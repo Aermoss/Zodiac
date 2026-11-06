@@ -92,15 +92,13 @@ fn Main(args: &mut Vector<String>) -> i32 {
         }
     };
 
-    let mut lexer = Lexer();
-    let mut tokens = lexer.Lex(content, input);
-
-    let mut parser = Parser();
-    let root = parser.Parse(tokens);
-    if root == null { return 1; }
+    let mut lexer = Lexer(content, input);
+    let mut parser = Parser(&mut lexer);
+    let module = parser.Parse();
+    if Logger::HasError() { return 1; }
 
     let mut assembler = Assembler();
-    let mut object = assembler.Assemble(root);
+    let mut object = assembler.Assemble(module);
     if Logger::HasError() { return 1; }
 
     if output.Empty() {

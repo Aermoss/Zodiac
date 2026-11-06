@@ -1,0 +1,181 @@
+/*
+ * Copyright 2025-2026 Yusuf Rençber
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+#[include "std/str", "std/vec", "src/Common/Source.zir", "src/Assembler/Mnemonic.zir" : *]
+
+enum ASTNodeKind: u8 {
+    Expression, Operand, Statement
+}
+
+class ASTNode {
+    pub kind: ASTNodeKind,
+    pub span: SourceSpan;
+
+    ASTNode(&mut this, kind: ASTNodeKind, span: SourceSpan) {
+        (this.kind, this.span) = (kind, span);
+    }
+
+    virtual ~ASTNode(&mut this) {}
+}
+
+enum ASTExpressionKind: u8 {
+    Literal, Identifier, Register, Address, Unary, Binary
+}
+
+class ASTExpression : ASTNode {
+    pub kind: ASTExpressionKind;
+
+    ASTExpression(&mut this, kind: ASTExpressionKind, span: SourceSpan) : ASTNode(ASTNodeKind::Expression, span) {
+        this.kind = kind;
+    }
+}
+
+enum ASTLiteralKind: u8 {
+    Integer, Character, String
+}
+
+class ASTLiteral : ASTExpression {
+    pub kind: ASTLiteralKind;
+
+    ASTLiteral(&mut this, kind: ASTLiteralKind, span: SourceSpan) : ASTExpression(ASTExpressionKind::Literal, span) {
+        this.kind = kind;
+    }
+}
+
+class ASTIntegerLiteral : ASTLiteral {
+    pub value: u32;
+
+    ASTIntegerLiteral(&mut this, value: u32, span: SourceSpan) : ASTLiteral(ASTLiteralKind::Integer, span) {
+        this.value = value;
+    }
+}
+
+class ASTCharacterLiteral : ASTLiteral {
+    pub value: u32;
+
+    ASTCharacterLiteral(&mut this, value: u32, span: SourceSpan) : ASTLiteral(ASTLiteralKind::Character, span) {
+        this.value = value;
+    }
+}
+
+class ASTStringLiteral : ASTLiteral {
+    pub value: String;
+
+    ASTStringLiteral(&mut this, value: String, span: SourceSpan) : ASTLiteral(ASTLiteralKind::String, span) {
+        this.value = value;
+    }
+}
+
+class ASTIdentifierExpression : ASTExpression {
+    pub name: String;
+
+    ASTIdentifierExpression(&mut this, name: &String, span: SourceSpan) : ASTExpression(ASTExpressionKind::Identifier, span) {
+        this.name = name;
+    }
+}
+
+class ASTRegisterExpression : ASTExpression {
+    pub index: u32;
+
+    ASTRegisterExpression(&mut this, index: u32, span: SourceSpan) : ASTExpression(ASTExpressionKind::Register, span) {
+        this.index = index;
+    }
+}
+
+class ASTAddressExpression : ASTExpression {
+    ASTAddressExpression(&mut this, span: SourceSpan) : ASTExpression(ASTExpressionKind::Address, span) {}
+}
+
+enum ASTUnaryKind: u8 {
+    Negate, Not
+}
+
+class ASTUnaryExpression : ASTExpression {
+    pub kind: ASTUnaryKind,
+    pub operand: *ASTExpression;
+
+    ASTUnaryExpression(&mut this, kind: ASTUnaryKind, operand: *ASTExpression, span: SourceSpan) : ASTExpression(ASTExpressionKind::Unary, span) {
+        (this.kind, this.operand) = (kind, operand);
+    }
+}
+
+enum ASTBinaryKind: u8 {
+    Add, Subtract, Multiply, Divide, Modulo,
+    BitwiseAnd, BitwiseOr, BitwiseXor, LeftShift, RightShift
+}
+
+class ASTBinaryExpression : ASTExpression {
+    pub kind: ASTBinaryKind,
+    pub left: *ASTExpression,
+    pub right: *ASTExpression;
+
+    ASTBinaryExpression(&mut this, kind: ASTBinaryKind, left: *ASTExpression, right: *ASTExpression, span: SourceSpan) : ASTExpression(ASTExpressionKind::Binary, span) {
+        (this.kind, this.left, this.right) = (kind, left, right);
+    }
+}
+
+class ASTOperand : ASTNode {
+    pub expression: *ASTExpression,
+    pub offset: *ASTExpression;
+
+    ASTOperand(&mut this, expression: *ASTExpression, offset: *ASTExpression, span: SourceSpan) : ASTNode(ASTNodeKind::Operand, span) {
+        (this.expression, this.offset) = (expression, offset);
+    }
+}
+
+enum ASTStatementKind: u8 {
+    Label, Instruction, Directive
+}
+
+class ASTStatement : ASTNode {
+    pub kind: ASTStatementKind;
+
+    ASTStatement(&mut this, kind: ASTStatementKind, span: SourceSpan) : ASTNode(ASTNodeKind::Statement, span) {
+        this.kind = kind;
+    }
+}
+
+class ASTLabelStatement : ASTStatement {
+    pub name: String;
+
+    ASTLabelStatement(&mut this, name: &String, span: SourceSpan) : ASTStatement(ASTStatementKind::Label, span) {
+        this.name = name;
+    }
+}
+
+class ASTInstructionStatement : ASTStatement {
+    pub mnemonic: Mnemonic,
+    pub operands: Vector<*ASTOperand>;
+
+    ASTInstructionStatement(&mut this, mnemonic: Mnemonic, span: SourceSpan) : ASTStatement(ASTStatementKind::Instruction, span) {
+        this.mnemonic = mnemonic;
+    }
+}
+
+class ASTDirectiveStatement : ASTStatement {
+    pub directive: Directive,
+    pub operands: Vector<*ASTOperand>;
+
+    ASTDirectiveStatement(&mut this, directive: Directive, span: SourceSpan) : ASTStatement(ASTStatementKind::Directive, span) {
+        this.directive = directive;
+    }
+}
+
+class ASTModule {
+    pub statements: Vector<*ASTStatement>;
+
+    ASTModule(&mut this) {}
+}
