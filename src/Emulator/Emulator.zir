@@ -56,7 +56,6 @@ class Emulator {
     trap_vector: u32,
     trap_scratch: u32,
     trap_address: u32,
-    kernel_stack: u32,
     page_table_base: u32,
     address_space: u32,
     tlb_keys: *mut u32,
@@ -151,7 +150,7 @@ class Emulator {
         (this.cycle_counter, this.instruction_counter) = (0, 0);
         (this.interrupt_enable, this.previous_interrupt_enable, this.interrupt_mask) = (false, false, 0);
         (this.trap_pc, this.trap_cause, this.trap_vector, this.trap_scratch, this.trap_address) = (0, 0, 0, 0, 0);
-        (this.kernel_stack, this.page_table_base, this.address_space) = (0, 0, 0);
+        (this.page_table_base, this.address_space) = (0, 0);
         this.FlushTLB();
         this.timer_compare = 0;
         (this.flash_selected, this.flash_write_enabled, this.flash_read_warned) = (false, false, false);
@@ -300,8 +299,6 @@ class Emulator {
             this.trap_scratch
         } else if index == CSR::BADADDR as u32 {
             this.trap_address
-        } else if index == CSR::KSTACK as u32 {
-            this.kernel_stack
         } else if index == CSR::PTBASE as u32 {
             this.page_table_base
         } else if index == CSR::ASID as u32 {
@@ -334,8 +331,6 @@ class Emulator {
             this.trap_scratch = value;
         } else if index == CSR::BADADDR as u32 {
             this.trap_address = value;
-        } else if index == CSR::KSTACK as u32 {
-            this.kernel_stack = value;
         } else if index == CSR::PTBASE as u32 {
             this.page_table_base = value;
         } else if index == CSR::ASID as u32 {
@@ -415,14 +410,24 @@ class Emulator {
         this.pc = this.trap_vector;
     }
 
-    fn IsAllowed(&this, opcode: Opcode, csr: u32) -> bool {
+    fn IsCSROperation(&this, opcode: Opcode) -> bool {
+        opcode as u32 >= Opcode::CSRRW as u32 && opcode as u32 <= Opcode::CSRRCI as u32
+    }
+
+    fn IsAllowed(&this, opcode: Opcode, csr: u32, writes: bool) -> bool {
+        let read_only = csr >= FIRST_READ_ONLY_CSR && csr <= LAST_READ_ONLY_CSR;
+
+        if this.IsCSROperation(opcode) && writes && read_only {
+            return false;
+        }
+
         if !this.user_mode {
             return true;
         }
 
         match opcode {
-            Opcode::CSRW | Opcode::ERET | Opcode::WFI | Opcode::HLT => false,
-            Opcode::CSRR => csr >= FIRST_USER_CSR && csr <= LAST_USER_CSR,
+            Opcode::ERET | Opcode::WFI | Opcode::HLT => false,
+            Opcode::CSRRW | Opcode::CSRRS | Opcode::CSRRC | Opcode::CSRRWI | Opcode::CSRRSI | Opcode::CSRRCI => !writes && read_only,
             _ => true
         }
     }
@@ -591,11 +596,10 @@ class Emulator {
         let opcode = raw_opcode as Opcode;
         let (reg0, reg1, reg2) = ((word >> REG0_SHIFT) & 0x1F, (word >> REG1_SHIFT) & 0x1F, (word >> REG2_SHIFT) & 0x1F);
         let (imm16, imm21, imm26) = (word & IMM16_MASK, word & IMM21_MASK, word & IMM26_MASK);
-        let simm16 = (((imm16 as i32) ^ (1 << 15)) - (1 << 15));
-        let simm21 = (((imm21 as i32) ^ (1 << 20)) - (1 << 20));
-        let simm26 = (((imm26 as i32) ^ (1 << 25)) - (1 << 25));
+        let (simm16, simm21, simm26) = (((imm16 as i32) ^ (1 << 15)) - (1 << 15), ((imm21 as i32) ^ (1 << 20)) - (1 << 20), ((imm26 as i32) ^ (1 << 25)) - (1 << 25));
+        let writes_csr = opcode == Opcode::CSRRW || opcode == Opcode::CSRRWI || reg1 != 0;
 
-        if (raw_opcode > Opcode::WFI as u32 && raw_opcode != Opcode::HLT as u32) || !this.IsAllowed(opcode, imm16) {
+        if (raw_opcode > Opcode::WFI as u32 && raw_opcode != Opcode::HLT as u32) || !this.IsAllowed(opcode, imm16, writes_csr) {
             this.Trap(TrapCause::IllegalInstruction as u32, this.pc, word);
             return;
         }
@@ -790,15 +794,29 @@ class Emulator {
             Opcode::SRAI => {
                 this.SetRegister(reg0, ((this.GetRegister(reg1) as i32) >> ((imm16 & 0x1F) as i32)) as u32);
             },
-            Opcode::CSRR => {
-                this.SetRegister(reg0, this.ReadCSR(imm16));
-            },
-            Opcode::CSRW => {
-                this.WriteCSR(imm16, this.GetRegister(reg1));
+            Opcode::CSRRW | Opcode::CSRRS | Opcode::CSRRC | Opcode::CSRRWI | Opcode::CSRRSI | Opcode::CSRRCI => {
+                let old = this.ReadCSR(imm16);
+                let source = if opcode as u32 >= Opcode::CSRRWI as u32 { reg1 } else { this.GetRegister(reg1) };
+
+                if writes_csr {
+                    let value = match opcode {
+                        Opcode::CSRRW | Opcode::CSRRWI => source,
+                        Opcode::CSRRS | Opcode::CSRRSI => old | source,
+                        _ => old & !source
+                    };
+
+                    this.WriteCSR(imm16, value);
+                }
+
+                this.SetRegister(reg0, old);
             },
             Opcode::ECALL => {
                 this.Trap(TrapCause::SystemCall as u32, this.pc + 4, 0);
                 this.instruction_counter += 1;
+                return;
+            },
+            Opcode::EBREAK => {
+                this.Trap(TrapCause::Breakpoint as u32, this.pc, this.pc);
                 return;
             },
             Opcode::ERET => {

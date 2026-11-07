@@ -120,9 +120,14 @@ module cpu #(
         OP_SRLI,
         OP_SRA,
         OP_SRAI,
-        OP_CSRR,
-        OP_CSRW,
+        OP_CSRRW,
+        OP_CSRRS,
+        OP_CSRRC,
+        OP_CSRRWI,
+        OP_CSRRSI,
+        OP_CSRRCI,
         OP_ECALL,
+        OP_EBREAK,
         OP_ERET,
         OP_WFI,
         OP_HLT = 6'h3F
@@ -136,10 +141,9 @@ module cpu #(
     localparam logic [15:0] CSR_VECTOR = 5;
     localparam logic [15:0] CSR_SCRATCH = 6;
     localparam logic [15:0] CSR_BADADDR = 7;
-    localparam logic [15:0] CSR_KSTACK = 8;
-    localparam logic [15:0] CSR_PTBASE = 9;
-    localparam logic [15:0] CSR_ASID = 10;
-    localparam logic [15:0] CSR_TLBFLUSH = 11;
+    localparam logic [15:0] CSR_PTBASE = 8;
+    localparam logic [15:0] CSR_ASID = 9;
+    localparam logic [15:0] CSR_TLBFLUSH = 10;
     localparam logic [15:0] CSR_CYCLE = 16;
     localparam logic [15:0] CSR_INSTRET = 17;
     localparam logic [15:0] CSR_TIME = 18;
@@ -313,7 +317,7 @@ module cpu #(
 
             OP_BL, OP_BLR: id_result_alu = 0;
 
-            OP_CSRR: begin
+            OP_CSRRW, OP_CSRRS, OP_CSRRC, OP_CSRRWI, OP_CSRRSI, OP_CSRRCI: begin
                 id_result_alu = 0;
                 id_result_csr = 1;
             end
@@ -431,8 +435,9 @@ module cpu #(
             OP_NOP,
             OP_LUI, OP_AUIPC,
             OP_B,
-            OP_CSRR, OP_ECALL, OP_ERET, OP_WFI,
-            OP_HLT: return 0;
+            OP_CSRRWI, OP_CSRRSI, OP_CSRRCI,
+            OP_ECALL, OP_EBREAK, OP_ERET,
+            OP_WFI, OP_HLT: return 0;
             default: return 1;
         endcase
     endfunction
@@ -458,7 +463,7 @@ module cpu #(
             OP_AND, OP_ANDI, OP_OR, OP_ORI, OP_XOR, OP_XORI,
             OP_SLL, OP_SLLI, OP_SRL, OP_SRLI, OP_SRA, OP_SRAI,
             OP_BL, OP_BLR,
-            OP_CSRR: return 1;
+            OP_CSRRW, OP_CSRRS, OP_CSRRC, OP_CSRRWI, OP_CSRRSI, OP_CSRRCI: return 1;
             default: return 0;
         endcase
     endfunction
@@ -713,10 +718,14 @@ module cpu #(
     logic [31:0] csr_vector;
     logic [31:0] csr_scratch;
     logic [31:0] csr_badaddr;
-    logic [31:0] csr_kstack;
     logic [31:0] csr_read;
+    logic [31:0] csr_source;
+    logic [31:0] csr_write;
     logic [31:0] interrupts;
     logic take_interrupt;
+    logic ex_csr;
+    logic ex_csr_writes;
+    logic ex_csr_read_only;
     logic ex_defined;
     logic ex_privileged;
     logic take_exception;
@@ -727,15 +736,27 @@ module cpu #(
 
     always_comb begin
         ex_defined = (6'(ex_opcode) <= 6'(OP_WFI)) || (ex_opcode == OP_HLT);
+        ex_csr = (6'(ex_opcode) >= 6'(OP_CSRRW)) && (6'(ex_opcode) <= 6'(OP_CSRRCI));
+        ex_csr_writes = ex_csr && (ex_opcode == OP_CSRRW || ex_opcode == OP_CSRRWI || ex_instr[20:16] != 0);
+        ex_csr_read_only = (ex_imm16 >= CSR_CYCLE) && (ex_imm16 <= CSR_TIME);
 
         case (ex_opcode)
-            OP_CSRW, OP_ERET, OP_WFI, OP_HLT: ex_privileged = 1;
-            OP_CSRR: ex_privileged = (ex_imm16 < CSR_CYCLE) || (ex_imm16 > CSR_TIME);
+            OP_ERET, OP_WFI, OP_HLT: ex_privileged = 1;
+            OP_CSRRW, OP_CSRRS, OP_CSRRC, OP_CSRRWI, OP_CSRRSI, OP_CSRRCI: ex_privileged = ex_csr_writes || !ex_csr_read_only;
             default: ex_privileged = 0;
+        endcase
+
+        csr_source = (ex_opcode == OP_CSRRWI || ex_opcode == OP_CSRRSI || ex_opcode == OP_CSRRCI) ? {27'b0, ex_instr[20:16]} : ex_reg1_fwd;
+
+        case (ex_opcode)
+            OP_CSRRS, OP_CSRRSI: csr_write = csr_read | csr_source;
+            OP_CSRRC, OP_CSRRCI: csr_write = csr_read & ~csr_source;
+            default: csr_write = csr_source;
         endcase
     end
 
-    assign take_exception = !take_interrupt && !take_data_fault && !halted && (ex_fetch_fault || !ex_defined || (user_mode && ex_privileged));
+    assign take_exception = !take_interrupt && !take_data_fault && !halted &&
+        (ex_fetch_fault || ex_opcode == OP_EBREAK || !ex_defined || (ex_csr_writes && ex_csr_read_only) || (user_mode && ex_privileged));
     assign should_wait = ex_opcode == OP_WFI && !take_exception && !take_data_fault && csr_ienable[1:0] != 0 && interrupts == 0;
     assign wake_from_interrupt = waiting_for_interrupt && interrupts != 0;
 
@@ -749,7 +770,6 @@ module cpu #(
             CSR_VECTOR: csr_read = csr_vector;
             CSR_SCRATCH: csr_read = csr_scratch;
             CSR_BADADDR: csr_read = csr_badaddr;
-            CSR_KSTACK: csr_read = csr_kstack;
             CSR_PTBASE: csr_read = csr_ptbase;
             CSR_ASID: csr_read = {28'b0, csr_asid};
             CSR_CYCLE: csr_read = cycle_counter;
@@ -771,7 +791,6 @@ module cpu #(
             csr_vector <= 0;
             csr_scratch <= 0;
             csr_badaddr <= 0;
-            csr_kstack <= 0;
             csr_ptbase <= 0;
             csr_asid <= 0;
         end else if (!bus_stall) begin
@@ -792,8 +811,8 @@ module cpu #(
                 user_mode <= 0;
             end else if (take_exception) begin
                 csr_epc <= ex_pc;
-                csr_cause <= ex_fetch_fault ? 32'h00000001 : 32'h00000002;
-                csr_badaddr <= ex_fetch_fault ? ex_pc : ex_instr;
+                csr_cause <= ex_fetch_fault ? 32'h00000001 : (ex_opcode == OP_EBREAK ? 32'h00000003 : 32'h00000002);
+                csr_badaddr <= (ex_fetch_fault || ex_opcode == OP_EBREAK) ? ex_pc : ex_instr;
                 csr_pie <= csr_ie;
                 csr_ie <= 0;
                 csr_pu <= user_mode;
@@ -810,18 +829,17 @@ module cpu #(
                 csr_pie <= 1;
                 user_mode <= csr_pu;
                 csr_pu <= 0;
-            end else if (ex_opcode == OP_CSRW) begin
+            end else if (ex_csr_writes) begin
                 case (ex_imm16)
-                    CSR_STATUS: {csr_pu, csr_pie, csr_ie} <= ex_reg1_fwd[2:0];
-                    CSR_IENABLE: csr_ienable <= ex_reg1_fwd;
-                    CSR_EPC: csr_epc <= ex_reg1_fwd;
-                    CSR_CAUSE: csr_cause <= ex_reg1_fwd;
-                    CSR_VECTOR: csr_vector <= ex_reg1_fwd;
-                    CSR_SCRATCH: csr_scratch <= ex_reg1_fwd;
-                    CSR_BADADDR: csr_badaddr <= ex_reg1_fwd;
-                    CSR_KSTACK: csr_kstack <= ex_reg1_fwd;
-                    CSR_PTBASE: csr_ptbase <= ex_reg1_fwd;
-                    CSR_ASID: csr_asid <= ex_reg1_fwd[3:0];
+                    CSR_STATUS: {csr_pu, csr_pie, csr_ie} <= csr_write[2:0];
+                    CSR_IENABLE: csr_ienable <= csr_write;
+                    CSR_EPC: csr_epc <= csr_write;
+                    CSR_CAUSE: csr_cause <= csr_write;
+                    CSR_VECTOR: csr_vector <= csr_write;
+                    CSR_SCRATCH: csr_scratch <= csr_write;
+                    CSR_BADADDR: csr_badaddr <= csr_write;
+                    CSR_PTBASE: csr_ptbase <= csr_write;
+                    CSR_ASID: csr_asid <= csr_write[3:0];
                     default: ;
                 endcase
             end
@@ -838,9 +856,9 @@ module cpu #(
             tlb_flush <= 0;
             cache_flush <= 0;
         end else begin
-            tlb_flush <= !bus_stall && ex_opcode == OP_CSRW && ex_imm16 == CSR_TLBFLUSH &&
+            tlb_flush <= !bus_stall && ex_csr_writes && ex_imm16 == CSR_TLBFLUSH &&
                 !take_interrupt && !take_exception && !take_data_fault;
-            cache_flush <= ex_reg1_fwd[0];
+            cache_flush <= csr_write[0];
         end
     end
 

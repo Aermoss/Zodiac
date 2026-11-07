@@ -26,7 +26,9 @@ enum Mnemonic: u8 {
     Mul, Mulh, Mulhsu, Mulhu, Div, Divu, Rem, Remu,
     And, Andi, Or, Ori, Xor, Xori,
     Sll, Slli, Srl, Srli, Sra, Srai,
-    Csrr, Csrw, Ecall, Eret, Wfi, Hlt
+    Csrrw, Csrrs, Csrrc, Csrrwi, Csrrsi, Csrrci,
+    Csrr, Csrw, Csrs, Csrc, Csrwi, Csrsi, Csrci, Rdcycle, Rdtime, Rdinstret,
+    Ecall, Ebreak, Eret, Wfi, Hlt
 }
 
 extend Mnemonic {
@@ -100,9 +102,24 @@ extend Mnemonic {
             Mnemonic::Srli => "srli",
             Mnemonic::Sra => "sra",
             Mnemonic::Srai => "srai",
+            Mnemonic::Csrrw => "csrrw",
+            Mnemonic::Csrrs => "csrrs",
+            Mnemonic::Csrrc => "csrrc",
+            Mnemonic::Csrrwi => "csrrwi",
+            Mnemonic::Csrrsi => "csrrsi",
+            Mnemonic::Csrrci => "csrrci",
             Mnemonic::Csrr => "csrr",
             Mnemonic::Csrw => "csrw",
+            Mnemonic::Csrs => "csrs",
+            Mnemonic::Csrc => "csrc",
+            Mnemonic::Csrwi => "csrwi",
+            Mnemonic::Csrsi => "csrsi",
+            Mnemonic::Csrci => "csrci",
+            Mnemonic::Rdcycle => "rdcycle",
+            Mnemonic::Rdtime => "rdtime",
+            Mnemonic::Rdinstret => "rdinstret",
             Mnemonic::Ecall => "ecall",
+            Mnemonic::Ebreak => "ebreak",
             Mnemonic::Eret => "eret",
             Mnemonic::Wfi => "wfi",
             Mnemonic::Hlt => "hlt"
@@ -119,7 +136,7 @@ extend Mnemonic {
             Mnemonic::Mv | Mnemonic::Not | Mnemonic::Neg | Mnemonic::Seqz | Mnemonic::Snez | Mnemonic::Sltz | Mnemonic::Sgtz => "RR",
             Mnemonic::Beqz | Mnemonic::Bnez | Mnemonic::Blez | Mnemonic::Bgez | Mnemonic::Bltz | Mnemonic::Bgtz => "RE",
             Mnemonic::Bgt | Mnemonic::Ble | Mnemonic::Bgtu | Mnemonic::Bleu => "RRE",
-            Mnemonic::Nop | Mnemonic::Ecall | Mnemonic::Eret | Mnemonic::Wfi | Mnemonic::Hlt => "",
+            Mnemonic::Nop | Mnemonic::Ecall | Mnemonic::Ebreak | Mnemonic::Eret | Mnemonic::Wfi | Mnemonic::Hlt => "",
             Mnemonic::Lb | Mnemonic::Lbu | Mnemonic::Lh | Mnemonic::Lhu | Mnemonic::Lw | Mnemonic::Sb | Mnemonic::Sh | Mnemonic::Sw => "RM",
             Mnemonic::Lui | Mnemonic::Auipc | Mnemonic::Bl => "RE",
             Mnemonic::B => "E",
@@ -127,8 +144,12 @@ extend Mnemonic {
             Mnemonic::Blr => "RR",
             Mnemonic::Beq | Mnemonic::Bne | Mnemonic::Blt | Mnemonic::Bltu | Mnemonic::Bge | Mnemonic::Bgeu => "RRE",
             Mnemonic::Slti | Mnemonic::Sltiu | Mnemonic::Addi | Mnemonic::Subi | Mnemonic::Andi | Mnemonic::Ori | Mnemonic::Xori | Mnemonic::Slli | Mnemonic::Srli | Mnemonic::Srai => "RRE",
+            Mnemonic::Csrrw | Mnemonic::Csrrs | Mnemonic::Csrrc => "RCR",
+            Mnemonic::Csrrwi | Mnemonic::Csrrsi | Mnemonic::Csrrci => "RCE",
             Mnemonic::Csrr => "RC",
-            Mnemonic::Csrw => "CR",
+            Mnemonic::Csrw | Mnemonic::Csrs | Mnemonic::Csrc => "CR",
+            Mnemonic::Csrwi | Mnemonic::Csrsi | Mnemonic::Csrci => "CE",
+            Mnemonic::Rdcycle | Mnemonic::Rdtime | Mnemonic::Rdinstret => "R",
             _ => "RRR"
         }
     }

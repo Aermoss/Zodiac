@@ -44,10 +44,9 @@ class Disassembler {
             5 => "vector".ToString(),
             6 => "scratch".ToString(),
             7 => "badaddr".ToString(),
-            8 => "kstack".ToString(),
-            9 => "ptbase".ToString(),
-            10 => "asid".ToString(),
-            11 => "tlbflush".ToString(),
+            8 => "ptbase".ToString(),
+            9 => "asid".ToString(),
+            10 => "tlbflush".ToString(),
             16 => "cycle".ToString(),
             17 => "instret".ToString(),
             18 => "time".ToString(),
@@ -114,9 +113,14 @@ class Disassembler {
             Opcode::SRLI => "srli",
             Opcode::SRA => "sra",
             Opcode::SRAI => "srai",
-            Opcode::CSRR => "csrr",
-            Opcode::CSRW => "csrw",
+            Opcode::CSRRW => "csrrw",
+            Opcode::CSRRS => "csrrs",
+            Opcode::CSRRC => "csrrc",
+            Opcode::CSRRWI => "csrrwi",
+            Opcode::CSRRSI => "csrrsi",
+            Opcode::CSRRCI => "csrrci",
             Opcode::ECALL => "ecall",
+            Opcode::EBREAK => "ebreak",
             Opcode::ERET => "eret",
             Opcode::WFI => "wfi",
             Opcode::HLT => "hlt"
@@ -158,10 +162,10 @@ class Disassembler {
             } else {
                 mnemonic + " " + this.DisassembleRegister(reg0) + ", " + this.DisassembleRegister(reg1) + ", " + String::FromInteger(simm16)
             }
-        } else if opcode == Opcode::CSRR {
-            mnemonic + " " + this.DisassembleRegister(reg0) + ", " + this.DisassembleCSR(imm16)
-        } else if opcode == Opcode::CSRW {
-            mnemonic + " " + this.DisassembleCSR(imm16) + ", " + this.DisassembleRegister(reg1)
+        } else if opcode >= Opcode::CSRRW && opcode <= Opcode::CSRRC {
+            mnemonic + " " + this.DisassembleRegister(reg0) + ", " + this.DisassembleCSR(imm16) + ", " + this.DisassembleRegister(reg1)
+        } else if opcode >= Opcode::CSRRWI && opcode <= Opcode::CSRRCI {
+            mnemonic + " " + this.DisassembleRegister(reg0) + ", " + this.DisassembleCSR(imm16) + ", " + String::FromInteger(reg1 as HostUnsigned)
         } else {
             mnemonic
         }

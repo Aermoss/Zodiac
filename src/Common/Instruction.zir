@@ -23,18 +23,20 @@ enum Opcode: u32 {
     MUL, MULH, MULHSU, MULHU, DIV, DIVU, REM, REMU,
     AND, ANDI, OR, ORI, XOR, XORI,
     SLL, SLLI, SRL, SRLI, SRA, SRAI,
-    CSRR, CSRW, ECALL, ERET, WFI,
+    CSRRW, CSRRS, CSRRC, CSRRWI, CSRRSI, CSRRCI,
+    ECALL, EBREAK, ERET, WFI,
     HLT = 0x3F
 }
 
 enum CSR: u32 {
-    STATUS, IENABLE, IPENDING, EPC, CAUSE, VECTOR, SCRATCH, BADADDR, KSTACK, PTBASE, ASID, TLBFLUSH,
+    STATUS, IENABLE, IPENDING, EPC, CAUSE, VECTOR, SCRATCH, BADADDR, PTBASE, ASID, TLBFLUSH,
     CYCLE = 16, INSTRET, TIME
 }
 
 enum TrapCause: u32 {
     InstructionFault = 0x00000001,
     IllegalInstruction = 0x00000002,
+    Breakpoint = 0x00000003,
     LoadFault = 0x00000005,
     StoreFault = 0x00000007,
     SystemCall = 0x00000008,
@@ -46,8 +48,9 @@ const STATUS_IE: u32 = 1;
 const STATUS_PIE: u32 = 2;
 const STATUS_PU: u32 = 4;
 
-const FIRST_USER_CSR: u32 = 16;
-const LAST_USER_CSR: u32 = 18;
+const FIRST_READ_ONLY_CSR: u32 = 16;
+const LAST_READ_ONLY_CSR: u32 = 18;
+const CSR_IMMEDIATE_MASK: u32 = 0x1F;
 
 const WINDOW_START: u32 = 0xC0000000;
 const PAGE_SHIFT: u32 = 12;

@@ -100,10 +100,9 @@ class Assembler {
             else if value == "vector" { 5 }
             else if value == "scratch" { 6 }
             else if value == "badaddr" { 7 }
-            else if value == "kstack" { 8 }
-            else if value == "ptbase" { 9 }
-            else if value == "asid" { 10 }
-            else if value == "tlbflush" { 11 }
+            else if value == "ptbase" { 8 }
+            else if value == "asid" { 9 }
+            else if value == "tlbflush" { 10 }
             else if value == "cycle" { 16 }
             else if value == "instret" { 17 }
             else if value == "time" { 18 }
@@ -113,6 +112,20 @@ class Assembler {
         } else {
             this.AssembleExpression(node)
         }
+    }
+
+    fn AssembleCSRImmediate(&mut this, node: *ASTExpression) -> u32 {
+        let value = this.AssembleExpression(node);
+
+        if value > CSR_IMMEDIATE_MASK {
+            this.Error("CSR immediate must be between 0 and 31.", node->span);
+        }
+
+        value & CSR_IMMEDIATE_MASK
+    }
+
+    fn CSRWord(&this, opcode: Opcode, destination: u32, csr: u32, source: u32) -> u32 {
+        (opcode as u32 << OPCODE_SHIFT) | (destination << REG0_SHIFT) | ((source & CSR_IMMEDIATE_MASK) << REG1_SHIFT) | (csr & IMM16_MASK)
     }
 
     fn AssembleExpression(&mut this, node: *ASTExpression) -> u32 {
@@ -240,9 +253,14 @@ class Assembler {
             Mnemonic::Srli => Opcode::SRLI,
             Mnemonic::Sra => Opcode::SRA,
             Mnemonic::Srai => Opcode::SRAI,
-            Mnemonic::Csrr => Opcode::CSRR,
-            Mnemonic::Csrw => Opcode::CSRW,
+            Mnemonic::Csrrw => Opcode::CSRRW,
+            Mnemonic::Csrrs => Opcode::CSRRS,
+            Mnemonic::Csrrc => Opcode::CSRRC,
+            Mnemonic::Csrrwi => Opcode::CSRRWI,
+            Mnemonic::Csrrsi => Opcode::CSRRSI,
+            Mnemonic::Csrrci => Opcode::CSRRCI,
             Mnemonic::Ecall => Opcode::ECALL,
+            Mnemonic::Ebreak => Opcode::EBREAK,
             Mnemonic::Eret => Opcode::ERET,
             Mnemonic::Wfi => Opcode::WFI,
             Mnemonic::Hlt => Opcode::HLT,
@@ -489,6 +507,32 @@ class Assembler {
             return;
         }
 
+        if mnemonic == Mnemonic::Csrr {
+            let destination = this.AssembleExpression(operands[0]->expression);
+            this.WriteWord(this.section, this.CSRWord(Opcode::CSRRS, destination, this.AssembleCSRExpression(operands[1]->expression), 0));
+            return;
+        }
+
+        if mnemonic == Mnemonic::Csrw || mnemonic == Mnemonic::Csrs || mnemonic == Mnemonic::Csrc {
+            let csr_opcode = if mnemonic == Mnemonic::Csrw { Opcode::CSRRW } else if mnemonic == Mnemonic::Csrs { Opcode::CSRRS } else { Opcode::CSRRC };
+            let csr = this.AssembleCSRExpression(operands[0]->expression);
+            this.WriteWord(this.section, this.CSRWord(csr_opcode, 0, csr, this.AssembleExpression(operands[1]->expression)));
+            return;
+        }
+
+        if mnemonic == Mnemonic::Csrwi || mnemonic == Mnemonic::Csrsi || mnemonic == Mnemonic::Csrci {
+            let csr_opcode = if mnemonic == Mnemonic::Csrwi { Opcode::CSRRWI } else if mnemonic == Mnemonic::Csrsi { Opcode::CSRRSI } else { Opcode::CSRRCI };
+            let csr = this.AssembleCSRExpression(operands[0]->expression);
+            this.WriteWord(this.section, this.CSRWord(csr_opcode, 0, csr, this.AssembleCSRImmediate(operands[1]->expression)));
+            return;
+        }
+
+        if mnemonic == Mnemonic::Rdcycle || mnemonic == Mnemonic::Rdtime || mnemonic == Mnemonic::Rdinstret {
+            let csr = if mnemonic == Mnemonic::Rdcycle { CSR::CYCLE } else if mnemonic == Mnemonic::Rdtime { CSR::TIME } else { CSR::INSTRET };
+            this.WriteWord(this.section, this.CSRWord(Opcode::CSRRS, this.AssembleExpression(operands[0]->expression), csr as u32, 0));
+            return;
+        }
+
         opcode = this.Opcode(mnemonic);
         let mut word = (opcode as u32 << OPCODE_SHIFT);
 
@@ -545,12 +589,11 @@ class Assembler {
             } else {
                 word |= (this.AssembleExpression(operands[2]->expression) & IMM16_MASK);
             }
-        } else if opcode == Opcode::CSRR {
-            word |= (this.AssembleExpression(operands[0]->expression) << REG0_SHIFT);
-            word |= (this.AssembleCSRExpression(operands[1]->expression) & IMM16_MASK);
-        } else if opcode == Opcode::CSRW {
-            word |= (this.AssembleCSRExpression(operands[0]->expression) & IMM16_MASK);
-            word |= (this.AssembleExpression(operands[1]->expression) << REG1_SHIFT);
+        } else if opcode >= Opcode::CSRRW && opcode <= Opcode::CSRRCI {
+            let destination = this.AssembleExpression(operands[0]->expression);
+            let csr = this.AssembleCSRExpression(operands[1]->expression);
+            let source = if opcode >= Opcode::CSRRWI { this.AssembleCSRImmediate(operands[2]->expression) } else { this.AssembleExpression(operands[2]->expression) };
+            word = this.CSRWord(opcode, destination, csr, source);
         }
 
         this.WriteWord(this.section, word);
