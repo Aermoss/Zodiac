@@ -41,16 +41,34 @@ module cpu #(
     output logic [4:0] video_scroll,
 
     output logic [31:0] fetch_addr,
+    output logic [31:0] fetch_next,
+    output logic [31:0] fetch_current,
+    output logic fetch_repeat,
     input logic [31:0] fetch_read,
+    input logic fetch_fault,
 
     output logic mem_access,
     output logic [3:0] actual_mem_we,
     output logic [31:0] mem_addr,
+    output logic [31:0] ex_addr,
     output logic [31:0] mem_write,
     input logic [31:0] mem_read,
+    input logic data_fault,
+
+    output logic user_mode,
+    output logic [31:0] csr_ptbase,
+    output logic [3:0] csr_asid,
+    output logic tlb_flush,
+    output logic cache_flush,
+
     input logic bus_stall
 );
     logic [3:0] mem_we;
+    logic [3:0] mem_we_raw;
+    logic mem_access_raw;
+    logic take_data_fault;
+    logic id_fetch_fault;
+    logic ex_fetch_fault;
 
     typedef enum logic [5:0] {
         OP_NOP,
@@ -117,6 +135,14 @@ module cpu #(
     localparam logic [15:0] CSR_CAUSE = 4;
     localparam logic [15:0] CSR_VECTOR = 5;
     localparam logic [15:0] CSR_SCRATCH = 6;
+    localparam logic [15:0] CSR_BADADDR = 7;
+    localparam logic [15:0] CSR_KSTACK = 8;
+    localparam logic [15:0] CSR_PTBASE = 9;
+    localparam logic [15:0] CSR_ASID = 10;
+    localparam logic [15:0] CSR_TLBFLUSH = 11;
+    localparam logic [15:0] CSR_CYCLE = 16;
+    localparam logic [15:0] CSR_INSTRET = 17;
+    localparam logic [15:0] CSR_TIME = 18;
 
     logic reg_we;
     logic [4:0] reg_addr;
@@ -297,7 +323,6 @@ module cpu #(
     logic [31:0] ex_pc;
     logic [31:0] ex_instr;
     logic [31:0] ex_result;
-    logic [31:0] ex_addr;
     opcode_t ex_opcode;
     logic [4:0] ex_reg_addr;
     logic [31:0] ex_reg0;
@@ -370,7 +395,7 @@ module cpu #(
 
     logic is_multicycle_op, alu_active, alu_stall;
     assign is_multicycle_op = ex_multicycle;
-    assign alu_start = is_multicycle_op && !alu_active;
+    assign alu_start = is_multicycle_op && !alu_active && !take_data_fault;
     assign alu_stall = is_multicycle_op && !alu_ready;
 
     always_ff @(posedge clk or posedge rst) begin
@@ -680,31 +705,56 @@ module cpu #(
 
     logic csr_ie;
     logic csr_pie;
+    logic csr_pu;
     logic [31:0] csr_ienable;
     logic [31:0] csr_ipending;
     logic [31:0] csr_epc;
     logic [31:0] csr_cause;
     logic [31:0] csr_vector;
     logic [31:0] csr_scratch;
+    logic [31:0] csr_badaddr;
+    logic [31:0] csr_kstack;
     logic [31:0] csr_read;
     logic [31:0] interrupts;
     logic take_interrupt;
+    logic ex_defined;
+    logic ex_privileged;
+    logic take_exception;
 
     assign csr_ipending = {30'b0, uart_rx_ready, timer_pending};
     assign interrupts = csr_ipending & csr_ienable;
-    assign take_interrupt = csr_ie && interrupts != 0 && !halted && (waiting_for_interrupt || (ex_instr != 0 && !is_multicycle_op));
-    assign should_wait = ex_opcode == OP_WFI && csr_ienable[1:0] != 0 && interrupts == 0;
+    assign take_interrupt = csr_ie && interrupts != 0 && !halted && !take_data_fault && (waiting_for_interrupt || (ex_instr != 0 && !is_multicycle_op));
+
+    always_comb begin
+        ex_defined = (6'(ex_opcode) <= 6'(OP_WFI)) || (ex_opcode == OP_HLT);
+
+        case (ex_opcode)
+            OP_CSRW, OP_ERET, OP_WFI, OP_HLT: ex_privileged = 1;
+            OP_CSRR: ex_privileged = (ex_imm16 < CSR_CYCLE) || (ex_imm16 > CSR_TIME);
+            default: ex_privileged = 0;
+        endcase
+    end
+
+    assign take_exception = !take_interrupt && !take_data_fault && !halted && (ex_fetch_fault || !ex_defined || (user_mode && ex_privileged));
+    assign should_wait = ex_opcode == OP_WFI && !take_exception && !take_data_fault && csr_ienable[1:0] != 0 && interrupts == 0;
     assign wake_from_interrupt = waiting_for_interrupt && interrupts != 0;
 
     always_comb begin
         case (ex_imm16)
-            CSR_STATUS: csr_read = {30'b0, csr_pie, csr_ie};
+            CSR_STATUS: csr_read = {29'b0, csr_pu, csr_pie, csr_ie};
             CSR_IENABLE: csr_read = csr_ienable;
             CSR_IPENDING: csr_read = csr_ipending;
             CSR_EPC: csr_read = csr_epc;
             CSR_CAUSE: csr_read = csr_cause;
             CSR_VECTOR: csr_read = csr_vector;
             CSR_SCRATCH: csr_read = csr_scratch;
+            CSR_BADADDR: csr_read = csr_badaddr;
+            CSR_KSTACK: csr_read = csr_kstack;
+            CSR_PTBASE: csr_read = csr_ptbase;
+            CSR_ASID: csr_read = {28'b0, csr_asid};
+            CSR_CYCLE: csr_read = cycle_counter;
+            CSR_INSTRET: csr_read = instret_counter;
+            CSR_TIME: csr_read = ms_counter;
             default: csr_read = 0;
         endcase
     end
@@ -713,33 +763,65 @@ module cpu #(
         if (rst) begin
             csr_ie <= 0;
             csr_pie <= 0;
+            csr_pu <= 0;
+            user_mode <= 0;
             csr_ienable <= 0;
             csr_epc <= 0;
             csr_cause <= 0;
             csr_vector <= 0;
             csr_scratch <= 0;
+            csr_badaddr <= 0;
+            csr_kstack <= 0;
+            csr_ptbase <= 0;
+            csr_asid <= 0;
         end else if (!bus_stall) begin
-            if (take_interrupt) begin
+            if (take_data_fault) begin
+                csr_epc <= mem_pc;
+                csr_cause <= mem_we_raw != 0 ? 32'h00000007 : 32'h00000005;
+                csr_badaddr <= stage_mem_addr;
+                csr_pie <= csr_ie;
+                csr_ie <= 0;
+                csr_pu <= user_mode;
+                user_mode <= 0;
+            end else if (take_interrupt) begin
                 csr_epc <= waiting_for_interrupt ? if_pc : ex_pc;
                 csr_cause <= interrupts[0] ? 32'h80000000 : 32'h80000001;
                 csr_pie <= csr_ie;
                 csr_ie <= 0;
+                csr_pu <= user_mode;
+                user_mode <= 0;
+            end else if (take_exception) begin
+                csr_epc <= ex_pc;
+                csr_cause <= ex_fetch_fault ? 32'h00000001 : 32'h00000002;
+                csr_badaddr <= ex_fetch_fault ? ex_pc : ex_instr;
+                csr_pie <= csr_ie;
+                csr_ie <= 0;
+                csr_pu <= user_mode;
+                user_mode <= 0;
             end else if (ex_opcode == OP_ECALL) begin
                 csr_epc <= ex_pc + 32'd4;
                 csr_cause <= 32'h00000008;
                 csr_pie <= csr_ie;
                 csr_ie <= 0;
+                csr_pu <= user_mode;
+                user_mode <= 0;
             end else if (ex_opcode == OP_ERET) begin
                 csr_ie <= csr_pie;
                 csr_pie <= 1;
+                user_mode <= csr_pu;
+                csr_pu <= 0;
             end else if (ex_opcode == OP_CSRW) begin
                 case (ex_imm16)
-                    CSR_STATUS: {csr_pie, csr_ie} <= ex_reg1_fwd[1:0];
+                    CSR_STATUS: {csr_pu, csr_pie, csr_ie} <= ex_reg1_fwd[2:0];
                     CSR_IENABLE: csr_ienable <= ex_reg1_fwd;
                     CSR_EPC: csr_epc <= ex_reg1_fwd;
                     CSR_CAUSE: csr_cause <= ex_reg1_fwd;
                     CSR_VECTOR: csr_vector <= ex_reg1_fwd;
                     CSR_SCRATCH: csr_scratch <= ex_reg1_fwd;
+                    CSR_BADADDR: csr_badaddr <= ex_reg1_fwd;
+                    CSR_KSTACK: csr_kstack <= ex_reg1_fwd;
+                    CSR_PTBASE: csr_ptbase <= ex_reg1_fwd;
+                    CSR_ASID: csr_asid <= ex_reg1_fwd[3:0];
                     default: ;
                 endcase
             end
@@ -751,7 +833,18 @@ module cpu #(
 
     assign branch_eq = (branch_reg0 == branch_reg1);
     assign branch_lt = $signed({ex_signed_compare & branch_reg0[31], branch_reg0}) < $signed({ex_signed_compare & branch_reg1[31], branch_reg1});
-    assign should_take_branch = take_interrupt || should_wait || wake_from_interrupt || ex_branch_always ||
+    always_ff @(posedge clk or posedge rst) begin
+        if (rst) begin
+            tlb_flush <= 0;
+            cache_flush <= 0;
+        end else begin
+            tlb_flush <= !bus_stall && ex_opcode == OP_CSRW && ex_imm16 == CSR_TLBFLUSH &&
+                !take_interrupt && !take_exception && !take_data_fault;
+            cache_flush <= ex_reg1_fwd[0];
+        end
+    end
+
+    assign should_take_branch = take_data_fault || take_interrupt || take_exception || should_wait || wake_from_interrupt || ex_branch_always ||
         (branch_eq ? ex_branch_if_eq : ex_branch_if_ne) || (branch_lt ? ex_branch_if_lt : ex_branch_if_ge);
 
     logic compare_less;
@@ -776,43 +869,50 @@ module cpu #(
             OP_HLT: should_halt = 1;
         endcase
 
-        if (take_interrupt) begin
+        if (take_data_fault || take_interrupt || take_exception) begin
             branch_target = csr_vector;
             should_halt = 0;
         end
     end
 
     assign mem_addr = stage_mem_addr;
-    assign fetch_addr = (hazard_stall || alu_stall || waiting_for_interrupt) ? if_pc_current : if_pc;
+    assign fetch_repeat = hazard_stall || alu_stall || waiting_for_interrupt;
+    assign fetch_next = if_pc;
+    assign fetch_current = if_pc_current;
+    assign fetch_addr = fetch_repeat ? if_pc_current : if_pc;
 
     always_comb begin
         mem_write = 0;
-        mem_access = 0;
-        mem_we = 0;
+        mem_access_raw = 0;
+        mem_we_raw = 0;
 
         case (mem_opcode)
             OP_LB, OP_LBU, OP_LH, OP_LHU, OP_LW:
-                mem_access = 1;
+                mem_access_raw = 1;
 
             OP_SB: begin
-                mem_we = 4'b0001 << mem_addr[1:0];
+                mem_we_raw = 4'b0001 << mem_addr[1:0];
                 mem_write = {24'b0, mem_reg0[7:0]} << (8 * mem_addr[1:0]);
-                mem_access = 1;
+                mem_access_raw = 1;
             end
 
             OP_SH: begin
-                mem_we = 4'b0011 << (2 * mem_addr[1]);
+                mem_we_raw = 4'b0011 << (2 * mem_addr[1]);
                 mem_write = {16'b0, mem_reg0[15:0]} << (16 * mem_addr[1]);
-                mem_access = 1;
+                mem_access_raw = 1;
             end
 
             OP_SW: begin
-                mem_we = 4'b1111;
+                mem_we_raw = 4'b1111;
                 mem_write = mem_reg0;
-                mem_access = 1;
+                mem_access_raw = 1;
             end
         endcase
     end
+
+    assign take_data_fault = mem_access_raw && ((user_mode && stage_mem_addr[31:30] != 2'b11) || data_fault);
+    assign mem_access = mem_access_raw && !take_data_fault;
+    assign mem_we = take_data_fault ? 4'b0000 : mem_we_raw;
 
     logic [31:0] io_read_word;
     logic io_read_hit;
@@ -882,9 +982,11 @@ module cpu #(
 
             id_pc <= 0;
             id_instr <= 0;
+            id_fetch_fault <= 0;
 
             ex_pc <= 0;
             ex_instr <= 0;
+            ex_fetch_fault <= 0;
             ex_opcode <= OP_NOP;
             ex_reg_addr <= 0;
             ex_reg0 <= 0;
@@ -961,12 +1063,15 @@ module cpu #(
             if (!hazard_stall && !alu_stall)
                 id_pc <= if_pc_current;
 
-            if (should_take_branch || branch_taken || halted || waiting_for_interrupt)
+            if (should_take_branch || branch_taken || halted || waiting_for_interrupt) begin
                 id_instr <= 0;
-            else if (!hazard_stall && !alu_stall)
-                id_instr <= if_instr;
+                id_fetch_fault <= 0;
+            end else if (!hazard_stall && !alu_stall) begin
+                id_instr <= fetch_fault ? 32'b0 : if_instr;
+                id_fetch_fault <= fetch_fault;
+            end
 
-            if (!alu_stall) begin
+            if (!alu_stall || take_data_fault) begin
                 ex_pc <= id_pc;
                 ex_reg0 <= id_reg0;
                 ex_reg1 <= id_reg1;
@@ -999,6 +1104,7 @@ module cpu #(
                     ex_branch_if_ne <= 0;
                     ex_branch_if_lt <= 0;
                     ex_branch_if_ge <= 0;
+                    ex_fetch_fault <= 0;
                 end else begin
                     ex_instr <= id_instr;
                     ex_opcode <= id_opcode;
@@ -1010,6 +1116,7 @@ module cpu #(
                     ex_branch_if_ne <= id_branch_if_ne;
                     ex_branch_if_lt <= id_branch_if_lt;
                     ex_branch_if_ge <= id_branch_if_ge;
+                    ex_fetch_fault <= id_fetch_fault;
                 end
             end
 
@@ -1023,7 +1130,7 @@ module cpu #(
 
             branch_taken <= should_take_branch;
 
-            if (alu_stall || take_interrupt) begin
+            if (alu_stall || take_interrupt || take_exception || take_data_fault) begin
                 mem_pc <= 0;
                 mem_instr <= 0;
                 mem_result <= 0;
@@ -1049,7 +1156,7 @@ module cpu #(
             wb_addr <= stage_mem_addr;
             wb_opcode <= mem_opcode;
             wb_reg_addr <= mem_reg_addr;
-            wb_writes <= writes_result(mem_opcode) || is_load_op(mem_opcode);
+            wb_writes <= (writes_result(mem_opcode) || is_load_op(mem_opcode)) && !take_data_fault;
             wb_load <= is_load_op(mem_opcode);
             wb_load_byte <= (mem_opcode == OP_LB) || (mem_opcode == OP_LBU);
             wb_load_half <= (mem_opcode == OP_LH) || (mem_opcode == OP_LHU);

@@ -36,14 +36,23 @@ class Disassembler {
 
     fn DisassembleCSR(&this, index: u32) -> String {
         match index {
-            0 => "status",
-            1 => "ienable",
-            2 => "ipending",
-            3 => "epc",
-            4 => "cause",
-            5 => "vector",
-            _ => "scratch"
-        }.ToString()
+            0 => "status".ToString(),
+            1 => "ienable".ToString(),
+            2 => "ipending".ToString(),
+            3 => "epc".ToString(),
+            4 => "cause".ToString(),
+            5 => "vector".ToString(),
+            6 => "scratch".ToString(),
+            7 => "badaddr".ToString(),
+            8 => "kstack".ToString(),
+            9 => "ptbase".ToString(),
+            10 => "asid".ToString(),
+            11 => "tlbflush".ToString(),
+            16 => "cycle".ToString(),
+            17 => "instret".ToString(),
+            18 => "time".ToString(),
+            _ => String::FromInteger(index as HostUnsigned)
+        }
     }
 
     fn DisassembleInstruction(&this, word: u32, offset: u32, section: SectionType, object: &Object) -> String {

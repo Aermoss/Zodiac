@@ -99,6 +99,14 @@ class Assembler {
             else if value == "cause" { 4 }
             else if value == "vector" { 5 }
             else if value == "scratch" { 6 }
+            else if value == "badaddr" { 7 }
+            else if value == "kstack" { 8 }
+            else if value == "ptbase" { 9 }
+            else if value == "asid" { 10 }
+            else if value == "tlbflush" { 11 }
+            else if value == "cycle" { 16 }
+            else if value == "instret" { 17 }
+            else if value == "time" { 18 }
             else {
                 this.AssembleExpression(node)
             }

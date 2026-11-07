@@ -14,14 +14,13 @@
  * limitations under the License.
  */
 
-module bus #(
-    parameter int CLK_FREQ = 54000000
-) (
+module bus (
     input logic clk,
     input logic rst,
 
     input logic [31:0] cpu_fetch_addr,
     output logic [31:0] cpu_fetch_read,
+    output logic cpu_fetch_fault,
 
     input logic cpu_mem_access,
     input logic [3:0] cpu_mem_we,
@@ -30,6 +29,8 @@ module bus #(
     output logic [31:0] cpu_mem_read,
     output logic cpu_stall,
 
+    input logic cpu_user_mode,
+
     output logic [3:0] bram_we,
     output logic [31:0] bram_addr,
     output logic [31:0] bram_write,
@@ -37,72 +38,92 @@ module bus #(
     output logic [31:0] bram_fetch_addr,
     input logic [31:0] bram_fetch_read,
 
-    output logic sdrc_cmd_en,
-    output logic [2:0] sdrc_cmd,
-    output logic [20:0] sdrc_addr,
-    output logic [31:0] sdrc_data_w,
-    output logic [3:0] sdrc_dqm,
-    input logic [31:0] sdrc_data_r,
-    input logic sdrc_init_done,
-    input logic sdrc_cmd_ack,
-
     output logic flash_req,
     output logic [23:0] flash_addr,
     input logic [31:0] flash_rdata,
-    input logic flash_ready
+    input logic flash_ready,
+
+    output logic memory_start,
+    output logic memory_write,
+    output logic [20:0] memory_address,
+    output logic [31:0] memory_data,
+    output logic [3:0] memory_dqm,
+    input logic memory_ready,
+    input logic memory_write_done,
+    input logic [31:0] memory_read_data,
+    output logic store_check,
+
+    output logic icache_request,
+    output logic [10:0] icache_tag,
+    input logic icache_lookup,
+    input logic [31:0] icache_read,
+    input logic icache_fill_request,
+    input logic icache_clearing,
+    output logic icache_grant,
+    input logic icache_start,
+    input logic [20:0] icache_address,
+    input logic icache_word,
+    input logic icache_done,
+
+    output logic dcache_request,
+    output logic [10:0] dcache_tag,
+    input logic dcache_lookup,
+    input logic [31:0] dcache_read,
+    input logic dcache_fill_request,
+    input logic dcache_clearing,
+    output logic dcache_grant,
+    input logic dcache_start,
+    input logic [20:0] dcache_address,
+    input logic dcache_word,
+    input logic dcache_done,
+
+    input logic [10:0] mmu_fetch_frame,
+    input logic mmu_fetch_fault,
+    input logic mmu_fetch_request,
+    input logic [10:0] mmu_data_frame,
+    input logic mmu_data_request,
+    input logic mmu_data_denied,
+    output logic mmu_grant_data,
+    output logic mmu_grant_fetch,
+    input logic mmu_start,
+    input logic [20:0] mmu_address,
+    input logic mmu_walk_done,
+    input logic mmu_walk_failed
 );
-    wire is_sdram_fetch = (cpu_fetch_addr[31:30] == 2'b01);
-    wire is_sdram_data = cpu_mem_access && (cpu_mem_addr[31:30] == 2'b01);
+    wire fetch_window = cpu_fetch_addr[31:30] == 2'b11;
+    wire data_window = cpu_mem_addr[31:30] == 2'b11;
+    wire fetch_denied = cpu_user_mode && !fetch_window;
+
+    wire is_sdram_fetch = (cpu_fetch_addr[31:30] == 2'b01 || fetch_window) && !fetch_denied;
+    wire is_sdram_data = cpu_mem_access && (cpu_mem_addr[31:30] == 2'b01 || data_window);
     wire is_sdram_load = is_sdram_data && (cpu_mem_we == 4'b0000);
     wire is_sdram_store = is_sdram_data && (cpu_mem_we != 4'b0000);
     wire is_flash_data = cpu_mem_access && (cpu_mem_addr[31:30] == 2'b10) && (cpu_mem_we == 4'b0000);
-    wire is_bram_data = cpu_mem_access && (cpu_mem_addr[31:30] != 2'b01) && (cpu_mem_addr[31:30] != 2'b10);
+    wire is_bram_data = cpu_mem_access && (cpu_mem_addr[31:30] == 2'b00);
 
-    wire [20:0] sdram_word_addr = {cpu_mem_addr[22:21], cpu_mem_addr[20:10], cpu_mem_addr[9:2]};
-    wire [20:0] fetch_word_addr = {cpu_fetch_addr[22:21], cpu_fetch_addr[20:10], cpu_fetch_addr[9:2]};
-    wire [23:0] flash_byte_addr = {cpu_mem_addr[23:2], 2'b00};
+    wire [10:0] data_frame = data_window ? mmu_data_frame : cpu_mem_addr[22:12];
+    wire [20:0] sdram_word_addr = {data_frame, cpu_mem_addr[11:2]};
 
-    localparam int CACHE_LINES = 1024;
-    localparam int LINE_WORDS = 4;
-    localparam int OFFSET_BITS = $clog2(LINE_WORDS);
-    localparam int INDEX_BITS = $clog2(CACHE_LINES);
-    localparam int TAG_BITS = 21 - INDEX_BITS - OFFSET_BITS;
-    localparam int DCACHE_LINES = 256;
-    localparam int DINDEX_BITS = $clog2(DCACHE_LINES);
-    localparam int DTAG_BITS = 21 - DINDEX_BITS - OFFSET_BITS;
-    localparam int CLEAR_BITS = INDEX_BITS > DINDEX_BITS ? INDEX_BITS : DINDEX_BITS;
+    assign icache_request = is_sdram_fetch;
+    assign icache_tag = fetch_window ? mmu_fetch_frame : cpu_fetch_addr[22:12];
+    assign dcache_request = is_sdram_load;
+    assign dcache_tag = data_frame;
 
-    wire [OFFSET_BITS - 1:0] fetch_offset = fetch_word_addr[OFFSET_BITS - 1:0];
-    wire [INDEX_BITS - 1:0] fetch_index = fetch_word_addr[OFFSET_BITS +: INDEX_BITS];
-    wire [TAG_BITS - 1:0] fetch_tag = fetch_word_addr[20 -: TAG_BITS];
-    wire [OFFSET_BITS - 1:0] data_offset = sdram_word_addr[OFFSET_BITS - 1:0];
-    wire [DINDEX_BITS - 1:0] data_index = sdram_word_addr[OFFSET_BITS +: DINDEX_BITS];
-    wire [DTAG_BITS - 1:0] data_tag = sdram_word_addr[20 -: DTAG_BITS];
-
-    localparam int REFRESH_CYCLES = CLK_FREQ / 1000000 * 15;
-
-    typedef enum logic [3:0] {
+    typedef enum logic [2:0] {
         S_IDLE,
-        S_ACTIVATE_WAIT,
-        S_SDRAM_WAIT,
-        S_READ_DELAY,
-        S_WRITE_DELAY,
-        S_SDRAM_DONE,
+        S_DCACHE,
+        S_WALK_DATA,
+        S_ICACHE,
+        S_WALK_FETCH,
+        S_STORE,
         S_FLASH_WAIT,
-        S_FLASH_DONE,
-        S_FILL,
-        S_REFRESH
+        S_FLASH_DONE
     } state_t;
 
     state_t state;
-    logic [2:0] read_delay_counter;
-    logic [2:0] write_delay_counter;
 
     logic [31:0] flash_read_reg;
     logic flash_read_active;
-
-    logic [$clog2(REFRESH_CYCLES) - 1:0] refresh_counter;
-    logic refresh_pending;
 
     logic [31:0] read_data;
     logic [31:0] read_hold;
@@ -111,141 +132,67 @@ module bus #(
     logic [31:0] fetch_data;
     logic [31:0] fetch_hold;
     logic fetch_held;
+    logic fetch_fault_hold;
 
-    logic [20:0] r_sdrc_addr;
-    logic [31:0] r_sdrc_data_w;
-    logic [2:0] r_sdrc_cmd;
-    logic [3:0] r_sdrc_dqm;
-    logic r_sdrc_is_read;
+    wire store_go = state == S_IDLE && !dcache_fill_request && !mmu_data_request && !icache_fill_request && !mmu_fetch_request &&
+        is_sdram_store && !mmu_data_denied && memory_ready;
 
-    assign sdrc_addr = r_sdrc_addr;
-    assign sdrc_data_w = r_sdrc_data_w;
-    assign sdrc_cmd = r_sdrc_cmd;
-    assign sdrc_dqm = r_sdrc_dqm;
-
-    logic [31:0] cache_data [0:CACHE_LINES * LINE_WORDS - 1];
-    logic [TAG_BITS:0] cache_tags [0:CACHE_LINES - 1];
-    logic [31:0] cache_read;
-    logic [TAG_BITS - 1:0] cache_read_tag;
-    logic cache_read_valid;
-    logic clearing;
-    logic [CLEAR_BITS - 1:0] clear_index;
-
-    logic lookup;
-    logic [OFFSET_BITS - 1:0] lookup_offset;
-    logic [INDEX_BITS - 1:0] lookup_index;
-    logic [TAG_BITS - 1:0] lookup_tag;
-    logic miss_pending;
-    logic filling;
-    logic [OFFSET_BITS - 1:0] fill_offset;
-
-    logic [31:0] dcache_data [0:DCACHE_LINES * LINE_WORDS - 1];
-    logic [DTAG_BITS:0] dcache_tags [0:DCACHE_LINES - 1];
-    logic [31:0] dcache_read;
-    logic [DTAG_BITS - 1:0] dcache_read_tag;
-    logic dcache_read_valid;
-
-    logic dlookup;
-    logic [OFFSET_BITS - 1:0] dlookup_offset;
-    logic [DINDEX_BITS - 1:0] dlookup_index;
-    logic [DTAG_BITS - 1:0] dlookup_tag;
-    logic dmiss_pending;
-    logic filling_data;
-    logic store_check;
-
-    wire [OFFSET_BITS - 1:0] sdrc_offset = r_sdrc_addr[OFFSET_BITS - 1:0];
-    wire [DINDEX_BITS - 1:0] sdrc_index = r_sdrc_addr[OFFSET_BITS +: DINDEX_BITS];
-    wire [DTAG_BITS - 1:0] sdrc_tag = r_sdrc_addr[20 -: DTAG_BITS];
-    wire [INDEX_BITS - 1:0] sdrc_code_index = r_sdrc_addr[OFFSET_BITS +: INDEX_BITS];
-
-    wire cache_miss = lookup && !(cache_read_valid && cache_read_tag == lookup_tag);
-    wire dcache_miss = dlookup && !(dcache_read_valid && dcache_read_tag == dlookup_tag);
-    wire fill_write = filling && state == S_READ_DELAY && read_delay_counter <= 3'd1;
-
-    wire store_hit = store_check && dcache_read_valid && dcache_read_tag == sdrc_tag;
-    logic [31:0] store_word;
+    assign icache_grant = state == S_ICACHE;
+    assign dcache_grant = state == S_DCACHE;
+    assign mmu_grant_data = state == S_WALK_DATA;
+    assign mmu_grant_fetch = state == S_WALK_FETCH;
+    assign cpu_fetch_fault = fetch_held ? fetch_fault_hold : mmu_fetch_fault;
 
     always_comb begin
-        for (int i = 0; i < 4; i++)
-            store_word[8 * i +: 8] = r_sdrc_dqm[i] ? dcache_read[8 * i +: 8] : r_sdrc_data_w[8 * i +: 8];
-    end
+        memory_start = 1'b0;
+        memory_write = 1'b0;
+        memory_address = sdram_word_addr;
+        memory_data = cpu_mem_write;
+        memory_dqm = 4'b0000;
 
-    always_ff @(posedge clk) begin
-        if (fill_write && !filling_data)
-            cache_data[{lookup_index, fill_offset}] <= sdrc_data_r;
+        case (state)
+            S_IDLE: begin
+                memory_start = store_go;
+                memory_write = 1'b1;
+                memory_dqm = ~cpu_mem_we;
+            end
 
-        if (clearing)
-            cache_tags[clear_index[INDEX_BITS - 1:0]] <= '0;
-        else if (store_check)
-            cache_tags[sdrc_code_index] <= '0;
-        else if (fill_write && !filling_data && fill_offset == {OFFSET_BITS{1'b1}})
-            cache_tags[lookup_index] <= {1'b1, lookup_tag};
+            S_DCACHE: begin
+                memory_start = dcache_start;
+                memory_address = dcache_address;
+            end
 
-        cache_read <= cache_data[{fetch_index, fetch_offset}];
-        {cache_read_valid, cache_read_tag} <= cache_tags[fetch_index];
-    end
+            S_ICACHE: begin
+                memory_start = icache_start;
+                memory_address = icache_address;
+            end
 
-    always_ff @(posedge clk) begin
-        if ((fill_write && filling_data) || store_hit)
-            dcache_data[{sdrc_index, sdrc_offset}] <= store_hit ? store_word : sdrc_data_r;
+            S_WALK_DATA, S_WALK_FETCH: begin
+                memory_start = mmu_start;
+                memory_address = mmu_address;
+            end
 
-        if (clearing)
-            dcache_tags[clear_index[DINDEX_BITS - 1:0]] <= '0;
-        else if (fill_write && filling_data && fill_offset == {OFFSET_BITS{1'b1}})
-            dcache_tags[sdrc_index] <= {1'b1, sdrc_tag};
-
-        dcache_read <= dcache_data[{data_index, data_offset}];
-        {dcache_read_valid, dcache_read_tag} <= dcache_tags[data_index];
+            default: ;
+        endcase
     end
 
     always_ff @(posedge clk or posedge rst) begin
         if (rst) begin
             state <= S_IDLE;
-            sdrc_cmd_en <= 1'b0;
-            r_sdrc_cmd <= 3'b000;
-            r_sdrc_addr <= 21'b0;
-            r_sdrc_data_w <= 32'b0;
-            r_sdrc_dqm <= 4'b0000;
-            r_sdrc_is_read <= 1'b0;
-            read_delay_counter <= 3'b0;
-            write_delay_counter <= 3'b0;
             flash_req <= 1'b0;
             flash_addr <= 24'b0;
             flash_read_reg <= 32'b0;
             flash_read_active <= 1'b0;
-            refresh_counter <= '0;
-            refresh_pending <= 1'b0;
             read_hold <= 32'b0;
             read_held <= 1'b0;
             fetch_hold <= 32'b0;
             fetch_held <= 1'b0;
-            clearing <= 1'b1;
-            clear_index <= '0;
-            lookup <= 1'b0;
-            lookup_offset <= '0;
-            lookup_index <= '0;
-            lookup_tag <= '0;
-            miss_pending <= 1'b0;
-            filling <= 1'b0;
-            fill_offset <= '0;
-            dlookup <= 1'b0;
-            dlookup_offset <= '0;
-            dlookup_index <= '0;
-            dlookup_tag <= '0;
-            dmiss_pending <= 1'b0;
-            filling_data <= 1'b0;
+            fetch_fault_hold <= 1'b0;
             store_check <= 1'b0;
         end else begin
             flash_read_active <= 1'b0;
             flash_req <= 1'b0;
             store_check <= 1'b0;
-
-            if (clearing) begin
-                clear_index <= clear_index + 1'b1;
-
-                if (clear_index == {CLEAR_BITS{1'b1}})
-                    clearing <= 1'b0;
-            end
 
             if (!cpu_stall) begin
                 read_held <= 1'b0;
@@ -258,150 +205,59 @@ module bus #(
 
                 if (!fetch_held) begin
                     fetch_hold <= fetch_data;
+                    fetch_fault_hold <= mmu_fetch_fault;
                     fetch_held <= 1'b1;
                 end
             end
 
-            if (!cpu_stall) begin
-                lookup <= is_sdram_fetch;
-                lookup_offset <= fetch_offset;
-                lookup_index <= fetch_index;
-                lookup_tag <= fetch_tag;
+            if (dcache_word)
+                read_hold <= memory_read_data;
 
-                dlookup <= is_sdram_load;
-                dlookup_offset <= data_offset;
-                dlookup_index <= data_index;
-                dlookup_tag <= data_tag;
-            end else begin
-                lookup <= 1'b0;
-                dlookup <= 1'b0;
-            end
+            if (icache_word)
+                fetch_hold <= memory_read_data;
 
-            if (cache_miss && state != S_IDLE)
-                miss_pending <= 1'b1;
-
-            if (dcache_miss && state != S_IDLE)
-                dmiss_pending <= 1'b1;
-
-            if (sdrc_init_done) begin
-                if (refresh_counter == REFRESH_CYCLES - 1) begin
-                    refresh_counter <= '0;
-                    refresh_pending <= 1'b1;
-                end else begin
-                    refresh_counter <= refresh_counter + 1'b1;
-                end
-            end
+            if (mmu_walk_failed)
+                fetch_fault_hold <= 1'b1;
 
             case (state)
                 S_IDLE: begin
-                    if (dcache_miss || dmiss_pending) begin
-                        dmiss_pending <= 1'b0;
-                        miss_pending <= miss_pending || cache_miss;
-                        filling <= 1'b1;
-                        filling_data <= 1'b1;
-                        fill_offset <= '0;
-                        state <= S_FILL;
-                    end else if (cache_miss || miss_pending) begin
-                        miss_pending <= 1'b0;
-                        filling <= 1'b1;
-                        filling_data <= 1'b0;
-                        fill_offset <= '0;
-                        state <= S_FILL;
-                    end else if (refresh_pending) begin
-                        refresh_pending <= 1'b0;
-                        sdrc_cmd_en <= 1'b1;
-                        r_sdrc_cmd <= 3'b001;
-                        state <= S_REFRESH;
-                    end else if (is_sdram_store && sdrc_init_done) begin
-                        sdrc_cmd_en <= 1'b1;
-                        r_sdrc_addr <= sdram_word_addr;
-                        r_sdrc_data_w <= cpu_mem_write;
-                        r_sdrc_dqm <= ~cpu_mem_we;
-                        r_sdrc_is_read <= 1'b0;
-                        r_sdrc_cmd <= 3'b011;
+                    if (dcache_fill_request) begin
+                        state <= S_DCACHE;
+                    end else if (mmu_data_request) begin
+                        state <= S_WALK_DATA;
+                    end else if (icache_fill_request) begin
+                        state <= S_ICACHE;
+                    end else if (mmu_fetch_request) begin
+                        state <= S_WALK_FETCH;
+                    end else if (store_go) begin
                         store_check <= 1'b1;
-                        state <= S_ACTIVATE_WAIT;
+                        state <= S_STORE;
                     end else if (is_flash_data) begin
                         flash_req <= 1'b1;
-                        flash_addr <= flash_byte_addr;
+                        flash_addr <= {cpu_mem_addr[23:2], 2'b00};
                         state <= S_FLASH_WAIT;
                     end
                 end
 
-                S_FILL: begin
-                    if (sdrc_init_done) begin
-                        sdrc_cmd_en <= 1'b1;
-                        r_sdrc_addr <= filling_data ? {dlookup_tag, dlookup_index, fill_offset} : {lookup_tag, lookup_index, fill_offset};
-                        r_sdrc_dqm <= 4'b0000;
-                        r_sdrc_is_read <= 1'b1;
-                        r_sdrc_cmd <= 3'b011;
-                        state <= S_ACTIVATE_WAIT;
-                    end
-                end
-
-                S_REFRESH: begin
-                    sdrc_cmd_en <= 1'b0;
-
-                    if (sdrc_cmd_ack)
+                S_DCACHE: begin
+                    if (dcache_done)
                         state <= S_IDLE;
                 end
 
-                S_ACTIVATE_WAIT: begin
-                    sdrc_cmd_en <= 1'b0;
-
-                    if (sdrc_cmd_ack) begin
-                        sdrc_cmd_en <= 1'b1;
-
-                        if (r_sdrc_is_read)
-                            r_sdrc_cmd <= 3'b101;
-                        else
-                            r_sdrc_cmd <= 3'b100;
-
-                        state <= S_SDRAM_WAIT;
-                    end
+                S_ICACHE: begin
+                    if (icache_done)
+                        state <= S_IDLE;
                 end
 
-                S_SDRAM_WAIT: begin
-                    sdrc_cmd_en <= 1'b0;
-
-                    if (sdrc_cmd_ack) begin
-                        if (r_sdrc_is_read) begin
-                            read_delay_counter <= 3'd5;
-                            state <= S_READ_DELAY;
-                        end else begin
-                            write_delay_counter <= 3'd5;
-                            state <= S_WRITE_DELAY;
-                        end
-                    end
+                S_WALK_DATA, S_WALK_FETCH: begin
+                    if (mmu_walk_done)
+                        state <= S_IDLE;
                 end
 
-                S_READ_DELAY: begin
-                    if (read_delay_counter > 3'd1) begin
-                        read_delay_counter <= read_delay_counter - 3'd1;
-                    end else begin
-                        if (filling_data && fill_offset == dlookup_offset)
-                            read_hold <= sdrc_data_r;
-                        else if (!filling_data && fill_offset == lookup_offset)
-                            fetch_hold <= sdrc_data_r;
-
-                        if (fill_offset == {OFFSET_BITS{1'b1}}) begin
-                            filling <= 1'b0;
-                            state <= S_IDLE;
-                        end else begin
-                            fill_offset <= fill_offset + 1'b1;
-                            state <= S_FILL;
-                        end
-                    end
+                S_STORE: begin
+                    if (memory_write_done)
+                        state <= S_IDLE;
                 end
-
-                S_WRITE_DELAY: begin
-                    if (write_delay_counter > 3'd1)
-                        write_delay_counter <= write_delay_counter - 3'd1;
-                    else
-                        state <= S_SDRAM_DONE;
-                end
-
-                S_SDRAM_DONE: state <= S_IDLE;
 
                 S_FLASH_WAIT: begin
                     if (flash_ready) begin
@@ -421,11 +277,13 @@ module bus #(
     end
 
     always_comb begin
-        if (clearing)
+        if (icache_clearing || dcache_clearing)
             cpu_stall = 1'b1;
-        else if (state == S_IDLE || state == S_REFRESH)
-            cpu_stall = cache_miss || miss_pending || dcache_miss || dmiss_pending || is_sdram_store || is_flash_data;
-        else if (state == S_SDRAM_DONE || state == S_FLASH_DONE)
+        else if (state == S_IDLE)
+            cpu_stall = icache_fill_request || dcache_fill_request || mmu_data_request || mmu_fetch_request || is_sdram_store || is_flash_data;
+        else if (state == S_STORE)
+            cpu_stall = !memory_write_done;
+        else if (state == S_FLASH_DONE)
             cpu_stall = 1'b0;
         else
             cpu_stall = 1'b1;
@@ -438,17 +296,17 @@ module bus #(
         if (is_bram_data && !cpu_stall)
             bram_we = cpu_mem_we;
 
-        if (dlookup)
+        if (dcache_lookup)
             read_data = dcache_read;
         else if (flash_read_active)
             read_data = flash_read_reg;
         else
             read_data = bram_read;
 
-        fetch_data = lookup ? cache_read : bram_fetch_read;
+        fetch_data = icache_lookup ? icache_read : bram_fetch_read;
         cpu_fetch_read = fetch_held ? fetch_hold : fetch_data;
 
-        if (!read_held && !dlookup && !flash_read_active)
+        if (!read_held && !dcache_lookup && !flash_read_active)
             cpu_mem_read = bram_read;
         else if (read_held)
             cpu_mem_read = read_hold;

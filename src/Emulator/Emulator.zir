@@ -24,10 +24,20 @@ extern "C" {
 const CLK_FREQ: u32 = 54000000;
 const CYCLES_PER_MS: u32 = CLK_FREQ / 1000;
 
+const SDRAM_START: u32 = 0x40000000;
+const SDRAM_MASK: u32 = 0x007FFFFF;
+const TLB_ENTRIES: u32 = 64;
+
+enum Access: u32 {
+    Fetch, Load, Store
+}
+
 class Emulator {
     pub quiet: bool,
     pc: u32,
     halted: bool,
+    user_mode: bool,
+    previous_user: bool,
     registers: *mut u32,
     bram: *mut u8,
     sdram: *mut u8,
@@ -45,6 +55,12 @@ class Emulator {
     trap_cause: u32,
     trap_vector: u32,
     trap_scratch: u32,
+    trap_address: u32,
+    kernel_stack: u32,
+    page_table_base: u32,
+    address_space: u32,
+    tlb_keys: *mut u32,
+    tlb_entries: *mut u32,
     timer_compare: u32,
     flash_selected: bool,
     flash_write_enabled: bool,
@@ -60,6 +76,8 @@ class Emulator {
     Emulator(&mut this, quiet: bool) {
         this.quiet = quiet;
         this.registers = new u32[32];
+        this.tlb_keys = new u32[TLB_ENTRIES as usize];
+        this.tlb_entries = new u32[TLB_ENTRIES as usize];
         this.bram = new u8[16 * 1024];
         this.sdram = new u8[8 * 1024 * 1024];
         this.flash = new u8[8 * 1024 * 1024];
@@ -75,6 +93,8 @@ class Emulator {
         delete[] this.flash;
         delete[] this.sdram;
         delete[] this.bram;
+        delete[] this.tlb_entries;
+        delete[] this.tlb_keys;
         delete[] this.registers;
     }
 
@@ -127,10 +147,12 @@ class Emulator {
     }
 
     pub fn Reset(&mut this) {
-        (this.pc, this.halted) = (0, false);
+        (this.pc, this.halted, this.user_mode, this.previous_user) = (0, false, false, false);
         (this.cycle_counter, this.instruction_counter) = (0, 0);
         (this.interrupt_enable, this.previous_interrupt_enable, this.interrupt_mask) = (false, false, 0);
-        (this.trap_pc, this.trap_cause, this.trap_vector, this.trap_scratch) = (0, 0, 0, 0);
+        (this.trap_pc, this.trap_cause, this.trap_vector, this.trap_scratch, this.trap_address) = (0, 0, 0, 0, 0);
+        (this.kernel_stack, this.page_table_base, this.address_space) = (0, 0, 0);
+        this.FlushTLB();
         this.timer_compare = 0;
         (this.flash_selected, this.flash_write_enabled, this.flash_read_warned) = (false, false, false);
         (this.flash_command, this.flash_rx, this.flash_count, this.flash_address) = (0, 0, 0, 0);
@@ -259,7 +281,11 @@ class Emulator {
 
     fn ReadCSR(&mut this, index: u32) -> u32 {
         if index == CSR::STATUS as u32 {
-            (if this.previous_interrupt_enable { 2 } else { 0 }) | (if this.interrupt_enable { 1 } else { 0 })
+            let mut status: u32 = 0;
+            if this.interrupt_enable { status |= STATUS_IE; }
+            if this.previous_interrupt_enable { status |= STATUS_PIE; }
+            if this.previous_user { status |= STATUS_PU; }
+            status
         } else if index == CSR::IENABLE as u32 {
             this.interrupt_mask
         } else if index == CSR::IPENDING as u32 {
@@ -272,6 +298,20 @@ class Emulator {
             this.trap_vector
         } else if index == CSR::SCRATCH as u32 {
             this.trap_scratch
+        } else if index == CSR::BADADDR as u32 {
+            this.trap_address
+        } else if index == CSR::KSTACK as u32 {
+            this.kernel_stack
+        } else if index == CSR::PTBASE as u32 {
+            this.page_table_base
+        } else if index == CSR::ASID as u32 {
+            this.address_space
+        } else if index == CSR::CYCLE as u32 {
+            this.cycle_counter as u32
+        } else if index == CSR::INSTRET as u32 {
+            this.instruction_counter
+        } else if index == CSR::TIME as u32 {
+            (this.cycle_counter / CYCLES_PER_MS as u64) as u32
         } else {
             0
         }
@@ -279,7 +319,9 @@ class Emulator {
 
     fn WriteCSR(&mut this, index: u32, value: u32) {
         if index == CSR::STATUS as u32 {
-            (this.interrupt_enable, this.previous_interrupt_enable) = ((value & 1) != 0, (value & 2) != 0);
+            this.interrupt_enable = (value & STATUS_IE) != 0;
+            this.previous_interrupt_enable = (value & STATUS_PIE) != 0;
+            this.previous_user = (value & STATUS_PU) != 0;
         } else if index == CSR::IENABLE as u32 {
             this.interrupt_mask = value;
         } else if index == CSR::EPC as u32 {
@@ -290,6 +332,98 @@ class Emulator {
             this.trap_vector = value;
         } else if index == CSR::SCRATCH as u32 {
             this.trap_scratch = value;
+        } else if index == CSR::BADADDR as u32 {
+            this.trap_address = value;
+        } else if index == CSR::KSTACK as u32 {
+            this.kernel_stack = value;
+        } else if index == CSR::PTBASE as u32 {
+            this.page_table_base = value;
+        } else if index == CSR::ASID as u32 {
+            this.address_space = value;
+        } else if index == CSR::TLBFLUSH as u32 {
+            this.FlushTLB();
+        }
+    }
+
+    fn FlushTLB(&mut this) {
+        for i in 0..TLB_ENTRIES {
+            this.tlb_keys[i as usize] = 0;
+        }
+    }
+
+    fn ReadTableEntry(&this, address: u32) -> u32 {
+        let offset = (address & SDRAM_MASK & !3u32) as usize;
+        let mut entry = this.sdram[offset] as u32;
+        entry |= this.sdram[offset + 1] as u32 << 8;
+        entry |= this.sdram[offset + 2] as u32 << 16;
+        entry |= this.sdram[offset + 3] as u32 << 24;
+        entry
+    }
+
+    fn Translate(&mut this, address: u32, access: Access, physical: *mut u32) -> bool {
+        if address < WINDOW_START {
+            *physical = address;
+            return !this.user_mode;
+        }
+
+        let page = (address - WINDOW_START) >> PAGE_SHIFT;
+        let key = 0x80000000 | ((this.address_space & 0xF) << 18) | page;
+        let slot = (page & (TLB_ENTRIES - 1)) as usize;
+        let mut entry: u32 = 0;
+
+        if this.tlb_keys[slot] == key {
+            entry = this.tlb_entries[slot];
+        } else {
+            if (this.page_table_base & PTBASE_VALID) == 0 {
+                return false;
+            }
+
+            let root = SDRAM_START | (this.page_table_base & 0x007FFC00);
+            let directory = this.ReadTableEntry(root + (page >> 10) * 4);
+
+            if (directory & PTE_VALID) == 0 {
+                return false;
+            }
+
+            let table = SDRAM_START | (directory & 0x007FF000);
+            entry = this.ReadTableEntry(table + (page & 0x3FF) * 4);
+
+            if (entry & PTE_VALID) == 0 {
+                return false;
+            }
+
+            this.tlb_keys[slot] = key;
+            this.tlb_entries[slot] = entry;
+        }
+
+        if access == Access::Store && (entry & PTE_WRITE) == 0 {
+            return false;
+        }
+
+        if access == Access::Fetch && (entry & PTE_EXECUTE) == 0 {
+            return false;
+        }
+
+        *physical = SDRAM_START | (entry & 0x007FF000) | (address & (PAGE_SIZE - 1));
+        true
+    }
+
+    fn Trap(&mut this, cause: u32, epc: u32, address: u32) {
+        (this.trap_pc, this.trap_cause, this.trap_address) = (epc, cause, address);
+        (this.previous_interrupt_enable, this.interrupt_enable) = (this.interrupt_enable, false);
+        (this.previous_user, this.user_mode) = (this.user_mode, false);
+        this.pc = this.trap_vector;
+    }
+
+    fn IsAllowed(&this, opcode: Opcode, csr: u32) -> bool {
+        if !this.user_mode {
+            return true;
+        }
+
+        match opcode {
+            Opcode::CSRW | Opcode::ERET | Opcode::WFI | Opcode::HLT => false,
+            Opcode::CSRR => csr >= FIRST_USER_CSR && csr <= LAST_USER_CSR,
+            _ => true
         }
     }
 
@@ -432,45 +566,78 @@ class Emulator {
     }
 
     fn Tick(&mut this) {
+        this.Step();
+        this.cycle_counter += 1;
+    }
+
+    fn Step(&mut this) {
         let interrupts = if this.interrupt_enable {
             this.GetPendingInterrupts(this.interrupt_mask)
         } else { 0 };
 
         if interrupts != 0 {
-            (this.trap_pc, this.trap_cause) = (this.pc, if (interrupts & 1) != 0 { TrapCause::Timer as u32 } else { TrapCause::Uart as u32 });
-            (this.previous_interrupt_enable, this.interrupt_enable) = (this.interrupt_enable, false);
-            this.pc = this.trap_vector;
+            this.Trap(if (interrupts & 1) != 0 { TrapCause::Timer as u32 } else { TrapCause::Uart as u32 }, this.pc, 0);
         }
 
-        let word = this.ReadWord(this.pc);
-        let opcode = (word >> OPCODE_SHIFT) as Opcode;
+        let mut fetch_address: u32 = 0;
+
+        if !this.Translate(this.pc, Access::Fetch, &mut fetch_address) {
+            this.Trap(TrapCause::InstructionFault as u32, this.pc, this.pc);
+            return;
+        }
+
+        let word = this.ReadWord(fetch_address);
+        let raw_opcode = word >> OPCODE_SHIFT;
+        let opcode = raw_opcode as Opcode;
         let (reg0, reg1, reg2) = ((word >> REG0_SHIFT) & 0x1F, (word >> REG1_SHIFT) & 0x1F, (word >> REG2_SHIFT) & 0x1F);
-        let (imm11, imm16, imm21, imm26) = (word & IMM11_MASK, word & IMM16_MASK, word & IMM21_MASK, word & IMM26_MASK);
-        let simm11 = (((imm11 as i32) ^ (1 << 10)) - (1 << 10));
+        let (imm16, imm21, imm26) = (word & IMM16_MASK, word & IMM21_MASK, word & IMM26_MASK);
         let simm16 = (((imm16 as i32) ^ (1 << 15)) - (1 << 15));
         let simm21 = (((imm21 as i32) ^ (1 << 20)) - (1 << 20));
         let simm26 = (((imm26 as i32) ^ (1 << 25)) - (1 << 25));
+
+        if (raw_opcode > Opcode::WFI as u32 && raw_opcode != Opcode::HLT as u32) || !this.IsAllowed(opcode, imm16) {
+            this.Trap(TrapCause::IllegalInstruction as u32, this.pc, word);
+            return;
+        }
+
+        let is_load = match opcode {
+            Opcode::LB | Opcode::LBU | Opcode::LH | Opcode::LHU | Opcode::LW => true,
+            _ => false
+        };
+
+        let is_store = match opcode {
+            Opcode::SB | Opcode::SH | Opcode::SW => true,
+            _ => false
+        };
+
+        let mut address: u32 = 0;
+
+        if is_load || is_store {
+            let virtual_address = (this.GetRegister(reg1) as i32 + simm16) as u32;
+
+            if !this.Translate(virtual_address, if is_store { Access::Store } else { Access::Load }, &mut address) {
+                this.Trap(if is_store { TrapCause::StoreFault as u32 } else { TrapCause::LoadFault as u32 }, this.pc, virtual_address);
+                return;
+            }
+        }
+
         let mut next_pc = this.pc + 4;
 
         match opcode {
+            Opcode::NOP => {},
             Opcode::LB => {
-                let address = (this.GetRegister(reg1) as i32 + simm16) as u32;
                 this.SetRegister(reg0, this.ReadByte(address) as i8 as u32);
             },
             Opcode::LBU => {
-                let address = (this.GetRegister(reg1) as i32 + simm16) as u32;
                 this.SetRegister(reg0, this.ReadByte(address) as u32);
             },
             Opcode::LH => {
-                let address = (this.GetRegister(reg1) as i32 + simm16) as u32;
                 this.SetRegister(reg0, this.ReadHalf(address) as i16 as u32);
             },
             Opcode::LHU => {
-                let address = (this.GetRegister(reg1) as i32 + simm16) as u32;
                 this.SetRegister(reg0, this.ReadHalf(address) as u32);
             },
             Opcode::LW => {
-                let address = (this.GetRegister(reg1) as i32 + simm16) as u32;
                 this.SetRegister(reg0, this.ReadWord(address));
             },
             Opcode::LUI => {
@@ -480,15 +647,12 @@ class Emulator {
                 this.SetRegister(reg0, this.pc + (imm21 << 11));
             },
             Opcode::SB => {
-                let address = (this.GetRegister(reg1) as i32 + simm16) as u32;
                 this.WriteByte(address, (this.GetRegister(reg0) & 0xFF) as u8);
             },
             Opcode::SH => {
-                let address = (this.GetRegister(reg1) as i32 + simm16) as u32;
                 this.WriteHalf(address, (this.GetRegister(reg0) & 0xFFFF) as u16);
             },
             Opcode::SW => {
-                let address = (this.GetRegister(reg1) as i32 + simm16) as u32;
                 this.WriteWord(address, this.GetRegister(reg0));
             },
             Opcode::B => {
@@ -633,25 +797,24 @@ class Emulator {
                 this.WriteCSR(imm16, this.GetRegister(reg1));
             },
             Opcode::ECALL => {
-                (this.trap_pc, this.trap_cause) = (this.pc + 4, TrapCause::SystemCall as u32);
-                (this.previous_interrupt_enable, this.interrupt_enable) = (this.interrupt_enable, false);
-                next_pc = this.trap_vector;
+                this.Trap(TrapCause::SystemCall as u32, this.pc + 4, 0);
+                this.instruction_counter += 1;
+                return;
             },
             Opcode::ERET => {
                 next_pc = this.trap_pc;
                 (this.interrupt_enable, this.previous_interrupt_enable) = (this.previous_interrupt_enable, true);
+                (this.user_mode, this.previous_user) = (this.previous_user, false);
             },
             Opcode::WFI => {
                 this.WaitForInterrupt();
             },
             Opcode::HLT => {
                 this.halted = true;
-            },
-            _ => {}
+            }
         }
 
         this.pc = next_pc;
-        this.cycle_counter += 1;
         this.instruction_counter += 1;
     }
 

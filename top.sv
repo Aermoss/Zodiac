@@ -76,10 +76,14 @@ module top (
     localparam int CLK_FREQ = 54000000;
 
     logic [31:0] cpu_fetch_addr;
+    logic [31:0] cpu_fetch_next;
+    logic [31:0] cpu_fetch_current;
+    logic cpu_fetch_repeat;
     logic [31:0] cpu_fetch_read;
     logic cpu_mem_access;
     logic [3:0] cpu_mem_we;
     logic [31:0] cpu_mem_addr;
+    logic [31:0] cpu_ex_addr;
     logic [31:0] cpu_mem_write;
     logic [31:0] cpu_mem_read;
     logic cpu_stall;
@@ -93,6 +97,13 @@ module top (
     logic [15:0] video_data;
     logic [15:0] video_cursor;
     logic [4:0] video_scroll;
+    logic cpu_fetch_fault;
+    logic cpu_data_fault;
+    logic cpu_user_mode;
+    logic [31:0] cpu_ptbase;
+    logic [3:0] cpu_asid;
+    logic cpu_tlb_flush;
+    logic cpu_cache_flush;
 
     cpu #(
         .SIMULATION(1'b0),
@@ -121,13 +132,26 @@ module top (
         .video_scroll(video_scroll),
 
         .fetch_addr(cpu_fetch_addr),
+        .fetch_next(cpu_fetch_next),
+        .fetch_current(cpu_fetch_current),
+        .fetch_repeat(cpu_fetch_repeat),
         .fetch_read(cpu_fetch_read),
+        .fetch_fault(cpu_fetch_fault),
 
         .mem_access(cpu_mem_access),
         .actual_mem_we(cpu_mem_we),
         .mem_addr(cpu_mem_addr),
+        .ex_addr(cpu_ex_addr),
         .mem_write(cpu_mem_write),
         .mem_read(cpu_mem_read),
+        .data_fault(cpu_data_fault),
+
+        .user_mode(cpu_user_mode),
+        .csr_ptbase(cpu_ptbase),
+        .csr_asid(cpu_asid),
+        .tlb_flush(cpu_tlb_flush),
+        .cache_flush(cpu_cache_flush),
+
         .bus_stall(cpu_stall)
     );
 
@@ -224,14 +248,197 @@ module top (
         .flash_miso(spi_miso_pin)
     );
 
-    bus #(
+    logic memory_start;
+    logic memory_write;
+    logic [20:0] memory_address;
+    logic [31:0] memory_data;
+    logic [3:0] memory_dqm;
+    logic memory_ready;
+    logic memory_valid;
+    logic [31:0] memory_read_data;
+    logic memory_write_done;
+    logic [20:0] memory_active_address;
+    logic [31:0] memory_active_data;
+    logic [3:0] memory_active_dqm;
+    logic store_check;
+
+    logic icache_request;
+    logic [10:0] icache_tag;
+    logic icache_lookup;
+    logic [31:0] icache_read;
+    logic icache_fill_request;
+    logic icache_clearing;
+    logic icache_grant;
+    logic icache_start;
+    logic [20:0] icache_address;
+    logic icache_word;
+    logic icache_done;
+
+    logic dcache_request;
+    logic [10:0] dcache_tag;
+    logic dcache_lookup;
+    logic [31:0] dcache_read;
+    logic dcache_fill_request;
+    logic dcache_clearing;
+    logic dcache_grant;
+    logic dcache_start;
+    logic [20:0] dcache_address;
+    logic dcache_word;
+    logic dcache_done;
+
+    logic [10:0] mmu_fetch_frame;
+    logic mmu_fetch_translated;
+    logic mmu_fetch_fault;
+    logic mmu_fetch_request;
+    logic [10:0] mmu_data_frame;
+    logic mmu_data_request;
+    logic mmu_data_denied;
+    logic mmu_grant_data;
+    logic mmu_grant_fetch;
+    logic mmu_start;
+    logic [20:0] mmu_address;
+    logic mmu_walk_done;
+    logic mmu_walk_resolved;
+    logic mmu_walk_failed;
+    logic [10:0] mmu_walk_frame;
+
+    mmu mmu0 (
+        .clk(sys_clk),
+        .rst(rst_reg),
+        .stall(cpu_stall),
+
+        .user_mode(cpu_user_mode),
+        .ptbase(cpu_ptbase),
+        .asid(cpu_asid),
+        .flush(cpu_tlb_flush),
+
+        .fetch_address(cpu_fetch_addr),
+        .fetch_next(cpu_fetch_next),
+        .fetch_current(cpu_fetch_current),
+        .fetch_repeat(cpu_fetch_repeat),
+        .fetch_lookup(icache_lookup),
+        .fetch_frame(mmu_fetch_frame),
+        .fetch_translated(mmu_fetch_translated),
+        .fetch_fault(mmu_fetch_fault),
+        .fetch_request(mmu_fetch_request),
+
+        .ex_address(cpu_ex_addr),
+        .data_address(cpu_mem_addr),
+        .data_access(cpu_mem_access),
+        .data_write(cpu_mem_we != 4'b0000),
+        .data_frame(mmu_data_frame),
+        .data_request(mmu_data_request),
+        .data_denied(mmu_data_denied),
+        .data_fault(cpu_data_fault),
+
+        .grant_data(mmu_grant_data),
+        .grant_fetch(mmu_grant_fetch),
+        .memory_ready(memory_ready),
+        .memory_valid(memory_valid),
+        .memory_data(memory_read_data),
+        .memory_start(mmu_start),
+        .memory_address(mmu_address),
+        .walk_done(mmu_walk_done),
+        .walk_resolved(mmu_walk_resolved),
+        .walk_failed(mmu_walk_failed),
+        .walk_frame(mmu_walk_frame)
+    );
+
+    icache icache0 (
+        .clk(sys_clk),
+        .rst(rst_reg),
+
+        .capture(!cpu_stall),
+        .request(icache_request),
+        .address(cpu_fetch_addr),
+        .tag(icache_tag),
+        .translated(mmu_fetch_translated),
+        .lookup(icache_lookup),
+        .read_data(icache_read),
+        .fill_request(icache_fill_request),
+        .clearing(icache_clearing),
+
+        .flush(cpu_tlb_flush && cpu_cache_flush),
+        .invalidate(store_check),
+        .invalidate_address(memory_active_address),
+        .retag(mmu_walk_resolved),
+        .new_tag(mmu_walk_frame),
+
+        .grant(icache_grant),
+        .memory_ready(memory_ready),
+        .memory_valid(memory_valid),
+        .memory_data(memory_read_data),
+        .memory_start(icache_start),
+        .memory_address(icache_address),
+        .word_valid(icache_word),
+        .fill_done(icache_done)
+    );
+
+    dcache dcache0 (
+        .clk(sys_clk),
+        .rst(rst_reg),
+
+        .capture(!cpu_stall),
+        .request(dcache_request),
+        .address(cpu_mem_addr),
+        .tag(dcache_tag),
+        .lookup(dcache_lookup),
+        .read_data(dcache_read),
+        .fill_request(dcache_fill_request),
+        .clearing(dcache_clearing),
+
+        .flush(cpu_tlb_flush && cpu_cache_flush),
+        .store(store_check),
+        .store_address(memory_active_address),
+        .store_data(memory_active_data),
+        .store_dqm(memory_active_dqm),
+
+        .grant(dcache_grant),
+        .memory_ready(memory_ready),
+        .memory_valid(memory_valid),
+        .memory_data(memory_read_data),
+        .memory_start(dcache_start),
+        .memory_address(dcache_address),
+        .word_valid(dcache_word),
+        .fill_done(dcache_done)
+    );
+
+    memory #(
         .CLK_FREQ(CLK_FREQ)
-    ) bus0 (
+    ) memory0 (
+        .clk(sys_clk),
+        .rst(rst_reg),
+
+        .start(memory_start),
+        .write(memory_write),
+        .address(memory_address),
+        .data(memory_data),
+        .dqm(memory_dqm),
+        .ready(memory_ready),
+        .read_valid(memory_valid),
+        .read_data(memory_read_data),
+        .write_done(memory_write_done),
+        .active_address(memory_active_address),
+        .active_data(memory_active_data),
+        .active_dqm(memory_active_dqm),
+
+        .sdrc_cmd_en(sdrc_cmd_en),
+        .sdrc_cmd(sdrc_cmd),
+        .sdrc_addr(sdrc_addr),
+        .sdrc_data_w(sdrc_data_w),
+        .sdrc_dqm(sdrc_dqm),
+        .sdrc_data_r(sdrc_data_r),
+        .sdrc_init_done(sdrc_init_done),
+        .sdrc_cmd_ack(sdrc_cmd_ack)
+    );
+
+    bus bus0 (
         .clk(sys_clk),
         .rst(rst_reg),
 
         .cpu_fetch_addr(cpu_fetch_addr),
         .cpu_fetch_read(cpu_fetch_read),
+        .cpu_fetch_fault(cpu_fetch_fault),
 
         .cpu_mem_access(cpu_mem_access),
         .cpu_mem_we(cpu_mem_we),
@@ -240,6 +447,8 @@ module top (
         .cpu_mem_read(cpu_mem_read),
         .cpu_stall(cpu_stall),
 
+        .cpu_user_mode(cpu_user_mode),
+
         .bram_we(bram_we),
         .bram_addr(bram_addr),
         .bram_write(bram_write),
@@ -247,18 +456,56 @@ module top (
         .bram_fetch_addr(bram_fetch_addr),
         .bram_fetch_read(bram_fetch_read),
 
-        .sdrc_cmd_en(sdrc_cmd_en),
-        .sdrc_cmd(sdrc_cmd),
-        .sdrc_addr(sdrc_addr),
-        .sdrc_dqm(sdrc_dqm),
-        .sdrc_data_w(sdrc_data_w),
-        .sdrc_data_r(sdrc_data_r),
-        .sdrc_init_done(sdrc_init_done),
-        .sdrc_cmd_ack(sdrc_cmd_ack),
-
         .flash_req(flash_req),
         .flash_addr(flash_addr),
         .flash_rdata(flash_rdata),
-        .flash_ready(flash_ready)
+        .flash_ready(flash_ready),
+
+        .memory_start(memory_start),
+        .memory_write(memory_write),
+        .memory_address(memory_address),
+        .memory_data(memory_data),
+        .memory_dqm(memory_dqm),
+        .memory_ready(memory_ready),
+        .memory_write_done(memory_write_done),
+        .memory_read_data(memory_read_data),
+        .store_check(store_check),
+
+        .icache_request(icache_request),
+        .icache_tag(icache_tag),
+        .icache_lookup(icache_lookup),
+        .icache_read(icache_read),
+        .icache_fill_request(icache_fill_request),
+        .icache_clearing(icache_clearing),
+        .icache_grant(icache_grant),
+        .icache_start(icache_start),
+        .icache_address(icache_address),
+        .icache_word(icache_word),
+        .icache_done(icache_done),
+
+        .dcache_request(dcache_request),
+        .dcache_tag(dcache_tag),
+        .dcache_lookup(dcache_lookup),
+        .dcache_read(dcache_read),
+        .dcache_fill_request(dcache_fill_request),
+        .dcache_clearing(dcache_clearing),
+        .dcache_grant(dcache_grant),
+        .dcache_start(dcache_start),
+        .dcache_address(dcache_address),
+        .dcache_word(dcache_word),
+        .dcache_done(dcache_done),
+
+        .mmu_fetch_frame(mmu_fetch_frame),
+        .mmu_fetch_fault(mmu_fetch_fault),
+        .mmu_fetch_request(mmu_fetch_request),
+        .mmu_data_frame(mmu_data_frame),
+        .mmu_data_request(mmu_data_request),
+        .mmu_data_denied(mmu_data_denied),
+        .mmu_grant_data(mmu_grant_data),
+        .mmu_grant_fetch(mmu_grant_fetch),
+        .mmu_start(mmu_start),
+        .mmu_address(mmu_address),
+        .mmu_walk_done(mmu_walk_done),
+        .mmu_walk_failed(mmu_walk_failed)
     );
 endmodule
