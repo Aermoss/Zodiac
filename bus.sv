@@ -43,14 +43,14 @@ module bus (
     input logic [31:0] flash_rdata,
     input logic flash_ready,
 
-    output logic memory_start,
-    output logic memory_write,
-    output logic [20:0] memory_address,
-    output logic [31:0] memory_data,
-    output logic [3:0] memory_dqm,
-    input logic memory_ready,
-    input logic memory_write_done,
-    input logic [31:0] memory_read_data,
+    output logic sdram_start,
+    output logic sdram_write,
+    output logic [20:0] sdram_address,
+    output logic [31:0] sdram_data,
+    output logic [3:0] sdram_dqm,
+    input logic sdram_ready,
+    input logic sdram_write_done,
+    input logic [31:0] sdram_read_data,
     output logic store_check,
 
     output logic icache_request,
@@ -135,7 +135,7 @@ module bus (
     logic fetch_fault_hold;
 
     wire store_go = state == S_IDLE && !dcache_fill_request && !mmu_data_request && !icache_fill_request && !mmu_fetch_request &&
-        is_sdram_store && !mmu_data_denied && memory_ready;
+        is_sdram_store && !mmu_data_denied && sdram_ready;
 
     assign icache_grant = state == S_ICACHE;
     assign dcache_grant = state == S_DCACHE;
@@ -144,32 +144,32 @@ module bus (
     assign cpu_fetch_fault = fetch_held ? fetch_fault_hold : mmu_fetch_fault;
 
     always_comb begin
-        memory_start = 1'b0;
-        memory_write = 1'b0;
-        memory_address = sdram_word_addr;
-        memory_data = cpu_mem_write;
-        memory_dqm = 4'b0000;
+        sdram_start = 1'b0;
+        sdram_write = 1'b0;
+        sdram_address = sdram_word_addr;
+        sdram_data = cpu_mem_write;
+        sdram_dqm = 4'b0000;
 
         case (state)
             S_IDLE: begin
-                memory_start = store_go;
-                memory_write = 1'b1;
-                memory_dqm = ~cpu_mem_we;
+                sdram_start = store_go;
+                sdram_write = 1'b1;
+                sdram_dqm = ~cpu_mem_we;
             end
 
             S_DCACHE: begin
-                memory_start = dcache_start;
-                memory_address = dcache_address;
+                sdram_start = dcache_start;
+                sdram_address = dcache_address;
             end
 
             S_ICACHE: begin
-                memory_start = icache_start;
-                memory_address = icache_address;
+                sdram_start = icache_start;
+                sdram_address = icache_address;
             end
 
             S_WALK_DATA, S_WALK_FETCH: begin
-                memory_start = mmu_start;
-                memory_address = mmu_address;
+                sdram_start = mmu_start;
+                sdram_address = mmu_address;
             end
 
             default: ;
@@ -211,10 +211,10 @@ module bus (
             end
 
             if (dcache_word)
-                read_hold <= memory_read_data;
+                read_hold <= sdram_read_data;
 
             if (icache_word)
-                fetch_hold <= memory_read_data;
+                fetch_hold <= sdram_read_data;
 
             if (mmu_walk_failed)
                 fetch_fault_hold <= 1'b1;
@@ -255,7 +255,7 @@ module bus (
                 end
 
                 S_STORE: begin
-                    if (memory_write_done)
+                    if (sdram_write_done)
                         state <= S_IDLE;
                 end
 
@@ -282,7 +282,7 @@ module bus (
         else if (state == S_IDLE)
             cpu_stall = icache_fill_request || dcache_fill_request || mmu_data_request || mmu_fetch_request || is_sdram_store || is_flash_data;
         else if (state == S_STORE)
-            cpu_stall = !memory_write_done;
+            cpu_stall = !sdram_write_done;
         else if (state == S_FLASH_DONE)
             cpu_stall = 1'b0;
         else

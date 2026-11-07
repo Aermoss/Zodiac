@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-module memory #(
+module sdram #(
     parameter int CLK_FREQ = 54000000
 ) (
     input logic clk,

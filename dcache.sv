@@ -38,11 +38,11 @@ module dcache #(
     input logic [3:0] store_dqm,
 
     input logic grant,
-    input logic memory_ready,
-    input logic memory_valid,
-    input logic [31:0] memory_data,
-    output logic memory_start,
-    output logic [20:0] memory_address,
+    input logic sdram_ready,
+    input logic sdram_valid,
+    input logic [31:0] sdram_data,
+    output logic sdram_start,
+    output logic [20:0] sdram_address,
     output logic word_valid,
     output logic fill_done
 );
@@ -66,7 +66,7 @@ module dcache #(
     logic [INDEX_BITS - 1:0] clear_index;
 
     wire miss = lookup && !(read_valid && read_tag == lookup_tag);
-    wire fill_write = grant && issued && memory_valid;
+    wire fill_write = grant && issued && sdram_valid;
     wire store_hit = store && read_valid && read_tag == store_address[20 -: TAG_BITS];
     logic [31:0] store_word;
 
@@ -76,14 +76,14 @@ module dcache #(
     end
 
     assign fill_request = miss || pending;
-    assign memory_start = grant && !issued && memory_ready;
-    assign memory_address = {lookup_tag, lookup_index, fill_offset};
+    assign sdram_start = grant && !issued && sdram_ready;
+    assign sdram_address = {lookup_tag, lookup_index, fill_offset};
     assign word_valid = fill_write && fill_offset == lookup_offset;
     assign fill_done = fill_write && fill_offset == {OFFSET_BITS{1'b1}};
 
     always_ff @(posedge clk) begin
         if (fill_write)
-            data[{lookup_index, fill_offset}] <= memory_data;
+            data[{lookup_index, fill_offset}] <= sdram_data;
         else if (store_hit)
             data[store_address[OFFSET_BITS + INDEX_BITS - 1:0]] <= store_word;
 
@@ -134,7 +134,7 @@ module dcache #(
             else if (miss)
                 pending <= 1'b1;
 
-            if (memory_start)
+            if (sdram_start)
                 issued <= 1'b1;
 
             if (fill_write) begin

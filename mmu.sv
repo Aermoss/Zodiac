@@ -47,11 +47,11 @@ module mmu #(
 
     input logic grant_data,
     input logic grant_fetch,
-    input logic memory_ready,
-    input logic memory_valid,
-    input logic [31:0] memory_data,
-    output logic memory_start,
-    output logic [20:0] memory_address,
+    input logic sdram_ready,
+    input logic sdram_valid,
+    input logic [31:0] sdram_data,
+    output logic sdram_start,
+    output logic [20:0] sdram_address,
     output logic walk_done,
     output logic walk_resolved,
     output logic walk_failed,
@@ -147,7 +147,7 @@ module mmu #(
     logic [17:0] walk_page;
     logic [31:0] walk_entry;
 
-    assign memory_start = walk_state == W_REQUEST && memory_ready;
+    assign sdram_start = walk_state == W_REQUEST && sdram_ready;
     assign walk_done = walk_state == W_CHECK && (!walk_entry[0] || walk_leaf);
     assign walk_resolved = walk_done && !walk_data && walk_entry[0] && walk_entry[2];
     assign walk_failed = walk_done && !walk_data && !(walk_entry[0] && walk_entry[2]);
@@ -172,7 +172,7 @@ module mmu #(
             walk_leaf <= 1'b0;
             walk_page <= '0;
             walk_entry <= '0;
-            memory_address <= '0;
+            sdram_address <= '0;
         end else begin
             if (flush)
                 tlb_valid <= '0;
@@ -204,7 +204,7 @@ module mmu #(
                         walk_data <= grant_data;
                         walk_leaf <= 1'b0;
                         walk_page <= grant_data ? data_address[29:12] : lookup_page;
-                        memory_address <= {ptbase[22:10], grant_data ? data_address[29:22] : lookup_page[17:10]};
+                        sdram_address <= {ptbase[22:10], grant_data ? data_address[29:22] : lookup_page[17:10]};
 
                         if (ptbase[0]) begin
                             walk_state <= W_REQUEST;
@@ -216,13 +216,13 @@ module mmu #(
                 end
 
                 W_REQUEST: begin
-                    if (memory_ready)
+                    if (sdram_ready)
                         walk_state <= W_WAIT;
                 end
 
                 W_WAIT: begin
-                    if (memory_valid) begin
-                        walk_entry <= memory_data;
+                    if (sdram_valid) begin
+                        walk_entry <= sdram_data;
                         walk_state <= W_CHECK;
                     end
                 end
@@ -235,7 +235,7 @@ module mmu #(
                             data_fault <= 1'b1;
                     end else if (!walk_leaf) begin
                         walk_leaf <= 1'b1;
-                        memory_address <= {walk_entry[22:12], walk_page[9:0]};
+                        sdram_address <= {walk_entry[22:12], walk_page[9:0]};
                         walk_state <= W_REQUEST;
                     end else begin
                         tlb_valid[tlb_next] <= 1'b1;

@@ -248,18 +248,18 @@ module top (
         .flash_miso(spi_miso_pin)
     );
 
-    logic memory_start;
-    logic memory_write;
-    logic [20:0] memory_address;
-    logic [31:0] memory_data;
-    logic [3:0] memory_dqm;
-    logic memory_ready;
-    logic memory_valid;
-    logic [31:0] memory_read_data;
-    logic memory_write_done;
-    logic [20:0] memory_active_address;
-    logic [31:0] memory_active_data;
-    logic [3:0] memory_active_dqm;
+    logic sdram_start;
+    logic sdram_write;
+    logic [20:0] sdram_address;
+    logic [31:0] sdram_data;
+    logic [3:0] sdram_dqm;
+    logic sdram_ready;
+    logic sdram_valid;
+    logic [31:0] sdram_read_data;
+    logic sdram_write_done;
+    logic [20:0] sdram_active_address;
+    logic [31:0] sdram_active_data;
+    logic [3:0] sdram_active_dqm;
     logic store_check;
 
     logic icache_request;
@@ -333,11 +333,11 @@ module top (
 
         .grant_data(mmu_grant_data),
         .grant_fetch(mmu_grant_fetch),
-        .memory_ready(memory_ready),
-        .memory_valid(memory_valid),
-        .memory_data(memory_read_data),
-        .memory_start(mmu_start),
-        .memory_address(mmu_address),
+        .sdram_ready(sdram_ready),
+        .sdram_valid(sdram_valid),
+        .sdram_data(sdram_read_data),
+        .sdram_start(mmu_start),
+        .sdram_address(mmu_address),
         .walk_done(mmu_walk_done),
         .walk_resolved(mmu_walk_resolved),
         .walk_failed(mmu_walk_failed),
@@ -360,16 +360,16 @@ module top (
 
         .flush(cpu_tlb_flush && cpu_cache_flush),
         .invalidate(store_check),
-        .invalidate_address(memory_active_address),
+        .invalidate_address(sdram_active_address),
         .retag(mmu_walk_resolved),
         .new_tag(mmu_walk_frame),
 
         .grant(icache_grant),
-        .memory_ready(memory_ready),
-        .memory_valid(memory_valid),
-        .memory_data(memory_read_data),
-        .memory_start(icache_start),
-        .memory_address(icache_address),
+        .sdram_ready(sdram_ready),
+        .sdram_valid(sdram_valid),
+        .sdram_data(sdram_read_data),
+        .sdram_start(icache_start),
+        .sdram_address(icache_address),
         .word_valid(icache_word),
         .fill_done(icache_done)
     );
@@ -389,38 +389,38 @@ module top (
 
         .flush(cpu_tlb_flush && cpu_cache_flush),
         .store(store_check),
-        .store_address(memory_active_address),
-        .store_data(memory_active_data),
-        .store_dqm(memory_active_dqm),
+        .store_address(sdram_active_address),
+        .store_data(sdram_active_data),
+        .store_dqm(sdram_active_dqm),
 
         .grant(dcache_grant),
-        .memory_ready(memory_ready),
-        .memory_valid(memory_valid),
-        .memory_data(memory_read_data),
-        .memory_start(dcache_start),
-        .memory_address(dcache_address),
+        .sdram_ready(sdram_ready),
+        .sdram_valid(sdram_valid),
+        .sdram_data(sdram_read_data),
+        .sdram_start(dcache_start),
+        .sdram_address(dcache_address),
         .word_valid(dcache_word),
         .fill_done(dcache_done)
     );
 
-    memory #(
+    sdram #(
         .CLK_FREQ(CLK_FREQ)
-    ) memory0 (
+    ) sdram0 (
         .clk(sys_clk),
         .rst(rst_reg),
 
-        .start(memory_start),
-        .write(memory_write),
-        .address(memory_address),
-        .data(memory_data),
-        .dqm(memory_dqm),
-        .ready(memory_ready),
-        .read_valid(memory_valid),
-        .read_data(memory_read_data),
-        .write_done(memory_write_done),
-        .active_address(memory_active_address),
-        .active_data(memory_active_data),
-        .active_dqm(memory_active_dqm),
+        .start(sdram_start),
+        .write(sdram_write),
+        .address(sdram_address),
+        .data(sdram_data),
+        .dqm(sdram_dqm),
+        .ready(sdram_ready),
+        .read_valid(sdram_valid),
+        .read_data(sdram_read_data),
+        .write_done(sdram_write_done),
+        .active_address(sdram_active_address),
+        .active_data(sdram_active_data),
+        .active_dqm(sdram_active_dqm),
 
         .sdrc_cmd_en(sdrc_cmd_en),
         .sdrc_cmd(sdrc_cmd),
@@ -461,14 +461,14 @@ module top (
         .flash_rdata(flash_rdata),
         .flash_ready(flash_ready),
 
-        .memory_start(memory_start),
-        .memory_write(memory_write),
-        .memory_address(memory_address),
-        .memory_data(memory_data),
-        .memory_dqm(memory_dqm),
-        .memory_ready(memory_ready),
-        .memory_write_done(memory_write_done),
-        .memory_read_data(memory_read_data),
+        .sdram_start(sdram_start),
+        .sdram_write(sdram_write),
+        .sdram_address(sdram_address),
+        .sdram_data(sdram_data),
+        .sdram_dqm(sdram_dqm),
+        .sdram_ready(sdram_ready),
+        .sdram_write_done(sdram_write_done),
+        .sdram_read_data(sdram_read_data),
         .store_check(store_check),
 
         .icache_request(icache_request),
